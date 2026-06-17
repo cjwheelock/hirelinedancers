@@ -1,17 +1,23 @@
-# HireALineDancer.com
+# Hire Line Dancers
 
-Static-exportable Next.js MVP for HireALineDancer.com, built from the PRD in `/Users/cjwheelock/Downloads/HireALineDancer_PRD.pdf`.
+Static-exportable Next.js site for hirelinedancers.com — a directory that helps event
+and party planners hire vetted line dance instructors near them.
 
 ## What is included
 
-- Homepage with buyer search and founding instructor CTA
-- Seeded instructor directory data
-- 25 city landing pages
-- 6 event-type landing pages
-- Instructor profile pages with inquiry forms
-- Instructor application, pricing, guarantee, admin prototype, legal pages, and buyer cost guide
-- `sitemap.xml`, `robots.txt`, `llms.txt`, schema markup, `CNAME`, and `.nojekyll`
-- GitHub Pages branch deployment support with `CNAME` and `.nojekyll`
+- Buyer-focused homepage: hero, benefits, how-it-works, instructor matching, featured profiles
+- Seeded instructor directory with 25 city pages and 6 event-type pages
+- Instructor profile pages with a working inquiry form (Supabase)
+- Working instructor application with headshot + teaching photo uploads (Supabase Storage)
+- Gated for-instructors page (`/instructors/join/`) with membership pricing — never shown to buyers
+- Approve-then-pay Stripe flow (designed; see `SUPABASE_SETUP.md` to go live)
+- Legal pages, buyer cost guide, `sitemap.xml`, `robots.txt`, `llms.txt`, schema markup, `CNAME`
+- Auto-deploy to GitHub Pages via GitHub Actions
+
+## Backend (forms, uploads, payments)
+
+See `SUPABASE_SETUP.md` for the one-time Supabase table/bucket setup and the Stripe plan.
+Copy `.env.local.example` to `.env.local` and add your Supabase URL + anon key before building.
 
 ## Local development
 
@@ -28,35 +34,22 @@ npm run build
 
 The static export is written to `out/`.
 
-## Publish to GitHub
+## Deploy (GitHub Actions → GitHub Pages)
 
-After GitHub CLI authentication is fixed:
+Deployment is automated by `.github/workflows/deploy.yml`. Every push to `main` builds the
+static export and publishes it to GitHub Pages.
 
-```bash
-gh auth login -h github.com
-gh repo create cjwheelock/hirelinedancers --public --source=. --remote=origin --push
-```
+One-time setup in the GitHub repo:
 
-Then publish the static export to `gh-pages`:
+1. **Settings → Secrets and variables → Actions** — add two repository secrets so the build
+   bakes in your Supabase keys:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+2. **Settings → Pages → Build and deployment** — set **Source** to **GitHub Actions**.
+3. Confirm the custom domain is `hirelinedancers.com` and enable **Enforce HTTPS**.
 
-```bash
-npm run build
-tmpdir=$(mktemp -d)
-cp -R out/. "$tmpdir/"
-git -C "$tmpdir" init -b gh-pages
-git -C "$tmpdir" add -A
-git -C "$tmpdir" commit -m "Deploy static site"
-git -C "$tmpdir" remote add origin https://github.com/cjwheelock/hirelinedancers.git
-git -C "$tmpdir" push -f origin gh-pages
-```
-
-Then in the GitHub repo:
-
-1. Go to **Settings -> Pages**.
-2. Set the source to **Deploy from a branch**.
-3. Select branch `gh-pages` and folder `/ (root)`.
-4. Confirm the custom domain is `hirelinedancers.com`.
-5. Enable **Enforce HTTPS** when GitHub allows it.
+After that, just `git push` to `main` and the live site updates automatically. The `public/CNAME`
+file keeps the custom domain bound on every deploy.
 
 ## Squarespace DNS for `hirelinedancers.com`
 

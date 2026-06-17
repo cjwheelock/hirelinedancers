@@ -23,37 +23,38 @@ export function SearchPanel() {
   }, [city, event, groupSize]);
 
   return (
-    <section className="search-section" id="search">
+    <section className="search-section" id="find">
       <div className="section-heading">
-        <p className="eyebrow">Search the directory</p>
-        <h2>Find an instructor who fits your event.</h2>
+        <p className="eyebrow">Find your match</p>
+        <h2>Tell us about your event. We&rsquo;ll show you who&rsquo;s nearby.</h2>
+        <p>Pick your city, the kind of event, and roughly how many guests. We&rsquo;ll match you with vetted instructors who love a crowd that size.</p>
       </div>
       <div className="search-grid">
-        <form className="search-form">
+        <form className="search-form" onSubmit={(e) => e.preventDefault()}>
           <label>
-            <span><MapPin size={16} aria-hidden="true" /> City</span>
-            <select value={city} onChange={(event) => setCity(event.target.value)}>
+            <span><MapPin size={16} aria-hidden="true" /> Your city</span>
+            <select value={city} onChange={(e) => setCity(e.target.value)}>
               {cities.map((item) => (
                 <option key={item.slug} value={item.slug}>{item.city}, {item.state}</option>
               ))}
             </select>
           </label>
           <label>
-            <span><CalendarDays size={16} aria-hidden="true" /> Event type</span>
-            <select value={event} onChange={(event) => setEvent(event.target.value)}>
-              <option value="">Any event type</option>
+            <span><CalendarDays size={16} aria-hidden="true" /> Type of event</span>
+            <select value={event} onChange={(e) => setEvent(e.target.value)}>
+              <option value="">Any event</option>
               {eventTypes.map((item) => (
                 <option key={item.slug} value={item.slug}>{item.label}</option>
               ))}
             </select>
           </label>
           <label>
-            <span><Users size={16} aria-hidden="true" /> Group size</span>
-            <input value={groupSize} onChange={(event) => setGroupSize(event.target.value)} type="number" min="1" />
+            <span><Users size={16} aria-hidden="true" /> Approx. group size</span>
+            <input value={groupSize} onChange={(e) => setGroupSize(e.target.value)} type="number" min="1" />
           </label>
-          <button type="button">
+          <button className="button primary" type="button">
             <Search size={18} aria-hidden="true" />
-            {results.length} matching instructors
+            Show {results.length} instructor{results.length === 1 ? "" : "s"} near me
           </button>
         </form>
         <div className="results-list" aria-live="polite">
@@ -61,8 +62,8 @@ export function SearchPanel() {
             <InstructorCard key={instructor.slug} instructor={instructor} compact />
           )) : (
             <div className="empty-state">
-              <h3>No exact seeded match yet.</h3>
-              <p>Submit an inquiry and we will route it manually while new instructors are reviewed.</p>
+              <h3>No instructor listed here just yet.</h3>
+              <p>We&rsquo;re adding instructors in new cities every week. Send us your event details and we&rsquo;ll personally help you find someone.</p>
             </div>
           )}
         </div>

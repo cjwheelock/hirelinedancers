@@ -2,25 +2,44 @@ import Link from "next/link";
 import { BadgeCheck, MapPin, Star } from "lucide-react";
 import type { Instructor } from "@/data/site";
 
+function initials(name: string) {
+  return name.split(" ").map((word) => word[0]).join("").slice(0, 2);
+}
+
 export function InstructorCard({ instructor, compact = false }: { instructor: Instructor; compact?: boolean }) {
   return (
     <article className={compact ? "instructor-card compact" : "instructor-card"}>
-      <div className="avatar" aria-hidden="true">{instructor.name.split(" ").map((word) => word[0]).join("")}</div>
-      <div className="card-body">
+      <div className="card-top">
+        <div className="avatar" aria-hidden={instructor.photo ? undefined : "true"}>
+          {instructor.photo ? (
+            <img src={instructor.photo} alt={`${instructor.name}, line dance instructor`} />
+          ) : (
+            initials(instructor.name)
+          )}
+        </div>
         <div className="card-title-row">
           <div>
-            <h3><Link href={`/instructors/${instructor.slug}/`}>{instructor.business}</Link></h3>
-            <p>{instructor.name}</p>
+            <h3><Link href={`/instructors/${instructor.slug}/`}>{instructor.name}</Link></h3>
+            <p className="card-sub">{instructor.business} · {instructor.city}, {instructor.state}</p>
           </div>
-          {instructor.founding && <span className="pill"><BadgeCheck size={14} aria-hidden="true" /> Founding</span>}
-        </div>
-        <p className="muted"><MapPin size={15} aria-hidden="true" /> {instructor.city}, {instructor.state} · travels {instructor.travelRadius} miles</p>
-        <div className="rating"><Star size={15} aria-hidden="true" /> {instructor.rating.toFixed(1)} · {instructor.reviews} reviews · ${instructor.startingRate}+</div>
-        <p>{instructor.bio}</p>
-        <div className="tag-row">
-          {instructor.tags.slice(0, compact ? 2 : 4).map((tag) => <span key={tag}>{tag}</span>)}
+          {instructor.founding && <span className="pill"><BadgeCheck size={13} aria-hidden="true" /> Top rated</span>}
         </div>
       </div>
+
+      <div className="rating">
+        <Star size={15} aria-hidden="true" fill="currentColor" /> {instructor.rating.toFixed(1)}
+        <span className="muted">· {instructor.reviews} reviews · travels {instructor.travelRadius} mi</span>
+      </div>
+
+      <p className="bio">{instructor.bio}</p>
+
+      <div className="tag-row">
+        {instructor.tags.slice(0, compact ? 2 : 3).map((tag) => <span key={tag}>{tag}</span>)}
+      </div>
+
+      <Link className="button secondary small" href={`/instructors/${instructor.slug}/`}>
+        <MapPin size={15} aria-hidden="true" /> View profile &amp; check availability
+      </Link>
     </article>
   );
 }

@@ -59,12 +59,12 @@ export default async function InstructorPage({ params }: { params: Promise<{ slu
               {instructor.styles.map((style) => <span key={style}>{style}</span>)}
             </div>
             <p>{instructor.name} serves events within about {instructor.travelRadius} miles of {instructor.city}. Confirm availability, exact rates, travel fees, and insurance directly before booking.</p>
-            {instructor.founding && <p className="pill inline"><BadgeCheck size={14} /> Founding instructor profile</p>}
+            {instructor.founding && <p className="pill inline"><BadgeCheck size={14} /> Top-rated instructor</p>}
           </div>
         </div>
         <aside className="sticky-panel">
           <h2>Request availability</h2>
-          <InquiryForm instructorName={instructor.name} />
+          <InquiryForm instructorName={instructor.name} instructorSlug={instructor.slug} />
         </aside>
       </div>
     </section>

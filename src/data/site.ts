@@ -1,9 +1,9 @@
 export const site = {
-  name: "HireALineDancer.com",
+  name: "Hire Line Dancers",
   url: "https://hirelinedancers.com",
   email: "hello@hirelinedancers.com",
   description:
-    "Find and hire line dance instructors for weddings, corporate events, private parties, venues, schools, and community events."
+    "Hire a line dance instructor and get every guest on their feet. Beginner-friendly, no rhythm required — perfect for weddings, corporate events, and private parties. Find a vetted instructor near you."
 };
 
 export const eventTypes = [
@@ -89,6 +89,7 @@ export type Instructor = {
   slug: string;
   name: string;
   business: string;
+  photo?: string;
   city: string;
   state: string;
   zip: string;

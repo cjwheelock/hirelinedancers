@@ -31,7 +31,7 @@ export default async function CityPage({ params }: { params: Promise<{ city: str
       {
         "@type": "Question",
         name: `Can I hire a line dance instructor in ${city.city}?`,
-        acceptedAnswer: { "@type": "Answer", text: `Yes. HireALineDancer.com lists instructors serving ${city.city}, ${city.state} and nearby areas.` }
+        acceptedAnswer: { "@type": "Answer", text: `Yes. Hire Line Dancers lists instructors serving ${city.city}, ${city.state} and nearby areas.` }
       },
       {
         "@type": "Question",
