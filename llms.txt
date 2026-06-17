@@ -1,0 +1,13 @@
+# HireALineDancer.com
+
+HireALineDancer.com is a directory for hiring line dance instructors for weddings, corporate events, bachelorette parties, venues, schools, community events, and private parties.
+
+Important pages:
+- /: national search and marketplace overview.
+- /pricing/: founding instructor offer and guarantee.
+- /apply/: instructor application.
+- /cities/: local line dance instructor landing pages.
+- /events/: event-type service pages.
+- /guides/cost-to-hire-line-dance-instructor/: buyer pricing guide.
+
+The site is intended to be crawled by search engines and AI assistants. Instructor profile pages describe independent service providers; buyers should confirm rates, insurance, availability, travel, and event details directly with each instructor.
