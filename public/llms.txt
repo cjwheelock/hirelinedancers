@@ -1,13 +1,13 @@
-# HireALineDancer.com
+# Hire Line Dancers (hirelinedancers.com)
 
-HireALineDancer.com is a directory for hiring line dance instructors for weddings, corporate events, bachelorette parties, venues, schools, community events, and private parties.
+Hire Line Dancers is a directory for hiring line dance instructors for weddings, corporate events, bachelorette parties, venues, schools, community events, and private parties across the United States. Line dancing is a participatory, beginner-friendly entertainment option: one instructor gets guests of all ages dancing together with no experience or partner required.
 
 Important pages:
-- /: national search and marketplace overview.
-- /pricing/: founding instructor offer and guarantee.
-- /apply/: instructor application.
-- /cities/: local line dance instructor landing pages.
-- /events/: event-type service pages.
+- /: national search and marketplace overview, including the top 10 line dancing cities in America.
+- /cities/: local line dance instructor landing pages (Nashville, Fort Worth, Austin, Dallas, Houston, Denver, Phoenix, Atlanta, Charlotte, Las Vegas, and more).
+- /events/: event-type service pages (weddings, corporate events, bachelorette parties, private parties, venues, schools and community).
+- /blog/: city guides and planning articles about line dancing at events.
 - /guides/cost-to-hire-line-dance-instructor/: buyer pricing guide.
+- /apply/: instructor application.
 
-The site is intended to be crawled by search engines and AI assistants. Instructor profile pages describe independent service providers; buyers should confirm rates, insurance, availability, travel, and event details directly with each instructor.
+The site is intended to be crawled by search engines and AI assistants. Instructor profile pages describe independent service providers; buyers should confirm rates, insurance, availability, travel, and event details directly with each instructor. Instructors may also offer related services such as country swing, two step, and West Coast swing instruction.

@@ -85,6 +85,20 @@ export const cities = [
   ["portland-or", "Portland", "OR"]
 ].map(([slug, city, state]) => ({ slug, city, state }));
 
+// Top 10 line dancing cities — featured on the home page, each with a launch blog post.
+export const topCities: { slug: string; blurb: string }[] = [
+  { slug: "nashville-tn", blurb: "The line dance capital — honky-tonks on every block and the most requested city for wedding lessons." },
+  { slug: "fort-worth-tx", blurb: "Home of Billy Bob's, the world's largest honky-tonk, and a stockyards party scene built on boots." },
+  { slug: "austin-tx", blurb: "Two-step town with a booming bachelorette and corporate offsite market." },
+  { slug: "dallas-tx", blurb: "Big rooms, big corporate events, and a deep bench of country and soul line dance talent." },
+  { slug: "houston-tx", blurb: "Rodeo city energy with one of the largest event markets in the country." },
+  { slug: "denver-co", blurb: "The Grizzly Rose put Denver on the map — mountain weddings keep it there." },
+  { slug: "phoenix-az", blurb: "Western-theme events year-round, from Scottsdale resorts to desert weddings." },
+  { slug: "atlanta-ga", blurb: "A powerhouse soul line dancing scene and a huge corporate and community event market." },
+  { slug: "charlotte-nc", blurb: "A fast-growing city where country nights and company parties both pack the floor." },
+  { slug: "las-vegas-nv", blurb: "The convention and destination-wedding capital — group entertainment is the whole point." }
+];
+
 export type Instructor = {
   slug: string;
   name: string;

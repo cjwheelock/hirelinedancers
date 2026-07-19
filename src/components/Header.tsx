@@ -12,6 +12,7 @@ export function Header() {
         <Link className="navlink" href="/#how-it-works">How it works</Link>
         <Link className="navlink" href="/events/weddings/">Events</Link>
         <Link className="navlink" href="/cities/nashville-tn/">Cities</Link>
+        <Link className="navlink" href="/blog/">Blog</Link>
         <span className="nav-divider" aria-hidden="true" />
         <Link className="navlink nav-ghost" href="/instructors/join/">For instructors</Link>
         <Link className="button primary small navlink is-cta" href="/#find">

@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { InstructorCard } from "@/components/InstructorCard";
 import { SearchPanel } from "@/components/SearchPanel";
-import { cities, eventTypes, instructors, site } from "@/data/site";
+import { cities, eventTypes, instructors, site, topCities } from "@/data/site";
 
 export default function Home() {
   const jsonLd = {
@@ -168,6 +168,25 @@ export default function Home() {
             <p>Within five minutes our entire reception was on the floor &mdash; grandparents, kids, everyone. It was the moment our guests kept talking about.</p>
             <cite>&mdash; Event planner, 180-guest wedding</cite>
           </blockquote>
+        </div>
+      </section>
+
+      {/* TOP 10 CITIES */}
+      <section className="section steps">
+        <div className="section-heading">
+          <p className="eyebrow">America&rsquo;s top line dancing cities</p>
+          <h2>The 10 best cities to hire a line dance instructor.</h2>
+        </div>
+        <div className="link-grid">
+          {topCities.map((top) => {
+            const city = cities.find((c) => c.slug === top.slug)!;
+            return (
+              <Link key={top.slug} href={`/cities/${top.slug}/`}>
+                <strong>{city.city}, {city.state}</strong>
+                <span>{top.blurb}</span>
+              </Link>
+            );
+          })}
         </div>
       </section>
 

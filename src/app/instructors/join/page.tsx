@@ -62,30 +62,30 @@ export default function JoinPage() {
 
       {/* PRICING — only shown here, gated from buyers */}
       <div className="faq-block">
-        <h2>Membership</h2>
+        <h2>Founding membership</h2>
         <p className="lede">Pricing is shared here for instructors only &mdash; it never appears on the pages event planners browse.</p>
         <div className="pricing-grid">
           <article className="price-card featured">
             <BadgeCheck size={28} />
-            <h2>Founding Instructor</h2>
-            <p className="price">$99 <span>first year</span></p>
-            <p>For our first 100 approved instructors. Renews at $299/year after your first year. Includes the founding badge and booking guarantee.</p>
-            <Link className="button primary" href="/apply/">Apply for a founding spot</Link>
-          </article>
-          <article className="price-card">
-            <ShieldCheck size={28} />
-            <h2>Standard Instructor</h2>
-            <p className="price">$299 <span>per year</span></p>
-            <p>Public profile, local search visibility, direct inquiries, media showcase, and city/category placement.</p>
-            <Link className="button secondary" href="/apply/">Start your application</Link>
+            <h2>Founding Instructor &mdash; Lifetime</h2>
+            <p className="price">$99 <span>once, for life</span></p>
+            <p>For our first 100 approved instructors only. One payment, lifetime membership &mdash; no renewals, ever. Includes the founding badge, full profile, local search placement, and our booking guarantee. When the 100 spots are gone, this offer is gone.</p>
+            <Link className="button primary" href="/apply/">Claim a founding spot</Link>
           </article>
         </div>
+        <p style={{ marginTop: 16 }}>Here&rsquo;s the math: instructors on our platform bill $200&ndash;$250 an hour for events. Fold the $99 into your first gig and your membership is paid for &mdash; everything after that is upside, for life.</p>
+      </div>
+
+      <div className="faq-block">
+        <h2>Your profile, your rules</h2>
+        <p>Your profile isn&rsquo;t just for line dancing. Teach country swing, two step, or West Coast swing? List it. Offer choreography, private lessons, or DJ services? Add them. You can edit and update your profile whenever you want &mdash; your rates, your services, your photos, your words. We don&rsquo;t limit what you offer; our job is to send planners your way.</p>
       </div>
 
       <div className="policy-box">
-        <h2>Founding guarantee</h2>
-        <p>Join as one of our first 100 instructors for $99 for your first year. If Hire Line Dancers does not help you get booked for a paid event in your first year, we will refund your membership fee.</p>
-        <p>Guarantee terms require a complete approved profile, current contact and service-area details, reasonable inquiry response, and a refund request within 30 days after the first membership year ends.</p>
+        <h2>Our guarantee &mdash; and an honest ask</h2>
+        <p>If Hire Line Dancers doesn&rsquo;t help you get booked for a paid event in your first 12 months, we&rsquo;ll refund your $99. Full stop.</p>
+        <p>The honest ask: give us time. We&rsquo;re building this alongside you &mdash; running Google ads, growing our search presence, and reaching out directly to event planners, wedding planners, and entertainment companies in your city so they know hiring a line dance instructor is even an option. Your founding membership funds that push. We have your best interests at heart, and we&rsquo;d rather earn your trust over months than overpromise on day one.</p>
+        <p>Guarantee terms require a complete approved profile, current contact and service-area details, and reasonable inquiry response. See the <Link href="/legal/refund-policy/">full refund policy</Link>.</p>
       </div>
     </section>
   );

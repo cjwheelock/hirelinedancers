@@ -8,7 +8,7 @@ export default function AdminPage() {
     ["Applications", "18", "Review identity, media, service area, and event fit"],
     ["Approved profiles", "6", "Seed profiles currently published"],
     ["Open leads", "11", "Track buyer inquiries and instructor response"],
-    ["Guarantee eligible", "4", "Founding members under first-year guarantee"]
+    ["Guarantee eligible", "4", "Founding members under 12-month booking guarantee"]
   ];
   return (
     <section className="page-shell">
