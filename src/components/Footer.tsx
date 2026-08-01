@@ -7,7 +7,7 @@ export function Footer() {
       <div className="footer-inner">
         <div>
           <h2 className="brand-name">{site.name}</h2>
-          <p>The easiest way to get every guest on their feet. Book a vetted line dance instructor for your event — no experience needed.</p>
+          <p>A simple way to find a line dance instructor for your event and help more guests get moving together. No experience needed.</p>
         </div>
         <div>
           <h3>Top cities</h3>
@@ -32,6 +32,7 @@ export function Footer() {
         <div>
           <h3>Company</h3>
           <ul>
+            <li><Link href="/about/">About</Link></li>
             <li><Link href="/#find">Find an instructor</Link></li>
             <li><Link href="/instructors/join/">For instructors</Link></li>
             <li><Link href="/guides/cost-to-hire-line-dance-instructor/">Cost guide</Link></li>
