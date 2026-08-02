@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BadgeCheck, MapPin, Star } from "lucide-react";
+import { BadgeCheck, MapPin } from "lucide-react";
 import type { Instructor } from "@/data/site";
 
 function initials(name: string) {
@@ -22,14 +22,11 @@ export function InstructorCard({ instructor, compact = false }: { instructor: In
             <h3><Link href={`/instructors/${instructor.slug}/`}>{instructor.name}</Link></h3>
             <p className="card-sub">{instructor.business} · {instructor.city}, {instructor.state}</p>
           </div>
-          {instructor.founding && <span className="pill"><BadgeCheck size={13} aria-hidden="true" /> Top rated</span>}
+          {instructor.founding && <span className="pill"><BadgeCheck size={13} aria-hidden="true" /> Founding instructor</span>}
         </div>
       </div>
 
-      <div className="rating">
-        <Star size={15} aria-hidden="true" fill="currentColor" /> {instructor.rating.toFixed(1)}
-        <span className="muted">· {instructor.reviews} reviews · travels {instructor.travelRadius} mi</span>
-      </div>
+      <p className="muted">{instructor.years} years teaching · travels about {instructor.travelRadius} miles</p>
 
       <p className="bio">{instructor.bio}</p>
 

@@ -1,18 +1,23 @@
 # Hire Line Dancers
 
-Static-exportable Next.js site for hirelinedancers.com — a directory that helps event
-and party planners hire vetted line dance instructors near them.
+Static-exportable Next.js site for hirelinedancers.com, a directory intended to help event
+and party planners find line dance instructors near them.
 
 ## What is included
 
 - Buyer-focused homepage: hero, benefits, how-it-works, instructor matching, featured profiles
-- Seeded instructor directory with 25 city pages and 6 event-type pages
-- Instructor profile pages with a working inquiry form (Supabase)
-- Working instructor application with headshot + teaching photo uploads (Supabase Storage)
-- Gated for-instructors page (`/instructors/join/`) with membership pricing — never shown to buyers
+- Seeded instructor directory with 10 launch-city pages and 11 event-type pages
+- Instructor profile pages with an inquiry form scaffold for Supabase
+- Instructor application scaffold with headshot and teaching photo uploads for Supabase Storage
+- For-instructors page (`/instructors/join/`) with membership pricing
 - Approve-then-pay Stripe flow (designed; see `SUPABASE_SETUP.md` to go live)
-- Legal pages, buyer cost guide, `sitemap.xml`, `robots.txt`, `llms.txt`, schema markup, `CNAME`
+- Legal pages, buyer cost guide, blog, RSS feed, `sitemap.xml`, `robots.txt`, `llms.txt`, schema markup, and `CNAME`
 - Auto-deploy to GitHub Pages via GitHub Actions
+
+## Strategy documents
+
+- `CONTENT_SEO_GEO_STRATEGY.md`: editorial calendar, SEO, AI discovery, backlinks, and evidence standards
+- `OUTREACH_AND_GROWTH_PLAYBOOK.md`: demand audiences, DJ partnerships, outreach tools, messaging, instructor-led content, and measurement
 
 ## Backend (forms, uploads, payments)
 
@@ -34,18 +39,18 @@ npm run build
 
 The static export is written to `out/`.
 
-## Deploy (GitHub Actions → GitHub Pages)
+## Deploy (GitHub Actions to GitHub Pages)
 
 Deployment is automated by `.github/workflows/deploy.yml`. Every push to `main` builds the
 static export and publishes it to GitHub Pages.
 
 One-time setup in the GitHub repo:
 
-1. **Settings → Secrets and variables → Actions** — add two repository secrets so the build
+1. **Settings, Secrets and variables, Actions**: add two repository secrets so the build
    bakes in your Supabase keys:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-2. **Settings → Pages → Build and deployment** — set **Source** to **GitHub Actions**.
+2. **Settings, Pages, Build and deployment**: set **Source** to **GitHub Actions**.
 3. Confirm the custom domain is `hirelinedancers.com` and enable **Enforce HTTPS**.
 
 After that, just `git push` to `main` and the live site updates automatically. The `public/CNAME`

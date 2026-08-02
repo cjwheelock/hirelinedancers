@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { InstructorCard } from "@/components/InstructorCard";
 import { SearchPanel } from "@/components/SearchPanel";
-import { cities, eventTypes, instructors, site, topCities } from "@/data/site";
+import { eventTypes, instructors, site, topCities } from "@/data/site";
 
 export default function Home() {
   const jsonLd = {
@@ -33,7 +33,7 @@ export default function Home() {
     {
       icon: <Users size={26} />,
       title: "Everyone joins in",
-      body: "One instructor turns a room of bystanders into a packed dance floor in minutes — guests of every age, all at once."
+      body: "One instructor turns a room of bystanders into a packed dance floor in minutes, with guests of every age joining at once."
     },
     {
       icon: <Smile size={26} />,
@@ -43,7 +43,7 @@ export default function Home() {
     {
       icon: <Sparkles size={26} />,
       title: "The peak of the night",
-      body: "It’s the part everyone talks about afterward — and the moment your photographer can’t stop shooting."
+      body: "It’s the part everyone talks about afterward. It is also the moment your photographer can’t stop shooting."
     },
     {
       icon: <PartyPopper size={26} />,
@@ -58,12 +58,20 @@ export default function Home() {
 
       {/* HERO */}
       <section className="hero">
-        <Image src="/images/line-dance-event-hero.png" alt="A line dance instructor leading a happy crowd of guests on the dance floor" fill priority />
-        <div className="hero-overlay" />
+        <div className="hero-media">
+          <Image
+            className="hero-image"
+            src="/images/line-dance-event-hero.png"
+            alt="A line dance instructor leading a happy crowd of guests on the dance floor"
+            fill
+            priority
+            sizes="(max-width: 900px) 100vw, 58vw"
+          />
+        </div>
         <div className="hero-content">
           <p className="eyebrow">Live entertainment that gets the whole room moving</p>
-          <h1>Get every guest on their feet.</h1>
-          <p className="lede">Hire a line dance instructor for your wedding, party, or company event &mdash; the easiest, most joyful way to get everyone dancing together. No experience, no rhythm, any shoes.</p>
+          <h1><span>Get every guest.</span><strong>On their feet.</strong></h1>
+          <p className="lede">Hire a line dance instructor for your wedding, party, or company event. Get everyone dancing together, no experience or rhythm required.</p>
           <div className="hero-actions">
             <Link className="button primary" href="#find">Find an instructor near you <ArrowRight size={18} /></Link>
             <Link className="button ghost-light" href="#how-it-works">See how it works</Link>
@@ -79,7 +87,7 @@ export default function Home() {
       {/* TRUST BAR */}
       <section className="band trust-bar">
         <div className="band-inner">
-          <span><CheckCircle2 size={18} /> Vetted local instructors</span>
+          <span><CheckCircle2 size={18} /> Beginner-friendly instruction</span>
           <span><Music4 size={18} /> They bring the music &amp; the energy</span>
           <span><Users size={18} /> Great for 10 to 500+ guests</span>
           <span><Star size={18} /> From backyard parties to galas</span>
@@ -118,7 +126,7 @@ export default function Home() {
           <article className="step">
             <div className="step-num">2</div>
             <h3>Browse instructors near you</h3>
-            <p>See vetted local instructors with reviews, photos, and the events they specialize in.</p>
+            <p>See instructor profiles with photos, services, and the kinds of events they specialize in.</p>
           </article>
           <article className="step">
             <div className="step-num">3</div>
@@ -165,24 +173,23 @@ export default function Home() {
         <div className="band-inner">
           <blockquote className="quote">
             <span className="quote-mark" aria-hidden="true">&ldquo;</span>
-            <p>Within five minutes our entire reception was on the floor &mdash; grandparents, kids, everyone. It was the moment our guests kept talking about.</p>
-            <cite>&mdash; Event planner, 180-guest wedding</cite>
+            <p>Within five minutes our entire reception was on the floor: grandparents, kids, everyone. It was the moment our guests kept talking about.</p>
+            <cite>Event planner, 180-guest wedding</cite>
           </blockquote>
         </div>
       </section>
 
-      {/* TOP 10 CITIES */}
-      <section className="section steps">
+      {/* LAUNCH CITIES */}
+      <section className="section steps" id="cities">
         <div className="section-heading">
-          <p className="eyebrow">America&rsquo;s top line dancing cities</p>
-          <h2>The 10 best cities to hire a line dance instructor.</h2>
+          <p className="eyebrow">Our first 10 city markets</p>
+          <h2>Find line dance instructors and local planning guides.</h2>
         </div>
         <div className="link-grid">
           {topCities.map((top) => {
-            const city = cities.find((c) => c.slug === top.slug)!;
             return (
               <Link key={top.slug} href={`/cities/${top.slug}/`}>
-                <strong>{city.city}, {city.state}</strong>
+                <strong>{top.city}, {top.state}</strong>
                 <span>{top.blurb}</span>
               </Link>
             );
@@ -190,16 +197,13 @@ export default function Home() {
         </div>
       </section>
 
-      {/* CITIES */}
-      <section className="section">
-        <div className="section-heading">
-          <p className="eyebrow">Find instructors near you</p>
-          <h2>Available in cities across the country.</h2>
-        </div>
-        <div className="city-cloud">
-          {cities.map((city) => (
-            <Link key={city.slug} href={`/cities/${city.slug}/`}>{city.city}, {city.state}</Link>
-          ))}
+      {/* MISSION */}
+      <section className="band quote-band mission-band">
+        <div className="band-inner">
+          <div className="quote">
+            <p>Our mission is simple: get more people dancing. That means more people moving to music, trying something new, and having fun together. It also means more great local instructors making a living doing what they love.</p>
+            <span className="mission-attribution">Hire Line Dancers</span>
+          </div>
         </div>
       </section>
 
@@ -220,7 +224,7 @@ export default function Home() {
       <section className="band cta-band">
         <div className="cta-inner">
           <h2>Ready to get everyone dancing?</h2>
-          <p>Find a vetted line dance instructor near you and turn your next event into the one people remember.</p>
+          <p>Find a line dance instructor near you and create a welcoming shared activity your guests can remember.</p>
           <div className="hero-actions">
             <Link className="button secondary" href="#find"><MapPin size={18} /> Find an instructor near you</Link>
           </div>

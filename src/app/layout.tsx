@@ -11,6 +11,9 @@ export const metadata: Metadata = {
     template: "%s | Hire Line Dancers"
   },
   description: site.description,
+  alternates: {
+    types: { "application/rss+xml": `${site.url}/feed.xml` }
+  },
   openGraph: {
     title: "Hire Line Dancers",
     description: site.description,
@@ -22,6 +25,20 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const organizationJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "@id": `${site.url}/#organization`,
+    name: site.name,
+    url: site.url,
+    email: site.email,
+    founder: {
+      "@type": "Person",
+      name: "CJ Wheelock",
+      url: `${site.url}/about/`
+    }
+  };
+
   return (
     <html lang="en">
       <head>
@@ -29,12 +46,14 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
           rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Anton&family=IBM+Plex+Mono:wght@500;600;700&family=Lato:ital,wght@0,400;0,700;0,900;1,400&display=swap"
         />
       </head>
       <body>
+        <a className="skip-link" href="#main-content">Skip to content</a>
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }} />
         <Header />
-        <main>{children}</main>
+        <main id="main-content">{children}</main>
         <Footer />
       </body>
     </html>

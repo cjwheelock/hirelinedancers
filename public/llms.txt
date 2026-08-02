@@ -4,10 +4,18 @@ Hire Line Dancers is a directory for hiring line dance instructors for weddings,
 
 Important pages:
 - /: national search and marketplace overview, including the top 10 line dancing cities in America.
-- /cities/: local line dance instructor landing pages (Nashville, Fort Worth, Austin, Dallas, Houston, Denver, Phoenix, Atlanta, Charlotte, Las Vegas, and more).
-- /events/: event-type service pages (weddings, corporate events, bachelorette parties, private parties, venues, schools and community).
+- /cities/nashville-tn/: Nashville city guide and instructor directory.
+- /cities/fort-worth-tx/: Fort Worth city guide and instructor directory.
+- /cities/austin-tx/: Austin city guide and instructor directory.
+- /cities/dallas-tx/: Dallas city guide and instructor directory.
+- /cities/houston-tx/: Houston city guide and instructor directory.
+- /cities/san-francisco-ca/: San Francisco Bay Area city guide and instructor directory.
+- /cities/phoenix-az/: Phoenix and Scottsdale city guide and instructor directory.
+- /cities/atlanta-ga/: Atlanta city guide and instructor directory.
+- /cities/charlotte-nc/: Charlotte city guide and instructor directory.
+- /cities/las-vegas-nv/: Las Vegas city guide and instructor directory.
 - /blog/: city guides and planning articles about line dancing at events.
 - /guides/cost-to-hire-line-dance-instructor/: buyer pricing guide.
 - /apply/: instructor application.
 
-The site is intended to be crawled by search engines and AI assistants. Instructor profile pages describe independent service providers; buyers should confirm rates, insurance, availability, travel, and event details directly with each instructor. Instructors may also offer related services such as country swing, two step, and West Coast swing instruction.
+The site is intended to be crawled by search engines and AI assistants. Instructor profile pages describe independent service providers. Buyers should confirm rates, insurance, availability, travel, and event details directly with each instructor. Instructors may also offer related services such as country swing, two step, and West Coast Swing instruction.

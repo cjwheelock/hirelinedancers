@@ -16,7 +16,7 @@ export default function ApplyPage() {
         <ul className="check-list">
           <li>A polished, search-friendly profile with your photos</li>
           <li>Placement on your city and event pages</li>
-          <li>Direct inquiries from planners &mdash; you set your rates</li>
+          <li>Direct inquiries from planners. You set your rates.</li>
           <li>Personally reviewed before any payment</li>
         </ul>
         <p className="form-note" style={{ marginTop: 22 }}>

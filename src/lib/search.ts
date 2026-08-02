@@ -13,11 +13,11 @@ export function findInstructors(citySlug?: string, eventSlug?: string) {
   const city = cities.find((item) => item.slug === citySlug);
   return instructors
     .filter((instructor) => {
-      const cityMatch = !city || instructor.state === city.state || instructor.city === city.city;
+      const cityMatch = !city || city.serviceCities.includes(instructor.city);
       const eventMatch = !eventSlug || instructor.events.includes(eventSlug);
       return cityMatch && eventMatch;
     })
-    .sort((a, b) => Number(b.featured) - Number(a.featured) || b.rating - a.rating);
+    .sort((a, b) => Number(b.featured) - Number(a.featured) || b.years - a.years);
 }
 
 export function profileJsonLd(slug: string) {
@@ -25,23 +25,20 @@ export function profileJsonLd(slug: string) {
   if (!instructor) return null;
   return {
     "@context": "https://schema.org",
-    "@type": "LocalBusiness",
-    name: instructor.business,
-    description: instructor.bio,
-    address: {
-      "@type": "PostalAddress",
-      addressLocality: instructor.city,
-      addressRegion: instructor.state,
-      postalCode: instructor.zip,
-      addressCountry: "US"
+    "@type": "ProfilePage",
+    mainEntity: {
+      "@type": "Person",
+      name: instructor.name,
+      worksFor: { "@type": "Organization", name: instructor.business },
+      description: instructor.bio,
+      address: {
+        "@type": "PostalAddress",
+        addressLocality: instructor.city,
+        addressRegion: instructor.state,
+        addressCountry: "US"
+      },
+      knowsAbout: instructor.styles
     },
-    aggregateRating: {
-      "@type": "AggregateRating",
-      ratingValue: instructor.rating,
-      reviewCount: instructor.reviews
-    },
-    priceRange: `$${instructor.startingRate}+`,
-    areaServed: `${instructor.travelRadius} miles from ${instructor.city}, ${instructor.state}`,
     url: `https://hirelinedancers.com/instructors/${instructor.slug}/`
   };
 }

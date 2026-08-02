@@ -14,7 +14,7 @@ NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-public-key
 ```
 
-The anon key is safe to ship publicly — access is locked down by Row Level Security below.
+The anon key is safe to ship publicly. Access is locked down by Row Level Security below.
 These are read at **build time**, so rebuild (`npm run build`) after editing them. Until
 they're set, the forms show a friendly "email us" fallback instead of erroring.
 
@@ -94,14 +94,14 @@ Then deploy `out/` to GitHub Pages (see README).
 
 ---
 
-## Stripe — payment flow (designed, not yet live)
+## Stripe payment flow (designed, not yet live)
 
 The instructor flow is intentionally **approve-then-pay** so you only collect money from
 people you've accepted. The UI for this is already built on `/instructors/join/`
 (Apply → Reviewed → Activate). To turn on real payments:
 
 1. In Stripe, create a **Product** "Instructor membership" with two **Prices**:
-   - Founding: $99 for year one (then $299/yr) — a subscription with a first-year coupon, or
+   - Founding: $99 for year one (then $299/yr), using a subscription with a first-year coupon, or
      a one-time $99 + scheduled $299 renewal.
    - Standard: $299/yr subscription.
 2. Create a **Payment Link** for each price (Stripe → Payment Links). No backend needed.
@@ -111,6 +111,6 @@ people you've accepted. The UI for this is already built on `/instructors/join/`
 4. Optional automation later: a Stripe webhook (via a Supabase Edge Function) can flip the
    status to `active` automatically and move uploaded media into the live `instructors` data.
 
-Because the public site is static, Payment Links are the simplest path — no server, no secret
+Because the public site is static, Payment Links are the simplest path. No server or secret
 keys in the frontend. If you later want self-serve in-page checkout, move hosting to Vercel
 and add a serverless route with your Stripe secret key.

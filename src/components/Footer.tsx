@@ -12,7 +12,7 @@ export function Footer() {
         <div>
           <h3>Top cities</h3>
           <ul>
-            {cities.slice(0, 8).map((city) => (
+            {cities.map((city) => (
               <li key={city.slug}>
                 <Link href={`/cities/${city.slug}/`}>{city.city}</Link>
               </li>

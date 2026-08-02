@@ -9,17 +9,18 @@ export function SearchPanel() {
   const [city, setCity] = useState("nashville-tn");
   const [event, setEvent] = useState("");
   const [groupSize, setGroupSize] = useState("100");
+  const selectedEvent = eventTypes.find((item) => item.slug === event);
 
   const results = useMemo(() => {
     const selectedCity = cities.find((item) => item.slug === city);
     return instructors
       .filter((instructor) => {
-        const cityMatch = !selectedCity || instructor.state === selectedCity.state || instructor.city === selectedCity.city;
+        const cityMatch = !selectedCity || selectedCity.serviceCities.includes(instructor.city);
         const eventMatch = !event || instructor.events.includes(event);
         const groupMatch = instructor.groupSize >= Number(groupSize || 0);
         return cityMatch && eventMatch && groupMatch;
       })
-      .sort((a, b) => Number(b.featured) - Number(a.featured) || b.rating - a.rating);
+      .sort((a, b) => Number(b.featured) - Number(a.featured) || b.years - a.years);
   }, [city, event, groupSize]);
 
   return (
@@ -27,7 +28,7 @@ export function SearchPanel() {
       <div className="section-heading">
         <p className="eyebrow">Find your match</p>
         <h2>Tell us about your event. We&rsquo;ll show you who&rsquo;s nearby.</h2>
-        <p>Pick your city, the kind of event, and roughly how many guests. We&rsquo;ll match you with vetted instructors who love a crowd that size.</p>
+        <p>Pick your city, the kind of event or program, and roughly how many guests. We&rsquo;ll show you listed instructors whose experience fits the request.</p>
       </div>
       <div className="search-grid">
         <form className="search-form" onSubmit={(e) => e.preventDefault()}>
@@ -40,9 +41,9 @@ export function SearchPanel() {
             </select>
           </label>
           <label>
-            <span><CalendarDays size={16} aria-hidden="true" /> Type of event</span>
+            <span><CalendarDays size={16} aria-hidden="true" /> Type of event or program</span>
             <select value={event} onChange={(e) => setEvent(e.target.value)}>
-              <option value="">Any event</option>
+              <option value="">Any event or program</option>
               {eventTypes.map((item) => (
                 <option key={item.slug} value={item.slug}>{item.label}</option>
               ))}
@@ -62,8 +63,8 @@ export function SearchPanel() {
             <InstructorCard key={instructor.slug} instructor={instructor} compact />
           )) : (
             <div className="empty-state">
-              <h3>No instructor listed here just yet.</h3>
-              <p>We&rsquo;re adding instructors in new cities every week. Send us your event details and we&rsquo;ll personally help you find someone.</p>
+              <h3>No instructor has listed this fit just yet.</h3>
+              <p>{selectedEvent ? `We do not have a ${selectedEvent.label.toLowerCase()} match in this city yet. ` : "We do not have a match for this group size in this city yet. "}Send us your details and we&rsquo;ll personally help you find someone.</p>
             </div>
           )}
         </div>

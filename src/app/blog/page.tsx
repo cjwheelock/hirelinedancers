@@ -2,7 +2,7 @@ import Link from "next/link";
 import { publishedPosts, formatPostDate } from "@/data/blog";
 
 export const metadata = {
-  title: "Blog — Line Dancing for Events",
+  title: "Line Dancing for Events Blog",
   description:
     "Guides and ideas for planning events with line dancing: city guides, entertainment comparisons, and tips for weddings, corporate events, and parties."
 };

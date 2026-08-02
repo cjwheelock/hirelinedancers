@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { BadgeCheck, Clock, DollarSign, MapPin, Users } from "lucide-react";
+import { BadgeCheck, Clock, MapPin, Users } from "lucide-react";
 import { InquiryForm } from "@/components/Forms";
-import { instructors } from "@/data/site";
+import { instructors, site } from "@/data/site";
 import { profileJsonLd } from "@/lib/search";
 
 export function generateStaticParams() {
@@ -15,7 +15,14 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   if (!instructor) return {};
   return {
     title: `${instructor.business} - ${instructor.city}, ${instructor.state} Line Dance Instructor`,
-    description: instructor.bio
+    description: instructor.bio,
+    alternates: { canonical: `/instructors/${instructor.slug}/` },
+    openGraph: {
+      title: `${instructor.business} in ${instructor.city}, ${instructor.state}`,
+      description: instructor.bio,
+      url: `${site.url}/instructors/${instructor.slug}/`,
+      images: ["/images/line-dance-event-hero.png"]
+    }
   };
 }
 
@@ -44,8 +51,7 @@ export default async function InstructorPage({ params }: { params: Promise<{ slu
           <div className="stat-grid">
             <span><MapPin size={18} /> {instructor.city}, {instructor.state}</span>
             <span><Users size={18} /> Up to {instructor.groupSize} guests</span>
-            <span><DollarSign size={18} /> Starts at ${instructor.startingRate}</span>
-            <span><Clock size={18} /> {instructor.minHours}+ hour minimum</span>
+            <span><Clock size={18} /> {instructor.years} years teaching</span>
           </div>
           <div className="policy-box">
             <h2>Sample event format</h2>
@@ -59,7 +65,7 @@ export default async function InstructorPage({ params }: { params: Promise<{ slu
               {instructor.styles.map((style) => <span key={style}>{style}</span>)}
             </div>
             <p>{instructor.name} serves events within about {instructor.travelRadius} miles of {instructor.city}. Confirm availability, exact rates, travel fees, and insurance directly before booking.</p>
-            {instructor.founding && <p className="pill inline"><BadgeCheck size={14} /> Top-rated instructor</p>}
+            {instructor.founding && <p className="pill inline"><BadgeCheck size={14} /> Founding instructor</p>}
           </div>
         </div>
         <aside className="sticky-panel">

@@ -15,7 +15,14 @@ export async function generateMetadata({ params }: { params: Promise<{ event: st
   if (!event) return {};
   return {
     title: event.title,
-    description: event.intro
+    description: event.intro,
+    alternates: { canonical: `/events/${event.slug}/` },
+    openGraph: {
+      title: event.title,
+      description: event.intro,
+      url: `${site.url}/events/${event.slug}/`,
+      images: ["/images/line-dance-event-hero.png"]
+    }
   };
 }
 
@@ -51,9 +58,9 @@ export default async function EventPage({ params }: { params: Promise<{ event: s
         {results.map((instructor) => <InstructorCard key={instructor.slug} instructor={instructor} />)}
       </div>
       <div className="faq-block">
-        <h2>Top city pages</h2>
+        <h2>Our 10 launch cities</h2>
         <div className="city-cloud">
-          {cities.slice(0, 12).map((city) => (
+          {cities.map((city) => (
             <Link key={city.slug} href={`/cities/${city.slug}/`}>{city.city}, {city.state}</Link>
           ))}
         </div>

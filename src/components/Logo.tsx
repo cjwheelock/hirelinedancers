@@ -8,23 +8,16 @@ export function LogoMark({ size = 40 }: { size?: number }) {
       aria-label="Hire Line Dancers"
       xmlns="http://www.w3.org/2000/svg"
     >
-      <defs>
-        <linearGradient id="hldGrad" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#f2c24b" />
-          <stop offset="0.55" stopColor="#e8a13a" />
-          <stop offset="1" stopColor="#d9532b" />
-        </linearGradient>
-      </defs>
-      <rect x="0" y="0" width="48" height="48" rx="13" fill="url(#hldGrad)" />
+      <rect x="1" y="1" width="46" height="46" rx="2" fill="#E7A33C" stroke="#FBFAF5" strokeWidth="2" />
       {/* dancing figure */}
       <g
         fill="none"
-        stroke="#fff"
+        stroke="#1C2A44"
         strokeWidth="3"
         strokeLinecap="round"
         strokeLinejoin="round"
       >
-        <circle cx="24.5" cy="13" r="3.6" fill="#fff" stroke="none" />
+        <circle cx="24.5" cy="13" r="3.6" fill="#1C2A44" stroke="none" />
         {/* torso */}
         <path d="M24 17.5 L22.5 27.5" />
         {/* arms raised */}
@@ -35,7 +28,7 @@ export function LogoMark({ size = 40 }: { size?: number }) {
         <path d="M22.5 27.5 L30 35.5" />
       </g>
       {/* floor line */}
-      <path d="M9 40 H39" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" opacity="0.7" />
+      <path d="M9 40 H39" stroke="#1C2A44" strokeWidth="2.4" strokeLinecap="round" opacity="0.75" />
     </svg>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { ImagePlus, Loader2, Send, X } from "lucide-react";
+import { eventTypes } from "@/data/site";
 import { supabase, supabaseEnabled, uploadImage } from "@/lib/supabase";
 
 const MAX_FILE_MB = 8;
@@ -98,14 +99,17 @@ export function ApplicationForm() {
     e.preventDefault();
     setError("");
 
+    const form = e.currentTarget;
+    const data = new FormData(form);
+    const selectedEvents = data.getAll("events").map(String);
+
     if (headshot.length === 0) { setError("A headshot is required so planners can see who they’re booking."); return; }
+    if (selectedEvents.length === 0) { setError("Choose at least one type of booking you’re open to."); return; }
     if (!supabaseEnabled || !supabase) {
       setError("Applications aren’t connected yet. Please email us at hello@hirelinedancers.com and we’ll get you set up.");
       return;
     }
 
-    const form = e.currentTarget;
-    const data = new FormData(form);
     setStatus("submitting");
     try {
       const folder = `applications/${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -122,7 +126,7 @@ export function ApplicationForm() {
         years: data.get("years") ? Number(data.get("years")) : null,
         travel_radius: data.get("radius"),
         links: data.get("links"),
-        events: data.get("events"),
+        events: selectedEvents.join(","),
         bio: data.get("bio"),
         headshot_url: headshotUrl,
         photo_urls: photoUrls,
@@ -165,12 +169,26 @@ export function ApplicationForm() {
       </div>
       <label>How far will you travel?<input name="radius" placeholder="Within 60 miles of Austin" /></label>
       <label>Links<input name="links" placeholder="Website, Instagram, TikTok, YouTube" /></label>
-      <label>Which events do you do?<textarea name="events" rows={2} placeholder="Weddings, corporate events, private parties, venues…" /></label>
+      <fieldset className="event-picker">
+        <legend className="req">Which bookings are you open to?</legend>
+        <span className="form-hint">Choose all that apply. You can update these preferences later.</span>
+        <div className="event-option-grid">
+          {eventTypes.map((event) => (
+            <label className="event-option" key={event.slug}>
+              <input type="checkbox" name="events" value={event.slug} />
+              <span>
+                <strong>{event.label}</strong>
+                <small>{event.bookingHint}</small>
+              </span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
       <label>Tell planners about you<textarea name="bio" rows={4} placeholder="Your style, what makes your lessons fun, the kinds of crowds you love." /></label>
 
       <ImageUploader
         label="Headshot"
-        hint="A clear, friendly photo of you — this is the first thing planners see."
+        hint="A clear, friendly photo of you. This is the first thing planners see."
         required
         max={1}
         files={headshot}
