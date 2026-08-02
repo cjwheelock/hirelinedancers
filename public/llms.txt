@@ -7,7 +7,9 @@ Important pages:
 - /cities/: local line dance instructor landing pages (Nashville, Fort Worth, Austin, Dallas, Houston, Denver, Phoenix, Atlanta, Charlotte, Las Vegas, and more).
 - /events/: event-type service pages (weddings, corporate events, bachelorette parties, private parties, venues, schools and community).
 - /blog/: city guides and planning articles about line dancing at events.
+- /guides/: practical resources for event organizers and community builders.
 - /guides/cost-to-hire-line-dance-instructor/: buyer pricing guide.
+- /guides/start-a-line-dance-club-on-campus/: step-by-step campus club guide with an eight-week plan and copyable student resources.
 - /apply/: instructor application.
 
 The site is intended to be crawled by search engines and AI assistants. Instructor profile pages describe independent service providers; buyers should confirm rates, insurance, availability, travel, and event details directly with each instructor. Instructors may also offer related services such as country swing, two step, and West Coast swing instruction.

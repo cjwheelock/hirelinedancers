@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export const metadata = {
   title: "How Much Does It Cost to Hire a Line Dance Instructor?",
   description: "Typical line dance instructor pricing, event variables, minimums, travel fees, and booking tips."
@@ -6,6 +8,11 @@ export const metadata = {
 export default function CostGuidePage() {
   return (
     <article className="page-shell article-page">
+      <nav className="breadcrumbs" aria-label="Breadcrumb">
+        <Link href="/">Home</Link>
+        <span aria-hidden="true">/</span>
+        <Link href="/guides/">Guides</Link>
+      </nav>
       <p className="eyebrow">Buyer guide</p>
       <h1>How much does it cost to hire a line dance instructor?</h1>
       <p className="lede">Many private-event line dance instructors start around $350 to $600 for a short local event, with higher pricing for large groups, travel, premium dates, sound equipment, custom choreography, or multi-hour programming.</p>
