@@ -35,10 +35,26 @@ create table if not exists public.instructor_applications (
   links         text,
   events        text,
   bio           text,
+  favorite_song text constraint instructor_applications_favorite_song_length
+    check (favorite_song is null or char_length(favorite_song) <= 200),
+  spotify_track_url text constraint instructor_applications_spotify_track_url
+    check (
+      spotify_track_url is null
+      or spotify_track_url ~ '^https://open[.]spotify[.]com/track/[A-Za-z0-9]{22}$'
+    ),
   headshot_url  text not null,
   photo_urls    text[] default '{}',
   status        text not null default 'pending'  -- pending | approved | rejected | paid | active
 );
+
+-- Add the optional favorite-song fields if the table already existed.
+alter table public.instructor_applications
+  add column if not exists favorite_song text,
+  add column if not exists spotify_track_url text;
+
+-- Run the idempotent migration in
+-- supabase/migrations/202608020001_add_instructor_favorite_song.sql
+-- on an existing table so these checks are added safely.
 
 -- Buyer inquiries (from instructor profile pages)
 create table if not exists public.inquiries (

@@ -581,6 +581,50 @@ main { display: block; }
 }
 .stat-grid svg { color: var(--sunset); }
 .sticky-panel { position: sticky; top: 90px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 26px; box-shadow: var(--shadow); display: grid; gap: 16px; }
+.favorite-song {
+  display: grid;
+  gap: 14px;
+  margin-top: 24px;
+  padding: 22px;
+  overflow: hidden;
+  border: 1px solid #cfe0d6;
+  border-radius: var(--radius);
+  background: var(--pine-soft);
+  box-shadow: var(--shadow-sm);
+}
+.favorite-song-intro { display: flex; align-items: center; gap: 13px; }
+.favorite-song-icon {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--pine);
+}
+.favorite-song-label {
+  color: var(--pine);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.favorite-song h2 { margin-top: 2px; font-size: clamp(21px, 2vw, 26px); line-height: 1.2; }
+.spotify-player { display: block; width: 100%; max-width: 100%; border: 0; border-radius: 12px; }
+.spotify-link {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: 6px;
+  min-height: 44px;
+  color: var(--pine);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.spotify-link:focus-visible { outline: 3px solid rgba(47, 90, 79, .3); outline-offset: 3px; border-radius: 6px; }
 
 /* ---------- Article / guide ---------- */
 .article-page { max-width: 760px; }

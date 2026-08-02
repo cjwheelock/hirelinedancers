@@ -23,7 +23,7 @@ export default function JoinPage() {
           <article className="benefit-card">
             <div className="benefit-icon"><Sparkles size={24} /></div>
             <h3>A polished public profile</h3>
-            <p>Your headshot, teaching photos, bio, service area, and the events you specialize in &mdash; built to convert.</p>
+            <p>Your headshot, teaching photos, bio, service area, favorite song, and the events you specialize in, all in one place.</p>
           </article>
           <article className="benefit-card">
             <div className="benefit-icon"><Users size={24} /></div>

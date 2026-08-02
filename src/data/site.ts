@@ -121,6 +121,10 @@ export type Instructor = {
   tags: string[];
   bio: string;
   sampleFormat: string[];
+  favoriteSong?: {
+    name: string;
+    spotifyUrl?: string;
+  };
 };
 
 export const instructors: Instructor[] = [
@@ -145,7 +149,11 @@ export const instructors: Instructor[] = [
     tags: ["Best for mixed-age groups", "Provides sound", "Custom choreography"],
     bio:
       "Avery teaches high-energy, beginner-first line dance experiences for receptions, corporate parties, and country nights across Middle Tennessee.",
-    sampleFormat: ["15-minute warmup", "Two crowd-pleaser dances", "Photo-ready group finale"]
+    sampleFormat: ["15-minute warmup", "Two crowd-pleaser dances", "Photo-ready group finale"],
+    favoriteSong: {
+      name: "Boot Scootin' Boogie by Brooks & Dunn",
+      spotifyUrl: "https://open.spotify.com/track/7Fq9RwQxSn3kW85PrDUf0M"
+    }
   },
   {
     slug: "morgan-rivera-austin-tx",
