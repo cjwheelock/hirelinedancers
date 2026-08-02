@@ -32,23 +32,23 @@ export default function Home() {
   const benefits = [
     {
       icon: <Users size={26} />,
-      title: "Everyone joins in",
-      body: "One instructor turns a room of bystanders into a packed dance floor in minutes, with guests of every age joining at once."
+      title: "A shared activity",
+      body: "An instructor gives guests a clear, welcoming way to join in together, whether they dance often or are trying it for the first time."
     },
     {
       icon: <Smile size={26} />,
-      title: "No rhythm required",
-      body: "No experience needed and no awkwardness. Steps are taught slowly and simply, so even the shyest guest is laughing and moving."
+      title: "Built for beginners",
+      body: "Step-by-step teaching helps first-time dancers follow along without needing a partner or any previous dance experience."
     },
     {
       icon: <Sparkles size={26} />,
-      title: "The peak of the night",
-      body: "It’s the part everyone talks about afterward. It is also the moment your photographer can’t stop shooting."
+      title: "A memorable moment",
+      body: "Learning and moving together creates a natural moment for connection, laughter, photos, and stories guests can share afterward."
     },
     {
       icon: <PartyPopper size={26} />,
-      title: "Completely turnkey",
-      body: "Your instructor brings the know-how, the energy, and the song picks. You just tell them the vibe and show up."
+      title: "Flexible for your event",
+      body: "Work directly with your instructor on timing, music, group size, sound requirements, and a lesson format that fits the room."
     }
   ];
 
@@ -65,20 +65,20 @@ export default function Home() {
             alt="A line dance instructor leading a happy crowd of guests on the dance floor"
             fill
             priority
-            sizes="(max-width: 900px) 100vw, 58vw"
+            sizes="100vw"
           />
         </div>
         <div className="hero-content">
           <p className="eyebrow">Live entertainment that gets the whole room moving</p>
-          <h1><span>Get every guest.</span><strong>On their feet.</strong></h1>
-          <p className="lede">Hire a line dance instructor for your wedding, party, or company event. Get everyone dancing together, no experience or rhythm required.</p>
+          <h1><span>Get more guests.</span><strong>On their feet.</strong></h1>
+          <p className="lede">Hire a line dance instructor for your wedding, party, or company event. Give guests a beginner-friendly way to learn, move, and have fun together.</p>
           <div className="hero-actions">
             <Link className="button primary" href="#find">Find an instructor near you <ArrowRight size={18} /></Link>
             <Link className="button ghost-light" href="#how-it-works">See how it works</Link>
           </div>
           <div className="hero-badges">
             <span><CheckCircle2 size={17} /> No experience needed</span>
-            <span><Footprints size={17} /> Any shoes, any outfit</span>
+            <span><Footprints size={17} /> No partner required</span>
             <span><Heart size={17} /> All ages welcome</span>
           </div>
         </div>
@@ -88,9 +88,9 @@ export default function Home() {
       <section className="band trust-bar">
         <div className="band-inner">
           <span><CheckCircle2 size={18} /> Beginner-friendly instruction</span>
-          <span><Music4 size={18} /> They bring the music &amp; the energy</span>
-          <span><Users size={18} /> Great for 10 to 500+ guests</span>
-          <span><Star size={18} /> From backyard parties to galas</span>
+          <span><Music4 size={18} /> Music selected for your crowd</span>
+          <span><Users size={18} /> Adaptable to different group sizes</span>
+          <span><Star size={18} /> From private parties to company events</span>
         </div>
       </section>
 
@@ -115,13 +115,13 @@ export default function Home() {
       <section className="section steps" id="how-it-works">
         <div className="section-heading">
           <p className="eyebrow">How it works</p>
-          <h2>Booked in three easy steps.</h2>
+          <h2>Start with three simple steps.</h2>
         </div>
         <div className="step-grid">
           <article className="step">
             <div className="step-num">1</div>
             <h3>Tell us about your event</h3>
-            <p>Your city, the type of event, and roughly how many guests. Takes about ten seconds.</p>
+            <p>Share your city, event type, and approximate group size so we can show you relevant profiles.</p>
           </article>
           <article className="step">
             <div className="step-num">2</div>
@@ -130,8 +130,8 @@ export default function Home() {
           </article>
           <article className="step">
             <div className="step-num">3</div>
-            <h3>Reach out and book</h3>
-            <p>Message your favorite directly to check availability and lock in the date. That&rsquo;s it.</p>
+            <h3>Send an event inquiry</h3>
+            <p>Share the date and key details. The instructor can reply by email with availability, rates, and next steps.</p>
           </article>
         </div>
       </section>
@@ -168,21 +168,20 @@ export default function Home() {
         </div>
       </section>
 
-      {/* TESTIMONIAL */}
+      {/* SHARED EXPERIENCE */}
       <section className="band quote-band">
         <div className="band-inner">
-          <blockquote className="quote">
-            <span className="quote-mark" aria-hidden="true">&ldquo;</span>
-            <p>Within five minutes our entire reception was on the floor: grandparents, kids, everyone. It was the moment our guests kept talking about.</p>
-            <cite>Event planner, 180-guest wedding</cite>
-          </blockquote>
+          <div className="quote">
+            <p>A guided lesson gives the room something joyful to do together, one approachable step at a time.</p>
+            <span className="mission-attribution">Simple steps. Shared momentum.</span>
+          </div>
         </div>
       </section>
 
       {/* LAUNCH CITIES */}
       <section className="section steps" id="cities">
         <div className="section-heading">
-          <p className="eyebrow">Our first 10 city markets</p>
+          <p className="eyebrow">Our first 11 city markets</p>
           <h2>Find line dance instructors and local planning guides.</h2>
         </div>
         <div className="link-grid">

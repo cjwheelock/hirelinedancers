@@ -11,7 +11,7 @@ export default function JoinPage() {
     <section className="page-shell">
       <p className="eyebrow">For instructors</p>
       <h1>Get booked by people planning events in your city.</h1>
-      <p className="lede">Hire Line Dancers connects you with event planners, couples, and companies actively looking to hire someone to get their guests dancing. Build a profile, show up in local searches, and receive inquiries directly.</p>
+      <p className="lede">Hire Line Dancers helps event planners, couples, and companies find instructors who can get their guests dancing. Build a profile, appear in relevant local searches, and receive event inquiries by email.</p>
 
       <div className="hero-actions" style={{ marginTop: 28 }}>
         <Link className="button primary" href="/apply/">Apply to get listed <ArrowRight size={18} /></Link>
@@ -23,7 +23,7 @@ export default function JoinPage() {
           <article className="benefit-card">
             <div className="benefit-icon"><Sparkles size={24} /></div>
             <h3>A polished public profile</h3>
-            <p>Your headshot, teaching photos, bio, service area, and the events you specialize in, all presented to convert.</p>
+            <p>Your headshot, teaching photos, bio, service area, favorite song, and the events you specialize in, all in one place.</p>
           </article>
           <article className="benefit-card">
             <div className="benefit-icon"><Users size={24} /></div>
@@ -55,7 +55,7 @@ export default function JoinPage() {
           <article className="step">
             <div className="step-num"><CreditCard size={20} /></div>
             <h3>3. Activate &amp; go live</h3>
-            <p>Once approved, you&rsquo;ll get a secure payment link to activate your membership. Your profile publishes right away.</p>
+            <p>Once approved, activate your $14.99 monthly membership. We publish your approved profile and send planner inquiries to you.</p>
           </article>
         </div>
       </div>
@@ -68,12 +68,12 @@ export default function JoinPage() {
           <article className="price-card featured">
             <BadgeCheck size={28} />
             <h2>Founding Instructor</h2>
-            <p className="price">$99 <span>for your first year</span></p>
-            <p>For our first 100 approved instructors only. Founding members get a <strong>Founding Instructor badge</strong> on their profile and a <strong>permanent ranking boost</strong>. We push founding profiles to the top of city and event searches. And it&rsquo;s no-risk: if you don&rsquo;t get a booking in your first 12 months, we refund every penny.</p>
+            <p className="price">$14.99 <span>per month</span></p>
+            <p>For our first 100 approved instructors. Founding members receive a <strong>Founding Instructor badge</strong>, a complete public profile, and early placement while we build each local directory. Your first year is protected by our money-back guarantee.</p>
             <Link className="button primary" href="/apply/">Claim a founding spot</Link>
           </article>
         </div>
-        <p style={{ marginTop: 16 }}>Here&rsquo;s the math: instructors on our platform bill $200&ndash;$215 an hour with a two-hour minimum. Just one booking more than covers your $99. Fold it into your first gig and everything after that is upside.</p>
+        <p style={{ marginTop: 16 }}>You set your rates and payment terms directly with each client. Hire Line Dancers does not take a commission or handle payment for your events.</p>
       </div>
 
       <div className="faq-block">
@@ -88,8 +88,8 @@ export default function JoinPage() {
 
       <div className="policy-box">
         <h2>Our guarantee and an honest ask</h2>
-        <p>If Hire Line Dancers doesn&rsquo;t help you get booked for a paid event in your first 12 months, we&rsquo;ll refund your $99. Full stop.</p>
-        <p>The honest ask: give us time. We&rsquo;re building this alongside you by running Google ads, growing our search presence, and reaching out directly to event planners, wedding planners, and entertainment companies in your city so they know hiring a line dance instructor is even an option. Your founding membership funds that push. We have your best interests at heart, and we&rsquo;d rather earn your trust over months than overpromise on day one.</p>
+        <p>If Hire Line Dancers does not help you get booked for a paid event in your first 12 months, we will refund the membership fees you paid during that first year, subject to the published guarantee terms.</p>
+        <p>The honest ask is time. We are building local awareness, improving search visibility, and introducing event professionals to line dancing as a participatory option. We would rather earn your trust through useful work than promise a specific number of inquiries or bookings.</p>
         <p>Guarantee terms require a complete approved profile, current contact and service-area details, and reasonable inquiry response. See the <Link href="/legal/refund-policy/">full refund policy</Link>.</p>
       </div>
     </section>

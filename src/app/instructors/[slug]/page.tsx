@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { BadgeCheck, Clock, MapPin, Users } from "lucide-react";
 import { InquiryForm } from "@/components/Forms";
+import { SpotifyTrack } from "@/components/SpotifyTrack";
 import { instructors, site } from "@/data/site";
 import { profileJsonLd } from "@/lib/search";
 
@@ -67,6 +68,13 @@ export default async function InstructorPage({ params }: { params: Promise<{ slu
             <p>{instructor.name} serves events within about {instructor.travelRadius} miles of {instructor.city}. Confirm availability, exact rates, travel fees, and insurance directly before booking.</p>
             {instructor.founding && <p className="pill inline"><BadgeCheck size={14} /> Founding instructor</p>}
           </div>
+          {instructor.favoriteSong && (
+            <SpotifyTrack
+              instructorName={instructor.name}
+              song={instructor.favoriteSong.name}
+              spotifyUrl={instructor.favoriteSong.spotifyUrl}
+            />
+          )}
         </div>
         <aside className="sticky-panel">
           <h2>Request availability</h2>

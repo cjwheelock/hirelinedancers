@@ -35,7 +35,8 @@ export function Footer() {
             <li><Link href="/about/">About</Link></li>
             <li><Link href="/#find">Find an instructor</Link></li>
             <li><Link href="/instructors/join/">For instructors</Link></li>
-            <li><Link href="/guides/cost-to-hire-line-dance-instructor/">Cost guide</Link></li>
+            <li><Link href="/guides/">Guides</Link></li>
+            <li><Link href="/guides/start-a-line-dance-club-on-campus/">Start a campus club</Link></li>
             <li><Link href="/blog/">Blog</Link></li>
             <li><Link href="/legal/terms/">Terms</Link></li>
             <li><Link href="/legal/privacy/">Privacy</Link></li>

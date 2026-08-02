@@ -118,7 +118,7 @@ export type LaunchCity = {
   serviceCities: string[];
 };
 
-// The single source of truth for the ten launch markets used across navigation,
+// The single source of truth for the eleven launch markets used across navigation,
 // search, event pages, city routes, editorial content, and the sitemap.
 export const cities: LaunchCity[] = [
   {
@@ -174,6 +174,15 @@ export const cities: LaunchCity[] = [
     localIntro: "The Bay Area is a natural place for a welcoming group activity that helps coworkers, friends, and families move together without needing prior dance experience.",
     planningNote: "Be specific about the venue city, traffic-sensitive travel, parking or load-in, floor space, and available sound equipment.",
     serviceCities: ["San Francisco", "Oakland", "Berkeley", "San Jose"]
+  },
+  {
+    slug: "new-york-ny",
+    city: "New York City metro",
+    state: "NY",
+    blurb: "A dense event market serving company gatherings, weddings, private celebrations, and community programs across the city and nearby areas.",
+    localIntro: "The New York City area is a strong fit for a guided activity that helps coworkers, families, and guests participate together without needing previous dance experience.",
+    planningNote: "Share the borough or nearby city, venue access, floor space, sound setup, and travel expectations across New York, New Jersey, Long Island, or Westchester.",
+    serviceCities: ["New York", "New York City", "Brooklyn", "Queens", "Bronx", "Staten Island", "Jersey City", "Hoboken", "White Plains"]
   },
   {
     slug: "phoenix-az",
@@ -237,6 +246,10 @@ export type Instructor = {
   tags: string[];
   bio: string;
   sampleFormat: string[];
+  favoriteSong?: {
+    name: string;
+    spotifyUrl?: string;
+  };
 };
 
 export const instructors: Instructor[] = [
@@ -261,7 +274,11 @@ export const instructors: Instructor[] = [
     tags: ["Best for mixed-age groups", "Provides sound", "Custom choreography"],
     bio:
       "Avery teaches high-energy, beginner-first line dance experiences for receptions, corporate parties, and country nights across Middle Tennessee.",
-    sampleFormat: ["15-minute warmup", "Two crowd-pleaser dances", "Photo-ready group finale"]
+    sampleFormat: ["15-minute warmup", "Two crowd-pleaser dances", "Photo-ready group finale"],
+    favoriteSong: {
+      name: "Boot Scootin' Boogie by Brooks & Dunn",
+      spotifyUrl: "https://open.spotify.com/track/7Fq9RwQxSn3kW85PrDUf0M"
+    }
   },
   {
     slug: "morgan-rivera-austin-tx",

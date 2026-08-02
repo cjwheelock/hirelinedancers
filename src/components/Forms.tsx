@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { ImagePlus, Loader2, Send, X } from "lucide-react";
 import { eventTypes } from "@/data/site";
 import { supabase, supabaseEnabled, uploadImage } from "@/lib/supabase";
+import { getSpotifyTrackLinks } from "@/lib/spotify";
 
 const MAX_FILE_MB = 8;
 
@@ -110,6 +111,13 @@ export function ApplicationForm() {
       return;
     }
 
+    const favoriteSong = String(data.get("favorite_song") || "").trim();
+    const spotifyUrl = String(data.get("spotify_track_url") || "").trim();
+    const spotifyTrack = spotifyUrl ? getSpotifyTrackLinks(spotifyUrl) : null;
+    if (spotifyUrl && !spotifyTrack) {
+      setError("Please paste a valid Spotify track link, such as https://open.spotify.com/track/...");
+      return;
+    }
     setStatus("submitting");
     try {
       const folder = `applications/${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -128,6 +136,8 @@ export function ApplicationForm() {
         links: data.get("links"),
         events: selectedEvents.join(","),
         bio: data.get("bio"),
+        favorite_song: favoriteSong || null,
+        spotify_track_url: spotifyTrack?.openUrl || null,
         headshot_url: headshotUrl,
         photo_urls: photoUrls,
         status: "pending"
@@ -185,6 +195,24 @@ export function ApplicationForm() {
         </div>
       </fieldset>
       <label>Tell planners about you<textarea name="bio" rows={4} placeholder="Your style, what makes your lessons fun, the kinds of crowds you love." /></label>
+      <div className="two-col">
+        <label>
+          Favorite line dance song
+          <input name="favorite_song" maxLength={200} placeholder="Boot Scootin' Boogie by Brooks & Dunn" />
+          <span className="form-hint">Add the song and artist so planners get to know your style.</span>
+        </label>
+        <label>
+          Spotify track link
+          <input
+            name="spotify_track_url"
+            type="url"
+            inputMode="url"
+            maxLength={512}
+            placeholder="https://open.spotify.com/track/..."
+          />
+          <span className="form-hint">Optional. We will turn this into a playable Spotify preview on your profile.</span>
+        </label>
+      </div>
 
       <ImageUploader
         label="Headshot"

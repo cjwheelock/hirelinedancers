@@ -6,7 +6,7 @@ export const employeeAdvocacyPosts: BlogPost[] = [
     title: "Want Line Dancing at Your Next Company Event? Copy This Message",
     description: "A practical guide for employees who want line dancing at their next company party, offsite, or celebration, including a message to copy and send to HR or the events team.",
     publishDate: "2026-08-01",
-    status: "draft",
+    status: "ready",
     category: "Planning",
     author: "CJ Wheelock",
     body: `

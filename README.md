@@ -6,7 +6,7 @@ and party planners find line dance instructors near them.
 ## What is included
 
 - Buyer-focused homepage: hero, benefits, how-it-works, instructor matching, featured profiles
-- Seeded instructor directory with 10 launch-city pages and 11 event-type pages
+- Seeded instructor directory with 11 launch-market pages and 11 event-type pages
 - Instructor profile pages with an inquiry form scaffold for Supabase
 - Instructor application scaffold with headshot and teaching photo uploads for Supabase Storage
 - For-instructors page (`/instructors/join/`) with membership pricing

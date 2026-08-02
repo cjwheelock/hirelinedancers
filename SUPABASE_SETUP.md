@@ -35,10 +35,26 @@ create table if not exists public.instructor_applications (
   links         text,
   events        text,
   bio           text,
+  favorite_song text constraint instructor_applications_favorite_song_length
+    check (favorite_song is null or char_length(favorite_song) <= 200),
+  spotify_track_url text constraint instructor_applications_spotify_track_url
+    check (
+      spotify_track_url is null
+      or spotify_track_url ~ '^https://open[.]spotify[.]com/track/[A-Za-z0-9]{22}$'
+    ),
   headshot_url  text not null,
   photo_urls    text[] default '{}',
   status        text not null default 'pending'  -- pending | approved | rejected | paid | active
 );
+
+-- Add the optional favorite-song fields if the table already existed.
+alter table public.instructor_applications
+  add column if not exists favorite_song text,
+  add column if not exists spotify_track_url text;
+
+-- Run the idempotent migration in
+-- supabase/migrations/202608020001_add_instructor_favorite_song.sql
+-- on an existing table so these checks are added safely.
 
 -- Buyer inquiries (from instructor profile pages)
 create table if not exists public.inquiries (
@@ -100,16 +116,13 @@ The instructor flow is intentionally **approve-then-pay** so you only collect mo
 people you've accepted. The UI for this is already built on `/instructors/join/`
 (Apply → Reviewed → Activate). To turn on real payments:
 
-1. In Stripe, create a **Product** "Instructor membership" with two **Prices**:
-   - Founding: $99 for year one (then $299/yr), using a subscription with a first-year coupon, or
-     a one-time $99 + scheduled $299 renewal.
-   - Standard: $299/yr subscription.
-2. Create a **Payment Link** for each price (Stripe → Payment Links). No backend needed.
+1. In Stripe, create a **Product** named "Hire Line Dancers instructor membership" with one recurring **Price** of $14.99 per month.
+2. Create a **Payment Link** for the recurring price. No application server is required for the initial checkout.
 3. When you approve an application (status → `approved` in Supabase), email the instructor
    their Payment Link. On successful payment, set their status to `active` and publish the
    profile.
-4. Optional automation later: a Stripe webhook (via a Supabase Edge Function) can flip the
-   status to `active` automatically and move uploaded media into the live `instructors` data.
+4. Add a Stripe webhook through a Supabase Edge Function so successful subscription events
+   set the instructor status to `active`, while cancellations or failed payments update access.
 
 Because the public site is static, Payment Links are the simplest path. No server or secret
 keys in the frontend. If you later want self-serve in-page checkout, move hosting to Vercel

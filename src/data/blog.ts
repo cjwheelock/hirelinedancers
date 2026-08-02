@@ -1,7 +1,4 @@
 import { cityPosts } from "./posts/cityPosts";
-import { launchGuidesEastVegas } from "./posts/launchGuidesEastVegas";
-import { launchGuidesTexasOne } from "./posts/launchGuidesTexasOne";
-import { launchGuidesTexasTwo } from "./posts/launchGuidesTexasTwo";
 import { employeeAdvocacyPosts } from "./posts/employeeAdvocacyPosts";
 import { weeklyPosts } from "./posts/weeklyPosts";
 
@@ -24,14 +21,7 @@ export type BlogPost = {
   body: string;
 };
 
-export const allPosts: BlogPost[] = [
-  ...cityPosts,
-  ...launchGuidesTexasOne,
-  ...launchGuidesTexasTwo,
-  ...launchGuidesEastVegas,
-  ...employeeAdvocacyPosts,
-  ...weeklyPosts
-];
+export const allPosts: BlogPost[] = [...cityPosts, ...employeeAdvocacyPosts, ...weeklyPosts];
 
 /** Posts whose publishDate is on or before the build date, newest first. */
 export function publishedPosts(): BlogPost[] {

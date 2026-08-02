@@ -51,14 +51,14 @@ export default async function EventPage({ params }: { params: Promise<{ event: s
         <ul className="check-list">
           <li>Simple dances taught step by step for beginners.</li>
           <li>Flexible formats for cocktail hour, reception resets, team activities, or public venue programming.</li>
-          <li>Instructor profiles with service area, group size comfort, rates, media, and inquiry forms.</li>
+          <li>Instructor profiles with service area, group size experience, media, and event inquiry forms.</li>
         </ul>
       </div>
       <div className="card-grid">
         {results.map((instructor) => <InstructorCard key={instructor.slug} instructor={instructor} />)}
       </div>
       <div className="faq-block">
-        <h2>Our 10 launch cities</h2>
+        <h2>Our 11 launch markets</h2>
         <div className="city-cloud">
           {cities.map((city) => (
             <Link key={city.slug} href={`/cities/${city.slug}/`}>{city.city}, {city.state}</Link>
