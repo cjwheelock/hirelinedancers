@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { cities, eventTypes, site } from "@/data/site";
+import { marketplaceConfigured } from "@/lib/marketplace";
 
 export function Footer() {
   return (
@@ -33,7 +34,8 @@ export function Footer() {
           <h3>Company</h3>
           <ul>
             <li><Link href="/about/">About</Link></li>
-            <li><Link href="/#find">Find an instructor</Link></li>
+            <li><Link href="/instructors/">Browse instructors</Link></li>
+            {marketplaceConfigured ? <li><Link href="/account/">Account / Sign in</Link></li> : null}
             <li><Link href="/instructors/join/">For instructors</Link></li>
             <li><Link href="/guides/">Guides</Link></li>
             <li><Link href="/guides/start-a-line-dance-club-on-campus/">Start a campus club</Link></li>

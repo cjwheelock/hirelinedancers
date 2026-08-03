@@ -6,3 +6,8 @@ node_modules
 .env*
 !.env.local.example
 design-preview.html
+tmp/
+supabase/.temp/
+*.tsbuildinfo
+output/preview/
+*.inspect.ndjson

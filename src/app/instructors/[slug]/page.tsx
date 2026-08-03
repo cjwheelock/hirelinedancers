@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
-import { BadgeCheck, Clock, MapPin, Users } from "lucide-react";
-import { InquiryForm } from "@/components/Forms";
+import { Clock, MapPin, Users } from "lucide-react";
 import { SpotifyTrack } from "@/components/SpotifyTrack";
 import { instructors, site } from "@/data/site";
 import { profileJsonLd } from "@/lib/search";
@@ -18,6 +18,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     title: `${instructor.business} - ${instructor.city}, ${instructor.state} Line Dance Instructor`,
     description: instructor.bio,
     alternates: { canonical: `/instructors/${instructor.slug}/` },
+    robots: { index: false, follow: true },
     openGraph: {
       title: `${instructor.business} in ${instructor.city}, ${instructor.state}`,
       description: instructor.bio,
@@ -39,7 +40,7 @@ export default async function InstructorPage({ params }: { params: Promise<{ slu
       <div className="profile-hero">
         <div className="avatar large" aria-hidden="true">{instructor.name.split(" ").map((word) => word[0]).join("")}</div>
         <div>
-          <p className="eyebrow">Instructor profile</p>
+          <p className="eyebrow">Illustrative profile preview</p>
           <h1>{instructor.business}</h1>
           <p className="lede">{instructor.bio}</p>
           <div className="tag-row">
@@ -66,7 +67,6 @@ export default async function InstructorPage({ params }: { params: Promise<{ slu
               {instructor.styles.map((style) => <span key={style}>{style}</span>)}
             </div>
             <p>{instructor.name} serves events within about {instructor.travelRadius} miles of {instructor.city}. Confirm availability, exact rates, travel fees, and insurance directly before booking.</p>
-            {instructor.founding && <p className="pill inline"><BadgeCheck size={14} /> Founding instructor</p>}
           </div>
           {instructor.favoriteSong && (
             <SpotifyTrack
@@ -77,8 +77,11 @@ export default async function InstructorPage({ params }: { params: Promise<{ slu
           )}
         </div>
         <aside className="sticky-panel">
-          <h2>Request availability</h2>
-          <InquiryForm instructorName={instructor.name} instructorSlug={instructor.slug} />
+          <p className="eyebrow">Example profile</p>
+          <h2>This is a preview of how instructor listings can look.</h2>
+          <p>This is not a verified or bookable instructor listing. Published profiles from approved instructors will appear in the live directory.</p>
+          <Link className="button primary" href="/instructors/">Browse published instructors</Link>
+          <Link className="button secondary" href="/instructors/join/">Create an instructor profile</Link>
         </aside>
       </div>
     </section>

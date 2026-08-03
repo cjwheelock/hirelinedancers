@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BadgeCheck, MapPin } from "lucide-react";
+import { MapPin } from "lucide-react";
 import type { Instructor } from "@/data/site";
 
 function initials(name: string) {
@@ -22,11 +22,11 @@ export function InstructorCard({ instructor, compact = false }: { instructor: In
             <h3><Link href={`/instructors/${instructor.slug}/`}>{instructor.name}</Link></h3>
             <p className="card-sub">{instructor.business} · {instructor.city}, {instructor.state}</p>
           </div>
-          {instructor.founding && <span className="pill"><BadgeCheck size={13} aria-hidden="true" /> Founding instructor</span>}
+          <span className="pill">Example profile</span>
         </div>
       </div>
 
-      <p className="muted">{instructor.years} years teaching · travels about {instructor.travelRadius} miles</p>
+      <p className="muted">Illustrative directory preview</p>
 
       <p className="bio">{instructor.bio}</p>
 
@@ -35,7 +35,7 @@ export function InstructorCard({ instructor, compact = false }: { instructor: In
       </div>
 
       <Link className="button secondary small" href={`/instructors/${instructor.slug}/`}>
-        <MapPin size={15} aria-hidden="true" /> View profile &amp; check availability
+        <MapPin size={15} aria-hidden="true" /> View example profile
       </Link>
     </article>
   );

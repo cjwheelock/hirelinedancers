@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { InstructorCard } from "@/components/InstructorCard";
+import { PublicInstructorResults } from "@/components/SearchPanel";
 import { formatPostDate, publishedPostsForCity } from "@/data/blog";
 import { cities, eventTypes, site } from "@/data/site";
-import { findInstructors } from "@/lib/search";
 
 export function generateStaticParams() {
   return cities.map((city) => ({ city: city.slug }));
@@ -32,7 +31,6 @@ export default async function CityPage({ params }: { params: Promise<{ city: str
   const { city: citySlug } = await params;
   const city = cities.find((item) => item.slug === citySlug);
   if (!city) notFound();
-  const results = findInstructors(city.slug);
   const localPosts = publishedPostsForCity(city.slug, 5);
   const jsonLd = {
     "@context": "https://schema.org",
@@ -85,14 +83,11 @@ export default async function CityPage({ params }: { params: Promise<{ city: str
         <p>{city.planningNote}</p>
       </div>
       <div className="card-grid">
-        {results.length ? results.map((instructor) => (
-          <InstructorCard key={instructor.slug} instructor={instructor} />
-        )) : (
-          <div className="policy-box">
-            <h2>Instructor seeding in progress</h2>
-            <p>We are reviewing instructors for {city.city}. Apply to be listed or submit an inquiry for manual routing.</p>
-          </div>
-        )}
+        <PublicInstructorResults
+          citySlug={city.slug}
+          emptyTitle={`No published ${city.city} profiles yet`}
+          emptyBody={`We are reviewing instructors for ${city.city}. Instructors can apply now to be considered for the directory.`}
+        />
       </div>
       <div className="faq-block">
         <h2>Popular event searches in {city.city}</h2>

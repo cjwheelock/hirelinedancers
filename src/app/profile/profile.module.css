@@ -1,0 +1,310 @@
+.shell {
+  width: min(1200px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: clamp(48px, 7vw, 92px) 0 104px;
+}
+
+.state {
+  width: min(720px, calc(100% - 40px));
+  min-height: 56vh;
+  margin: 0 auto;
+  padding: clamp(72px, 10vw, 128px) 0;
+}
+
+.state h1 {
+  margin-bottom: 20px;
+}
+
+.state > p:not(.kicker) {
+  max-width: 58ch;
+  color: #57607a;
+  font-size: 1.08rem;
+  line-height: 1.65;
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: minmax(180px, 260px) minmax(0, 1fr);
+  gap: clamp(28px, 5vw, 64px);
+  align-items: center;
+  padding-bottom: clamp(42px, 6vw, 72px);
+  border-bottom: 2px solid #1c2a44;
+}
+
+.headshot {
+  display: grid;
+  aspect-ratio: 1;
+  place-items: center;
+  overflow: hidden;
+  border: 2px solid #1c2a44;
+  background: #e7a33c;
+  color: #1c2a44;
+  font-size: clamp(3rem, 8vw, 6rem);
+  font-weight: 900;
+}
+
+.headshot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.heroCopy h1 {
+  max-width: 12ch;
+}
+
+.kicker {
+  margin: 0 0 12px;
+  color: #b5472b;
+  font: 700 0.75rem/1.3 "IBM Plex Mono", monospace;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.business {
+  margin-top: 12px;
+  color: #1c2a44;
+  font-size: clamp(1.1rem, 2vw, 1.35rem);
+  font-weight: 900;
+}
+
+.headline {
+  max-width: 62ch;
+  margin-top: 18px;
+  color: #3f4b66;
+  font-size: clamp(1.05rem, 2vw, 1.3rem);
+  line-height: 1.55;
+}
+
+.heroTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-top: 24px;
+}
+
+.heroTags span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 11px;
+  border: 1px solid #1c2a44;
+  background: #fff;
+  color: #1c2a44;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(290px, 0.72fr);
+  gap: clamp(28px, 5vw, 64px);
+  align-items: start;
+  margin-top: clamp(42px, 6vw, 72px);
+}
+
+.content {
+  display: grid;
+  gap: 28px;
+}
+
+.section {
+  padding: clamp(24px, 4vw, 36px);
+  border: 1px solid #d8d9dc;
+  background: #fff;
+}
+
+.section h2 {
+  font-size: clamp(2rem, 4vw, 3.4rem);
+}
+
+.section h3 {
+  margin-bottom: 10px;
+  font-size: 1rem;
+}
+
+.bodyCopy {
+  margin-top: 20px;
+  color: #3f4b66;
+  font-size: 1.02rem;
+  line-height: 1.75;
+}
+
+.serviceGroups {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 26px;
+  margin-top: 26px;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.tags span {
+  padding: 6px 10px;
+  background: #e8ebf2;
+  color: #1c2a44;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.detailList {
+  display: grid;
+  gap: 0;
+  margin-top: 26px;
+  border-top: 1px solid #d8d9dc;
+}
+
+.detailList > div {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 11px;
+  padding: 16px 0;
+  border-bottom: 1px solid #d8d9dc;
+  color: #3f4b66;
+  line-height: 1.55;
+}
+
+.detailList svg {
+  color: #b5472b;
+}
+
+.mediaGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 26px;
+}
+
+.mediaItem {
+  min-width: 0;
+  margin: 0;
+  border: 1px solid #1c2a44;
+  background: #f1efe8;
+}
+
+.media {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  background: #1c2a44;
+}
+
+.videoLink {
+  display: grid;
+  min-height: 220px;
+  place-content: center;
+  justify-items: center;
+  gap: 12px;
+  padding: 28px;
+  color: #fff;
+  background: #1c2a44;
+  text-align: center;
+  font-weight: 900;
+}
+
+.videoLink:hover {
+  color: #e7a33c;
+}
+
+.mediaItem figcaption {
+  padding: 11px 13px;
+  color: #3f4b66;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.contactCard {
+  position: sticky;
+  top: 100px;
+  display: grid;
+  gap: 16px;
+  padding: clamp(24px, 4vw, 34px);
+  border: 2px solid #1c2a44;
+  border-top: 8px solid #e7a33c;
+  background: #fff;
+}
+
+.contactCard > svg {
+  color: #b5472b;
+}
+
+.contactCard h2 {
+  font-size: clamp(2rem, 3.5vw, 3.4rem);
+}
+
+.contactCard > p:not(.kicker, .finePrint, .response) {
+  color: #3f4b66;
+  line-height: 1.65;
+}
+
+.primaryButton {
+  display: inline-flex;
+  min-height: 50px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 6px;
+  padding: 12px 18px;
+  border: 2px solid #e7a33c;
+  background: #e7a33c;
+  color: #1c2a44;
+  font-weight: 900;
+}
+
+.primaryButton:hover {
+  border-color: #b5472b;
+  background: #b5472b;
+  color: #fff;
+}
+
+.finePrint {
+  color: #57607a;
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.response {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding-top: 14px;
+  border-top: 1px solid #d8d9dc;
+  color: #1c2a44;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+@media (max-width: 840px) {
+  .hero,
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .headshot {
+    width: min(240px, 72vw);
+  }
+
+  .contactCard {
+    position: static;
+  }
+}
+
+@media (max-width: 560px) {
+  .shell {
+    width: min(100% - 32px, 1200px);
+  }
+
+  .mediaGrid,
+  .serviceGroups {
+    grid-template-columns: 1fr;
+  }
+
+  .section,
+  .contactCard {
+    padding: 22px 18px;
+  }
+}

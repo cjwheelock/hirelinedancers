@@ -5,24 +5,29 @@ and party planners find line dance instructors near them.
 
 ## What is included
 
-- Buyer-focused homepage: hero, benefits, how-it-works, instructor matching, featured profiles
-- Seeded instructor directory with 11 launch-market pages and 11 event-type pages
-- Instructor profile pages with an inquiry form scaffold for Supabase
-- Instructor application scaffold with headshot and teaching photo uploads for Supabase Storage
-- For-instructors page (`/instructors/join/`) with membership pricing
-- Approve-then-pay Stripe flow (designed; see `SUPABASE_SETUP.md` to go live)
+- Navy and gold buyer-focused homepage with benefits, process, and instructor discovery
+- Public database-backed instructor directory with 11 launch-market pages and 11 event-type pages
+- Google sign-in and email magic-link code through Supabase Auth
+- Organizer, instructor, and admin account workspaces
+- Instructor onboarding, private rates, travel preferences, equipment, insurance, event preferences, favorite Spotify song, and response commitment
+- One headshot, up to three additional images, one welcome video, and up to three teaching or dancing videos
+- Authenticated inquiry forms, inquiry status tracking, and self-reported booking outcomes
+- Durable Resend email and optional Twilio SMS notification jobs
+- Personally reviewed approve-then-pay Stripe Checkout flow at $14.99 per month
+- Stripe Customer Portal and signature-verified membership webhooks
 - Legal pages, buyer cost guide, blog, RSS feed, `sitemap.xml`, `robots.txt`, `llms.txt`, schema markup, and `CNAME`
 - Auto-deploy to GitHub Pages via GitHub Actions
 
+The browser UI, database migrations, and Edge Function source are in the repository. Real accounts, payments, email, and SMS require the external services and secrets described in `SUPABASE_SETUP.md`.
+
 ## Strategy documents
 
-- `CONTENT_SEO_GEO_STRATEGY.md`: editorial calendar, SEO, AI discovery, backlinks, and evidence standards
-- `OUTREACH_AND_GROWTH_PLAYBOOK.md`: demand audiences, DJ partnerships, outreach tools, messaging, instructor-led content, and measurement
+- `CONTENT_SEO_GEO_STRATEGY.md`: authority-first SEO, AI discovery, evidence standards, and the decision not to bulk publish city posts
+- `OUTREACH_AND_GROWTH_PLAYBOOK.md`: deferred demand audiences, DJ partnerships, outreach tools, messaging, instructor-led content, and measurement
 
-## Backend (forms, uploads, payments)
+## Backend
 
-See `SUPABASE_SETUP.md` for the one-time Supabase table/bucket setup and the Stripe plan.
-Copy `.env.local.example` to `.env.local` and add your Supabase URL + anon key before building.
+See `SUPABASE_SETUP.md` for Supabase Auth, migrations, Storage, Stripe, Resend, Twilio, Cron, secrets, and production verification. Copy `.env.local.example` to `.env.local` and add the Supabase URL and publishable key before building.
 
 ## Local development
 

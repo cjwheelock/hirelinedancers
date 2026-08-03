@@ -1260,7 +1260,7 @@ button:disabled { opacity: 0.7; cursor: progress; }
 
 /* ---------- Responsive ---------- */
 @media (max-width: 1040px) {
-  .site-header nav .navlink:not(.is-cta) { display: none; }
+  .site-header nav .navlink:not(.is-cta):not(.is-account) { display: none; }
   .nav-divider { display: none; }
   .hero { min-height: clamp(620px, 82dvh, 760px); }
   .hero::after {
@@ -1310,6 +1310,7 @@ button:disabled { opacity: 0.7; cursor: progress; }
   .brand > svg { width: 34px; height: 34px; }
   .brand-name { font-size: 14px; white-space: nowrap; }
   .site-header nav .is-cta { min-height: 44px; padding: 8px 12px; font-size: 13px; white-space: nowrap; }
+  .site-header nav .is-account { padding: 8px; font-size: 13px; white-space: nowrap; }
   .site-header nav .is-cta svg { display: block; }
   .nav-cta-long { display: none; }
   .nav-cta-short { display: inline; }

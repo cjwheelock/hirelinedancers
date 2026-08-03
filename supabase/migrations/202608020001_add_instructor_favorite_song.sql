@@ -1,9 +1,15 @@
-alter table public.instructor_applications
-  add column if not exists favorite_song text,
-  add column if not exists spotify_track_url text;
-
 do $$
 begin
+  -- Fresh marketplace projects do not use the legacy application table.
+  -- Keep this migration harmless there while still upgrading older projects.
+  if to_regclass('public.instructor_applications') is null then
+    return;
+  end if;
+
+  alter table public.instructor_applications
+    add column if not exists favorite_song text,
+    add column if not exists spotify_track_url text;
+
   if not exists (
     select 1
     from pg_constraint

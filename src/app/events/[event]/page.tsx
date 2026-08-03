@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { InstructorCard } from "@/components/InstructorCard";
+import { PublicInstructorResults } from "@/components/SearchPanel";
 import { cities, eventTypes, site } from "@/data/site";
-import { findInstructors } from "@/lib/search";
 
 export function generateStaticParams() {
   return eventTypes.map((event) => ({ event: event.slug }));
@@ -30,7 +29,6 @@ export default async function EventPage({ params }: { params: Promise<{ event: s
   const { event: eventSlug } = await params;
   const event = eventTypes.find((item) => item.slug === eventSlug);
   if (!event) notFound();
-  const results = findInstructors(undefined, event.slug);
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Service",
@@ -55,7 +53,11 @@ export default async function EventPage({ params }: { params: Promise<{ event: s
         </ul>
       </div>
       <div className="card-grid">
-        {results.map((instructor) => <InstructorCard key={instructor.slug} instructor={instructor} />)}
+        <PublicInstructorResults
+          eventSlug={event.slug}
+          emptyTitle={`No published ${event.label.toLowerCase()} profiles yet`}
+          emptyBody="Try another event type, or check back as new instructors are approved."
+        />
       </div>
       <div className="faq-block">
         <h2>Our 11 launch markets</h2>

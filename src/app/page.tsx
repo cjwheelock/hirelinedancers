@@ -142,8 +142,8 @@ export default function Home() {
       {/* FEATURED INSTRUCTORS */}
       <section className="section">
         <div className="section-heading">
-          <p className="eyebrow">Meet a few instructors</p>
-          <h2>Friendly pros who know how to read a room.</h2>
+          <p className="eyebrow">Profile previews</p>
+          <h2>See what instructor listings can include.</h2>
         </div>
         <div className="card-grid">
           {featured.map((instructor) => (

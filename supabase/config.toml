@@ -1,0 +1,11 @@
+[functions.create-instructor-checkout]
+verify_jwt = true
+
+[functions.create-billing-portal]
+verify_jwt = true
+
+[functions.stripe-webhook]
+verify_jwt = false
+
+[functions.process-inquiry-notifications]
+verify_jwt = false

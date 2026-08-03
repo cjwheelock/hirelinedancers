@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ApplicationForm } from "@/components/Forms";
+import { marketplaceConfigured } from "@/lib/marketplace";
 
 export const metadata = {
   title: "Apply to List Your Line Dance Instructor Services",
@@ -23,7 +23,25 @@ export default function ApplyPage() {
           Curious about membership first? See <Link href="/instructors/join/" style={{ color: "var(--sunset)", fontWeight: 600 }}>how joining works and pricing</Link>.
         </p>
       </div>
-      <ApplicationForm />
+      <aside className="sticky-panel">
+        <p className="eyebrow">Build your profile</p>
+        <h2>Create one account, then add everything at your own pace.</h2>
+        <p>
+          Add your headshot, teaching details, travel preferences, private rates, favorite song, photos, and videos. We personally review every profile before membership activation.
+        </p>
+        {marketplaceConfigured ? (
+          <Link className="button primary" href="/login/?next=%2Faccount%2F">
+            Create an instructor account
+          </Link>
+        ) : (
+          <>
+            <p className="form-note">The new instructor account system is being connected to production.</p>
+            <a className="button primary" href="mailto:hello@hirelinedancers.com?subject=Instructor%20account">
+              Email us to get started
+            </a>
+          </>
+        )}
+      </aside>
     </section>
   );
 }
