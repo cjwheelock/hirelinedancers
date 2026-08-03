@@ -124,6 +124,7 @@ function marketMatches(profile: Pick<PublicProfile, "city" | "region">, citySlug
 }
 
 function exampleMarketMatches(instructor: Instructor, citySlug?: string) {
+  if (instructor.demoEverywhere) return true;
   if (!citySlug) return true;
   const market = cities.find((item) => item.slug === citySlug);
   return Boolean(market?.serviceCities.includes(instructor.city));
@@ -182,25 +183,38 @@ function PublicProfileCard({ profile, compact = false }: { profile: PublicProfil
 }
 
 function ExampleProfileCard({ instructor, compact = false }: { instructor: Instructor; compact?: boolean }) {
+  const isUniversalDemo = Boolean(instructor.demoEverywhere);
+  const profileHref = `/instructors/${instructor.slug}/`;
+
   return (
     <article className={compact ? "instructor-card compact" : "instructor-card"}>
       <div className="card-top">
-        <div className="avatar" aria-hidden="true">{initials(instructor.name)}</div>
+        <div className="avatar" aria-hidden={instructor.photo ? undefined : "true"}>
+          {instructor.photo ? (
+            // Static demo media is exported with the site and can be safely rendered here.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={instructor.photo} alt={`${instructor.name}, fictional demo line dance instructor`} />
+          ) : (
+            initials(instructor.name)
+          )}
+        </div>
         <div className="card-title-row">
           <div>
-            <h3>{instructor.name}</h3>
-            <p className="card-sub">{instructor.business} · {instructor.city}, {instructor.state}</p>
+            <h3>{isUniversalDemo ? <Link href={profileHref}>{instructor.name}</Link> : instructor.name}</h3>
+            <p className="card-sub">
+              {instructor.business} · {isUniversalDemo ? "Shown in every city" : `${instructor.city}, ${instructor.state}`}
+            </p>
           </div>
-          <span className="pill">Example profile</span>
+          <span className="pill">{isUniversalDemo ? "Demo profile" : "Example profile"}</span>
         </div>
       </div>
-      <p className="muted">Illustrative directory preview</p>
+      <p className="muted">{isUniversalDemo ? "Fictional and not bookable" : "Illustrative directory preview"}</p>
       <p className="bio">{instructor.bio}</p>
       <div className="tag-row">
         {instructor.tags.slice(0, compact ? 2 : 3).map((tag) => <span key={tag}>{tag}</span>)}
       </div>
-      <Link className="button secondary small" href="/instructors/join/">
-        Are you an instructor? Apply to join
+      <Link className="button secondary small" href={isUniversalDemo ? profileHref : "/instructors/join/"}>
+        {isUniversalDemo ? "View the complete demo profile" : "Are you an instructor? Apply to join"}
       </Link>
     </article>
   );
@@ -307,7 +321,17 @@ export function PublicInstructorResults({
     })
     .sort((a, b) => Number(b.featured) - Number(a.featured) || b.years - a.years), [citySlug, eventSlug, groupSize]);
 
-  const visibleCount = marketplaceConfigured ? results.length : showExamplesWhenUnconfigured ? exampleResults.length : 0;
+  const demoResults = useMemo(() => instructors
+    .filter((instructor) => instructor.demoEverywhere)
+    .filter((instructor) => {
+      const eventMatch = !eventSlug || instructor.events.includes(eventSlug);
+      const groupMatch = !groupSize || instructor.groupSize >= groupSize;
+      return eventMatch && groupMatch;
+    }), [eventSlug, groupSize]);
+
+  const visibleCount = marketplaceConfigured
+    ? results.length + demoResults.length
+    : showExamplesWhenUnconfigured ? exampleResults.length : demoResults.length;
 
   useEffect(() => {
     onCountChange?.(loading ? null : visibleCount);
@@ -326,10 +350,15 @@ export function PublicInstructorResults({
 
   if (loadFailed) {
     return (
-      <div className={stateClass} role="status">
-        <h3>We could not load the directory</h3>
-        <p>Please try again soon. Your filters have not been submitted.</p>
-      </div>
+      <>
+        <div className={stateClass} role="status">
+          <h3>We could not load the live directory</h3>
+          <p>Please try again soon. You can still explore the fictional demo profile below.</p>
+        </div>
+        {demoResults.map((instructor) => (
+          <ExampleProfileCard key={instructor.slug} instructor={instructor} compact={compact} />
+        ))}
+      </>
     );
   }
 
@@ -357,14 +386,19 @@ export function PublicInstructorResults({
 
   if (!marketplaceConfigured) {
     return (
-      <div className={stateClass}>
-        <h3>Published profiles are coming soon</h3>
-        <p>The live directory is not connected in this build. Instructors can apply now to be considered for launch.</p>
-      </div>
+      <>
+        <div className={stateClass}>
+          <h3>Published profiles are coming soon</h3>
+          <p>The live directory is not connected in this build. You can still explore the fictional demo profile below.</p>
+        </div>
+        {demoResults.map((instructor) => (
+          <ExampleProfileCard key={instructor.slug} instructor={instructor} compact={compact} />
+        ))}
+      </>
     );
   }
 
-  if (!results.length) {
+  if (!results.length && !demoResults.length) {
     return (
       <div className={stateClass}>
         <h3>{emptyTitle}</h3>
@@ -373,7 +407,26 @@ export function PublicInstructorResults({
     );
   }
 
-  return <>{results.map((profile) => <PublicProfileCard key={profile.id} profile={profile} compact={compact} />)}</>;
+  return (
+    <>
+      {results.map((profile) => <PublicProfileCard key={profile.id} profile={profile} compact={compact} />)}
+      {demoResults.length ? (
+        <>
+          <div className={stateClass}>
+            <h3>{results.length ? "Explore a complete demo profile" : emptyTitle}</h3>
+            <p>
+              {results.length
+                ? "Tessa McTester is fictional and shown in every city so you can preview the full profile experience. She cannot receive inquiries."
+                : `${emptyBody} Tessa McTester is a fictional, nonbookable example you can explore while instructors join.`}
+            </p>
+          </div>
+          {demoResults.map((instructor) => (
+            <ExampleProfileCard key={instructor.slug} instructor={instructor} compact={compact} />
+          ))}
+        </>
+      ) : null}
+    </>
+  );
 }
 
 export function InstructorDirectoryBrowser() {
@@ -405,7 +458,7 @@ export function InstructorDirectoryBrowser() {
         </label>
         <button className="button primary" type="submit" disabled={resultCount === null}>
           <Search size={18} aria-hidden="true" />
-          {resultCount === null ? "Loading instructors" : `${resultCount} published instructor${resultCount === 1 ? "" : "s"}`}
+          {resultCount === null ? "Loading instructors" : `${resultCount} matching profile${resultCount === 1 ? "" : "s"}`}
         </button>
       </form>
       <div className="results-list" aria-live="polite">
@@ -459,7 +512,7 @@ export function SearchPanel() {
           </label>
           <button className="button primary" type="submit" disabled={resultCount === null}>
             <Search size={18} aria-hidden="true" />
-            {resultCount === null ? "Loading instructors" : `Show ${resultCount} instructor${resultCount === 1 ? "" : "s"} near me`}
+            {resultCount === null ? "Loading instructors" : `Show ${resultCount} matching profile${resultCount === 1 ? "" : "s"}`}
           </button>
         </form>
         <div className="results-list" aria-live="polite">

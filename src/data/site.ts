@@ -229,6 +229,7 @@ export type Instructor = {
   name: string;
   business: string;
   photo?: string;
+  demoEverywhere?: boolean;
   city: string;
   state: string;
   zip: string;
@@ -253,6 +254,35 @@ export type Instructor = {
 };
 
 export const instructors: Instructor[] = [
+  {
+    slug: "tessa-mctester",
+    name: "Tessa McTester",
+    business: "Tessa's Demo Dance Co.",
+    photo: "/images/instructors/tessa-mctester.jpg",
+    demoEverywhere: true,
+    city: "Every launch market",
+    state: "US",
+    zip: "00000",
+    travelRadius: 0,
+    years: 10,
+    startingRate: 425,
+    minHours: 1,
+    groupSize: 500,
+    founding: false,
+    featured: true,
+    rating: 5,
+    reviews: 0,
+    styles: ["Country line dancing", "Beginner-friendly", "Large groups", "Corporate events"],
+    events: ["corporate-events", "weddings", "bar-bat-mitzvahs", "fundraisers", "summer-camps"],
+    tags: ["Fictional demo", "All ages", "Provides sound"],
+    bio:
+      "Tessa McTester is a fictional demo instructor created to show how a complete profile works. Her sample sessions are welcoming, beginner-friendly, and built to get mixed-age groups dancing together.",
+    sampleFormat: ["Friendly host introduction", "Step-by-step beginner lesson", "Two crowd-favorite dances", "Optional song-request round", "Group photo finale"],
+    favoriteSong: {
+      name: "Choosing Texas by Ella Langley",
+      spotifyUrl: "https://open.spotify.com/track/65DbTqJKhbwqYbZ1Okr0rc"
+    }
+  },
   {
     slug: "avery-cole-nashville-tn",
     name: "Avery Cole",

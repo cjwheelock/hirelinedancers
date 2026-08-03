@@ -13,7 +13,7 @@ export function findInstructors(citySlug?: string, eventSlug?: string) {
   const city = cities.find((item) => item.slug === citySlug);
   return instructors
     .filter((instructor) => {
-      const cityMatch = !city || city.serviceCities.includes(instructor.city);
+      const cityMatch = !city || instructor.demoEverywhere || city.serviceCities.includes(instructor.city);
       const eventMatch = !eventSlug || instructor.events.includes(eventSlug);
       return cityMatch && eventMatch;
     })
@@ -22,7 +22,7 @@ export function findInstructors(citySlug?: string, eventSlug?: string) {
 
 export function profileJsonLd(slug: string) {
   const instructor = instructors.find((item) => item.slug === slug);
-  if (!instructor) return null;
+  if (!instructor || instructor.demoEverywhere) return null;
   return {
     "@context": "https://schema.org",
     "@type": "ProfilePage",
