@@ -4,9 +4,6 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-  schedule:
-    # Rebuild every Monday at 12:00 UTC (8am ET) so the next queued blog post goes live.
-    - cron: "0 12 * * 1"
 
 permissions:
   contents: read
@@ -30,8 +27,10 @@ jobs:
       - name: Build static export
         run: npm run build
         env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          # These are browser-safe Supabase credentials. Row Level Security
+          # remains the authorization boundary for all marketplace data.
+          NEXT_PUBLIC_SUPABASE_URL: https://wzmyroeowbsxxibkeejf.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_36gNqu74ysQhY2_VvJlS4A_XTYUFyxe
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

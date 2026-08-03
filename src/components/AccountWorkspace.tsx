@@ -197,7 +197,7 @@ function OnboardingForm({
           </label>
           <label className={styles.check}>
             <input type="checkbox" checked={smsOptIn} onChange={(event) => setSmsOptIn(event.target.checked)} />
-            <span>Text me when I receive a new inquiry. Message and data rates may apply. Reply STOP to opt out.</span>
+            <span>Text me when I receive a new inquiry. Message and data rates may apply. Turn alerts off any time in your account.</span>
           </label>
         </>
       ) : null}
@@ -543,7 +543,7 @@ function InstructorProfileForm({
       </div>
       <label className={styles.check}>
         <input disabled={!canEdit} type="checkbox" checked={form.sms_notifications_enabled} onChange={(e) => setValue("sms_notifications_enabled", e.target.checked)} />
-        <span>Text me when a new inquiry arrives. Message and data rates may apply. Reply STOP to opt out.</span>
+        <span>Text me when a new inquiry arrives. Message and data rates may apply. Turn alerts off any time in your account.</span>
       </label>
 
       {message ? <p className={styles.success}>{message}</p> : null}

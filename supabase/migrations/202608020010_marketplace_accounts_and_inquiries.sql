@@ -626,8 +626,11 @@ begin
     from public.instructor_private_settings
     where instructor_profile_id = new.instructor_profile_id;
     delivery_email := settings.inquiry_email;
-    delivery_phone := case when settings.sms_notifications_enabled then settings.inquiry_phone_e164 end;
-    send_sms := settings.sms_notifications_enabled and settings.inquiry_phone_e164 is not null;
+    send_sms := settings.sms_notifications_enabled
+      and settings.inquiry_phone_e164 is not null
+      and settings.sms_consent_at is not null
+      and settings.sms_opted_out_at is null;
+    delivery_phone := case when send_sms then settings.inquiry_phone_e164 end;
   end if;
 
   if delivery_email is null then

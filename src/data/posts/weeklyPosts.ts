@@ -7,6 +7,7 @@ export const weeklyPosts: BlogPost[] = [
     title: "7 Reasons Line Dancing Is the Best Entertainment You Haven't Booked Yet",
     description: "Participation, photos, price, and the memory factor: why event planners are adding line dance instructors to weddings, corporate events, and parties.",
     publishDate: "2026-07-20",
+    status: "ready",
     category: "Planning",
     body: `
 <p>Most event entertainment asks your guests to watch. Line dancing asks them to join, and that one difference changes the whole night. Here's the case for booking a line dance instructor, whatever you're planning.</p>
@@ -32,6 +33,7 @@ export const weeklyPosts: BlogPost[] = [
     title: "Top 5 Interactive Entertainment Ideas for Your Next Event",
     description: "From casino tables to line dancing, a practical comparison of interactive entertainment options that get guests involved instead of just watching.",
     publishDate: "2026-07-27",
+    status: "ready",
     category: "Ideas",
     body: `
 <p>The best events give guests something to do, not just something to see. Here are five interactive entertainment options that reliably work, with honest notes on where each fits best.</p>
@@ -54,6 +56,7 @@ export const weeklyPosts: BlogPost[] = [
     title: "Why Line Dancing Works So Well at Corporate Events (and Which Events to Book It For)",
     description: "Holiday parties, offsites, conference socials, team building: the corporate events where line dancing shines, and what makes those sessions succeed.",
     publishDate: "2027-07-19",
+    status: "draft",
     category: "Planning",
     body: `
 <p>Corporate entertainment has a hard job: it has to work for the intern and the CFO, the extrovert and the skeptic, all at once. Line dancing has quietly become a favorite of corporate planners because it solves exactly that problem.</p>
@@ -81,6 +84,7 @@ export const weeklyPosts: BlogPost[] = [
     title: "Line Dancing at Your Wedding: The Planner's Guide to a Packed Floor",
     description: "When to schedule it, how long to book, and why a guided line dance is the most reliable way to get every generation dancing at a wedding reception.",
     publishDate: "2027-07-26",
+    status: "draft",
     category: "Planning",
     body: `
 <p>Every couple wants the same photo: a dance floor packed with both families, all ages, everyone smiling. Very few receptions get it by accident. A line dance instructor gets it on purpose.</p>
@@ -104,6 +108,7 @@ export const weeklyPosts: BlogPost[] = [
     title: "Team Building That Doesn't Feel Forced: The Case for Group Dance",
     description: "Why learning a dance together beats trust falls and escape rooms for building real team connection, plus how to run it without the cringe.",
     publishDate: "2027-08-02",
+    status: "draft",
     category: "Ideas",
     body: `
 <p>Ask employees about their least favorite work memory and "mandatory team building" comes up a lot. The problem isn't the goal of connection; it's the format: forced vulnerability, manufactured competition, or icebreakers nobody asked for. Group dance takes a different route.</p>
@@ -129,6 +134,7 @@ export const weeklyPosts: BlogPost[] = [
     title: "DJ, Band, or Dance Instructor: What Actually Fills a Dance Floor?",
     description: "An honest comparison of the three ways to program dancing at an event, and why the answer for most rooms is a combination.",
     publishDate: "2027-08-09",
+    status: "draft",
     category: "Planning",
     body: `
 <p>You've booked great music before and still watched an empty floor. Music alone doesn't make people dance; permission does. Here's how the three main options compare at the only job that matters: getting guests moving.</p>
@@ -148,6 +154,7 @@ export const weeklyPosts: BlogPost[] = [
     title: "How to Plan a Bachelorette Party Line Dance Class",
     description: "The group activity that includes everyone, photographs perfectly, and doesn't wreck the evening: planning a private line dance lesson for a bachelorette.",
     publishDate: "2027-08-16",
+    status: "draft",
     category: "Ideas",
     body: `
 <p>Every bachelorette itinerary needs one activity that works for the whole group: the dancers and the non-dancers, the early crew and the late arrivals. A private line dance class has quietly become that activity, especially in cities like <a href="/cities/nashville-tn/">Nashville</a> and <a href="/cities/austin-tx/">Austin</a>.</p>
@@ -175,6 +182,7 @@ export const weeklyPosts: BlogPost[] = [
     title: "The Social Media Factor: Why Group Dances Create the Best Event Content",
     description: "Guests film what they're part of. How a guided group dance turns your event into shareable content, and why that matters for hosts and brands.",
     publishDate: "2027-08-23",
+    status: "draft",
     category: "Ideas",
     body: `
 <p>Look at what actually gets posted from events: not the decor or the entertainment on stage, but the moments guests were <em>inside</em>. A room full of people doing the same dance is the single most shareable thing an event can produce, and it's the one kind of content you can plan in advance.</p>

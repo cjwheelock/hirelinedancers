@@ -192,7 +192,7 @@ async function sendSms(job: NotificationJob): Promise<string> {
 
   const form = new URLSearchParams({
     To: job.delivered_to_phone_e164,
-    Body: "Hire Line Dancers: You have a new inquiry to teach. Check your inbox and reply to the organizer by email. Reply STOP to opt out.",
+    Body: "Hire Line Dancers: You have a new inquiry to teach. Check your inbox and reply to the organizer by email. Manage text alerts at https://hirelinedancers.com/account/.",
   });
   if (messagingServiceSid) form.set("MessagingServiceSid", messagingServiceSid);
   else form.set("From", fromNumber!);
@@ -228,6 +228,40 @@ async function sendSms(job: NotificationJob): Promise<string> {
   return payload.sid;
 }
 
+async function requireCurrentSmsConsent(admin: AdminClient, job: NotificationJob): Promise<void> {
+  const { data: recipient, error: recipientError } = await admin
+    .from("inquiry_recipients")
+    .select("instructor_profile_id")
+    .eq("id", job.inquiry_recipient_id)
+    .maybeSingle();
+
+  if (recipientError) {
+    throw new ProviderError("Unable to verify the current SMS recipient", true);
+  }
+  if (!recipient?.instructor_profile_id) {
+    throw new ProviderError("SMS suppressed because the inquiry has no instructor profile", false);
+  }
+
+  const { data: settings, error: settingsError } = await admin
+    .from("instructor_private_settings")
+    .select("inquiry_phone_e164,sms_notifications_enabled,sms_consent_at,sms_opted_out_at")
+    .eq("instructor_profile_id", recipient.instructor_profile_id)
+    .maybeSingle();
+
+  if (settingsError) {
+    throw new ProviderError("Unable to verify current SMS consent", true);
+  }
+  if (
+    !settings
+    || !settings.sms_notifications_enabled
+    || !settings.sms_consent_at
+    || settings.sms_opted_out_at
+    || settings.inquiry_phone_e164 !== job.delivered_to_phone_e164
+  ) {
+    throw new ProviderError("SMS suppressed because current consent is not active for this phone number", false);
+  }
+}
+
 async function finishJob(
   admin: AdminClient,
   job: NotificationJob,
@@ -256,6 +290,9 @@ async function deferJob(admin: AdminClient, job: NotificationJob, error: string)
 
 async function processJob(admin: AdminClient, job: NotificationJob): Promise<string> {
   try {
+    if (job.channel === "sms") {
+      await requireCurrentSmsConsent(admin, job);
+    }
     const providerMessageId = job.channel === "email"
       ? await sendEmail(job)
       : await sendSms(job);

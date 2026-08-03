@@ -6,11 +6,10 @@ export type BlogPost = {
   slug: string;
   title: string;
   description: string;
-  /** ISO date (YYYY-MM-DD). Posts with a future date are excluded from the build
-   *  and go live automatically on the next scheduled Monday rebuild. */
+  /** ISO date (YYYY-MM-DD). Future dates stay out of production builds. */
   publishDate: string;
-  /** Draft posts stay out of production pages, feeds, and sitemaps. Set
-   *  INCLUDE_DRAFT_POSTS=true for a local editorial preview build. */
+  /** Only posts explicitly marked ready appear in production pages, feeds, and
+   *  sitemaps. Set INCLUDE_DRAFT_POSTS=true for a local editorial preview build. */
   status?: "draft" | "ready";
   category: "City guide" | "Planning" | "Ideas";
   citySlug?: string;
@@ -23,12 +22,12 @@ export type BlogPost = {
 
 export const allPosts: BlogPost[] = [...cityPosts, ...employeeAdvocacyPosts, ...weeklyPosts];
 
-/** Posts whose publishDate is on or before the build date, newest first. */
+/** Explicitly approved posts whose publishDate is on or before the build date. */
 export function publishedPosts(): BlogPost[] {
   const now = Date.now();
   const includeDrafts = process.env.INCLUDE_DRAFT_POSTS === "true";
   return allPosts
-    .filter((p) => (includeDrafts || p.status !== "draft") && new Date(p.publishDate).getTime() <= now)
+    .filter((p) => (includeDrafts || p.status === "ready") && new Date(p.publishDate).getTime() <= now)
     .sort((a, b) => b.publishDate.localeCompare(a.publishDate));
 }
 

@@ -6,6 +6,7 @@ export const cityPosts: BlogPost[] = [
     title: "Line Dancing in the San Francisco Bay Area: A Welcoming Group Activity for Events",
     description: "A practical guide to bringing beginner-friendly line dancing to a Bay Area company event, wedding, or private celebration.",
     publishDate: "2026-08-03",
+    status: "draft",
     category: "City guide",
     citySlug: "san-francisco-ca",
     author: "CJ Wheelock",
