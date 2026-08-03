@@ -245,11 +245,24 @@ export type Instructor = {
   styles: string[];
   events: string[];
   tags: string[];
+  headline?: string;
   bio: string;
   sampleFormat: string[];
+  eventDescriptions?: Partial<Record<string, string>>;
+  profileDetails?: {
+    teachingApproach: string;
+    travelNote: string;
+    equipment: string[];
+    venueNeeds: string[];
+    insurance: string;
+    ageGroups: string[];
+    languages: string[];
+    responseTime: string;
+  };
   favoriteSong?: {
     name: string;
     spotifyUrl?: string;
+    note?: string;
   };
 };
 
@@ -257,30 +270,55 @@ export const instructors: Instructor[] = [
   {
     slug: "tessa-mctester",
     name: "Tessa McTester",
-    business: "Tessa's Demo Dance Co.",
+    business: "Tessa McTester Dance Co.",
     photo: "/images/instructors/tessa-mctester.jpg",
     demoEverywhere: true,
-    city: "Every launch market",
-    state: "US",
-    zip: "00000",
-    travelRadius: 0,
-    years: 10,
+    city: "Austin",
+    state: "TX",
+    zip: "78701",
+    travelRadius: 75,
+    years: 8,
     startingRate: 425,
     minHours: 1,
-    groupSize: 500,
+    groupSize: 300,
     founding: false,
     featured: true,
     rating: 5,
     reviews: 0,
-    styles: ["Country line dancing", "Beginner-friendly", "Large groups", "Corporate events"],
+    styles: ["Country line dancing", "Beginner lessons", "Large groups", "Custom playlists"],
     events: ["corporate-events", "weddings", "bar-bat-mitzvahs", "fundraisers", "summer-camps"],
-    tags: ["Fictional demo", "All ages", "Provides sound"],
+    tags: ["Beginner focused", "All ages", "Sound available"],
+    headline: "Beginner-friendly line dancing for parties, celebrations, and large-group events.",
     bio:
-      "Tessa McTester is a fictional demo instructor created to show how a complete profile works. Her sample sessions are welcoming, beginner-friendly, and built to get mixed-age groups dancing together.",
-    sampleFormat: ["Friendly host introduction", "Step-by-step beginner lesson", "Two crowd-favorite dances", "Optional song-request round", "Group photo finale"],
+      "Hi, I’m Tessa, an Austin-based line dance instructor who loves helping a room full of people relax, learn something new, and dance together. I teach private and corporate events throughout Central Texas, and I travel nationally for select dates. My lessons welcome first-time dancers while keeping the experience fun for guests who have danced before. Before each event, I work with the host to choose the music, timing, and lesson format that fit the group.",
+    sampleFormat: [
+      "Welcome, spacing, and rhythm basics, 5 minutes",
+      "Core steps and practice combinations, 10 minutes",
+      "First beginner dance, 15 minutes",
+      "Second dance selected for the group, 20 minutes",
+      "Full-group run-through and optional photo moment, 10 minutes"
+    ],
+    eventDescriptions: {
+      "corporate-events": "An inclusive group activity for team celebrations, conferences, retreats, and company parties.",
+      weddings: "One or two approachable dances that invite guests of different ages onto the floor together.",
+      "bar-bat-mitzvahs": "High-energy, family-friendly instruction with clean music and options for mixed-age groups.",
+      fundraisers: "A structured participation segment that can work as an opener, energizer, or finale.",
+      "summer-camps": "Age-appropriate instruction, repeatable choreography, and music selected with camp staff in advance."
+    },
+    profileDetails: {
+      teachingApproach: "I start with simple steps, clear counts, and plenty of repetition. We learn one short section at a time, practice it with music, and build from there. No partner or prior dance experience is needed. I can offer lower-impact options, adjust the pace, and change the plan in the moment based on the room.",
+      travelNote: "Based in Austin and available throughout Central Texas. National travel is available for select dates when transportation and lodging are included in the event agreement.",
+      equipment: ["Laptop and music adapters", "Wireless headset microphone", "Compact speaker system for groups up to 75"],
+      venueNeeds: ["Clear dance area", "Grounded power access", "Pre-event sound check", "House sound or DJ support for larger rooms"],
+      insurance: "General liability insurance is available. A certificate of insurance can be provided when venue requirements are received at least 10 business days before the event.",
+      ageGroups: ["Children 8+", "Teens", "Adults", "Older adults", "Mixed-age groups"],
+      languages: ["English"],
+      responseTime: "Replies to new event inquiries within one business day."
+    },
     favoriteSong: {
       name: "Choosing Texas by Ella Langley",
-      spotifyUrl: "https://open.spotify.com/track/65DbTqJKhbwqYbZ1Okr0rc"
+      spotifyUrl: "https://open.spotify.com/track/65DbTqJKhbwqYbZ1Okr0rc",
+      note: "I love its modern country sound and confident energy. When it fits the audience, I pair it with choreography selected for the group’s experience level."
     }
   },
   {

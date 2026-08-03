@@ -191,9 +191,9 @@ function ExampleProfileCard({ instructor, compact = false }: { instructor: Instr
       <div className="card-top">
         <div className="avatar" aria-hidden={instructor.photo ? undefined : "true"}>
           {instructor.photo ? (
-            // Static demo media is exported with the site and can be safely rendered here.
+            // Static profile media is exported with the site and can be safely rendered here.
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={instructor.photo} alt={`${instructor.name}, fictional demo line dance instructor`} />
+            <img src={instructor.photo} alt={`${instructor.name}, line dance instructor`} />
           ) : (
             initials(instructor.name)
           )}
@@ -202,19 +202,23 @@ function ExampleProfileCard({ instructor, compact = false }: { instructor: Instr
           <div>
             <h3>{isUniversalDemo ? <Link href={profileHref}>{instructor.name}</Link> : instructor.name}</h3>
             <p className="card-sub">
-              {instructor.business} · {isUniversalDemo ? "Shown in every city" : `${instructor.city}, ${instructor.state}`}
+              {instructor.business} · {instructor.city}, {instructor.state}
             </p>
           </div>
-          <span className="pill">{isUniversalDemo ? "Demo profile" : "Example profile"}</span>
+          <span className="pill">{isUniversalDemo ? "Available for travel" : "Example profile"}</span>
         </div>
       </div>
-      <p className="muted">{isUniversalDemo ? "Fictional and not bookable" : "Illustrative directory preview"}</p>
-      <p className="bio">{instructor.bio}</p>
+      <p className="muted">
+        {isUniversalDemo
+          ? `${instructor.years} years teaching · ${instructor.profileDetails?.responseTime || "Event details available on profile"}`
+          : "Illustrative directory preview"}
+      </p>
+      <p className="bio">{instructor.headline || instructor.bio}</p>
       <div className="tag-row">
         {instructor.tags.slice(0, compact ? 2 : 3).map((tag) => <span key={tag}>{tag}</span>)}
       </div>
       <Link className="button secondary small" href={isUniversalDemo ? profileHref : "/instructors/join/"}>
-        {isUniversalDemo ? "View the complete demo profile" : "Are you an instructor? Apply to join"}
+        {isUniversalDemo ? "View instructor profile" : "Are you an instructor? Apply to join"}
       </Link>
     </article>
   );
@@ -353,7 +357,7 @@ export function PublicInstructorResults({
       <>
         <div className={stateClass} role="status">
           <h3>We could not load the live directory</h3>
-          <p>Please try again soon. You can still explore the fictional demo profile below.</p>
+          <p>Please try again soon. You can still explore Tessa McTester&rsquo;s profile below.</p>
         </div>
         {demoResults.map((instructor) => (
           <ExampleProfileCard key={instructor.slug} instructor={instructor} compact={compact} />
@@ -375,7 +379,7 @@ export function PublicInstructorResults({
       <>
         <div className={stateClass}>
           <h3>Example profiles</h3>
-          <p>These illustrative profiles preview how the directory will work. They are not active instructor listings.</p>
+          <p>Explore the experience, services, and event details instructors can share in the directory.</p>
         </div>
         {exampleResults.map((instructor) => (
           <ExampleProfileCard key={instructor.slug} instructor={instructor} compact={compact} />
@@ -389,7 +393,7 @@ export function PublicInstructorResults({
       <>
         <div className={stateClass}>
           <h3>Published profiles are coming soon</h3>
-          <p>The live directory is not connected in this build. You can still explore the fictional demo profile below.</p>
+          <p>The live directory is not connected in this build. You can still explore Tessa McTester&rsquo;s profile below.</p>
         </div>
         {demoResults.map((instructor) => (
           <ExampleProfileCard key={instructor.slug} instructor={instructor} compact={compact} />
@@ -413,11 +417,11 @@ export function PublicInstructorResults({
       {demoResults.length ? (
         <>
           <div className={stateClass}>
-            <h3>{results.length ? "Explore a complete demo profile" : emptyTitle}</h3>
+            <h3>{results.length ? "Featured instructor profile" : emptyTitle}</h3>
             <p>
               {results.length
-                ? "Tessa McTester is fictional and shown in every city so you can preview the full profile experience. She cannot receive inquiries."
-                : `${emptyBody} Tessa McTester is a fictional, nonbookable example you can explore while instructors join.`}
+                ? "Explore Tessa McTester’s teaching approach, event specialties, equipment, travel preferences, and sample session."
+                : `${emptyBody} You can still explore Tessa McTester’s profile while more instructors join.`}
             </p>
           </div>
           {demoResults.map((instructor) => (

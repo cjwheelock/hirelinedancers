@@ -4,11 +4,13 @@ import { getSpotifyTrackLinks } from "@/lib/spotify";
 export function SpotifyTrack({
   instructorName,
   song,
-  spotifyUrl
+  spotifyUrl,
+  note
 }: {
   instructorName: string;
   song?: string;
   spotifyUrl?: string;
+  note?: string;
 }) {
   const track = getSpotifyTrackLinks(spotifyUrl);
   if (!song && !track) return null;
@@ -26,6 +28,7 @@ export function SpotifyTrack({
           <h2 id="favorite-song-heading">{song || `${instructorName}'s pick`}</h2>
         </div>
       </div>
+      {note ? <p className="favorite-song-note">{note}</p> : null}
       {track && (
         <>
           <iframe

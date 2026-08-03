@@ -15,7 +15,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const instructor = instructors.find((item) => item.slug === slug);
   if (!instructor) return {};
   const title = instructor.demoEverywhere
-    ? `${instructor.name} | Fictional Demo Instructor Profile`
+    ? `${instructor.name} | ${instructor.city}, ${instructor.state} Line Dance Instructor`
     : `${instructor.business} - ${instructor.city}, ${instructor.state} Line Dance Instructor`;
   return {
     title,
@@ -46,16 +46,16 @@ export default async function InstructorPage({ params }: { params: Promise<{ slu
           {instructor.photo ? (
             // Static preview media is exported with the site and does not need image optimization.
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={instructor.photo} alt={`${instructor.name}, fictional demo line dance instructor`} />
+            <img src={instructor.photo} alt={`${instructor.name}, line dance instructor`} />
           ) : (
             instructor.name.split(" ").map((word) => word[0]).join("")
           )}
         </div>
-        <div>
-          <p className="eyebrow">{instructor.demoEverywhere ? "Fictional demo profile" : "Illustrative profile preview"}</p>
+        <div className="profile-hero-copy">
+          <p className="eyebrow">Line dance instructor</p>
           <h1>{instructor.name}</h1>
           <p className="card-sub">{instructor.business}</p>
-          <p className="lede">{instructor.bio}</p>
+          <p className="lede">{instructor.headline || instructor.bio}</p>
           <div className="tag-row">
             {instructor.tags.map((tag) => <span key={tag}>{tag}</span>)}
           </div>
@@ -64,44 +64,104 @@ export default async function InstructorPage({ params }: { params: Promise<{ slu
       <div className="profile-grid">
         <div>
           <div className="stat-grid">
-            <span><MapPin size={18} /> {instructor.demoEverywhere ? "Shown in every launch market" : `${instructor.city}, ${instructor.state}`}</span>
+            <span><MapPin size={18} /> {instructor.city}, {instructor.state}{instructor.demoEverywhere ? " · National travel available" : ""}</span>
             <span><Users size={18} /> Up to {instructor.groupSize} guests</span>
             <span><Clock size={18} /> {instructor.years} years teaching</span>
           </div>
+
           <div className="policy-box">
-            <h2>Sample event format</h2>
+            <h2>About {instructor.name.split(" ")[0]}</h2>
+            <p>{instructor.bio}</p>
+          </div>
+
+          {instructor.profileDetails ? (
+            <div className="policy-box">
+              <h2>Teaching approach</h2>
+              <p>{instructor.profileDetails.teachingApproach}</p>
+            </div>
+          ) : null}
+
+          <div className="policy-box">
+            <h2>{instructor.demoEverywhere ? "Sample 60-minute session" : "Sample event format"}</h2>
             <ul className="check-list">
               {instructor.sampleFormat.map((item) => <li key={item}>{item}</li>)}
             </ul>
           </div>
+
           <div className="policy-box">
-            <h2>Services</h2>
+            <h2>Events and programs</h2>
+            <div className="profile-specialty-grid">
+              {profileEvents.map((event) => (
+                <article key={event.slug}>
+                  <h3>{event.label}</h3>
+                  <p>{instructor.eventDescriptions?.[event.slug] || event.bookingHint}</p>
+                </article>
+              ))}
+            </div>
+
+            <h2>Dance styles and services</h2>
             <div className="tag-row">
               {instructor.styles.map((style) => <span key={style}>{style}</span>)}
             </div>
-            <h3>Available for</h3>
-            <div className="tag-row">
-              {profileEvents.map((event) => <span key={event.slug}>{event.label}</span>)}
-            </div>
             <p>
-              {instructor.demoEverywhere
-                ? "Tessa is a fictional example. Her five sample event types demonstrate how real instructors can describe the work they want."
+              {instructor.profileDetails
+                ? instructor.profileDetails.travelNote
                 : `${instructor.name} serves events within about ${instructor.travelRadius} miles of ${instructor.city}. Confirm availability, exact rates, travel fees, and insurance directly before booking.`}
             </p>
           </div>
+
+          {instructor.profileDetails ? (
+            <>
+              <div className="policy-box">
+                <h2>Equipment and venue setup</h2>
+                <div className="profile-detail-grid">
+                  <div>
+                    <h3>Equipment available</h3>
+                    <ul className="check-list">
+                      {instructor.profileDetails.equipment.map((item) => <li key={item}>{item}</li>)}
+                    </ul>
+                  </div>
+                  <div>
+                    <h3>Venue needs</h3>
+                    <ul className="check-list">
+                      {instructor.profileDetails.venueNeeds.map((item) => <li key={item}>{item}</li>)}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <div className="policy-box">
+                <h2>Who I teach</h2>
+                <div className="tag-row">
+                  {instructor.profileDetails.ageGroups.map((group) => <span key={group}>{group}</span>)}
+                  {instructor.profileDetails.languages.map((language) => <span key={language}>Language: {language}</span>)}
+                </div>
+                <h3>Insurance</h3>
+                <p>{instructor.profileDetails.insurance}</p>
+              </div>
+            </>
+          ) : null}
+
           {instructor.favoriteSong && (
             <SpotifyTrack
               instructorName={instructor.name}
               song={instructor.favoriteSong.name}
               spotifyUrl={instructor.favoriteSong.spotifyUrl}
+              note={instructor.favoriteSong.note}
             />
           )}
         </div>
         <aside className="sticky-panel">
-          <p className="eyebrow">{instructor.demoEverywhere ? "Demo only" : "Example profile"}</p>
-          <h2>This is a preview of how instructor listings can look.</h2>
-          <p>This is not a verified or bookable instructor listing. It cannot receive inquiries. Published profiles from approved instructors will appear in the live directory.</p>
-          <Link className="button primary" href="/instructors/">Browse published instructors</Link>
+          <p className="eyebrow">Booking details</p>
+          <h2>Plan your line dance experience</h2>
+          <p>{instructor.profileDetails?.responseTime || "Event details and availability are confirmed directly with the instructor."}</p>
+          <ul className="check-list profile-booking-list">
+            <li>Rates quoted after reviewing the date, location, group size, and format</li>
+            <li>{instructor.minHours}-hour minimum booking</li>
+            <li>Song requests and accessibility needs discussed before the event</li>
+            <li>Travel, venue access, sound, and insurance confirmed in advance</li>
+          </ul>
+          <Link className="button primary" href="/instructors/">Find an instructor for your event</Link>
           <Link className="button secondary" href="/instructors/join/">Create an instructor profile</Link>
         </aside>
       </div>
