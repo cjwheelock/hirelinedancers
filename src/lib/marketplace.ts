@@ -72,6 +72,17 @@ export type MarketplaceInquiry = {
   message: string | null;
   status: string;
   booking_outcome: string;
+  booking_event_date: string | null;
+  outcome_note: string | null;
+  outcome_reported_at: string | null;
+  outcome_followup_count: number;
+  outcome_last_asked_at: string | null;
+  outcome_next_ask_at: string | null;
+  completion_status: "unknown" | "completed" | "did_not_happen";
+  completion_reported_at: string | null;
+  completion_followup_count: number;
+  completion_last_asked_at: string | null;
+  completion_next_ask_at: string | null;
   first_responded_at: string | null;
 };
 

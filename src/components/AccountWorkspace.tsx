@@ -27,6 +27,7 @@ const danceStyles = [
 
 type ProfileMedia = {
   id: string;
+  instructor_profile_id: string;
   media_type: "headshot" | "image" | "welcome_video" | "video";
   storage_path: string | null;
   external_url: string | null;
@@ -35,9 +36,23 @@ type ProfileMedia = {
   sort_order: number;
 };
 
-export function AccountWorkspace() {
-  const { session, account, loading, error, configured, refresh } = useMarketplaceSession();
+export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean }) {
+  const { session, account, isAdmin, isOwner, loading, error, configured, refresh } = useMarketplaceSession();
   const [signingOut, setSigningOut] = useState(false);
+  const [workspaceMode, setWorkspaceMode] = useState<"admin" | "account">("admin");
+
+  useEffect(() => {
+    if (!isAdmin) {
+      setWorkspaceMode("account");
+      return;
+    }
+    if (adminOnly || account?.role === "admin") {
+      setWorkspaceMode("admin");
+      return;
+    }
+    const params = new URLSearchParams(window.location.search);
+    setWorkspaceMode(params.has("followup") || params.get("tab") === "inquiries" ? "account" : "admin");
+  }, [account?.role, adminOnly, isAdmin]);
 
   async function signOut() {
     const client = getMarketplaceClient();
@@ -60,19 +75,33 @@ export function AccountWorkspace() {
   }
 
   if (!session) {
+    const next = typeof window === "undefined"
+      ? (adminOnly ? "/admin/" : "/account/")
+      : `${window.location.pathname}${window.location.search}`;
     return (
       <section className={`${styles.shell} ${styles.narrow}`}>
         <p className={styles.eyebrow}>Your account</p>
         <h1 className={styles.title}>Sign in to continue</h1>
         <p className={styles.subtitle}>Manage your instructor profile or keep track of the instructors you contacted.</p>
         <div className={styles.buttonRow} style={{ marginTop: 28 }}>
-          <a className={styles.button} href={loginUrl("/account/")}>Sign in</a>
+          <a className={styles.button} href={loginUrl(next)}>Sign in</a>
         </div>
       </section>
     );
   }
 
-  if (!account?.role) {
+  if (adminOnly && !isAdmin) {
+    return (
+      <section className={`${styles.shell} ${styles.narrow}`}>
+        <p className={styles.eyebrow}>Admin access</p>
+        <h1 className={styles.title}>Access restricted</h1>
+        <p className={styles.error}>This dashboard is available only to approved Hire Line Dancers administrators.</p>
+        <a className={styles.secondaryButton} href="/account/">Open my account</a>
+      </section>
+    );
+  }
+
+  if (!account?.role && !isAdmin) {
     return (
       <section className={`${styles.shell} ${styles.narrow}`}>
         <p className={styles.eyebrow}>One quick step</p>
@@ -92,18 +121,25 @@ export function AccountWorkspace() {
     <section className={styles.shell}>
       <div className={styles.topbar}>
         <div>
-          <p className={styles.eyebrow}>{account.role === "instructor" ? "Instructor workspace" : "Planner workspace"}</p>
-          <h1>Welcome, {account.full_name?.split(" ")[0] || "there"}</h1>
-          <p className={styles.muted}>{account.email}</p>
+          <p className={styles.eyebrow}>{workspaceMode === "admin" && isAdmin ? "Admin workspace" : account?.role === "instructor" ? "Instructor workspace" : "Planner workspace"}</p>
+          <h1>Welcome, {account?.full_name?.split(" ")[0] || "there"}</h1>
+          <p className={styles.muted}>{account?.email}</p>
         </div>
         <button className={styles.secondaryButton} type="button" disabled={signingOut} onClick={() => void signOut()}>
           {signingOut ? "Signing out..." : "Sign out"}
         </button>
       </div>
 
-      {account.role === "instructor" ? <InstructorDashboard account={account} /> : null}
-      {account.role === "organizer" ? <OrganizerDashboard /> : null}
-      {account.role === "admin" ? <AdminDashboard /> : null}
+      {!adminOnly && isAdmin && account?.role && account.role !== "admin" ? (
+        <div className={styles.tabs} role="tablist" aria-label="Workspace selection">
+          <button className={`${styles.tab} ${workspaceMode === "admin" ? styles.activeTab : ""}`} type="button" onClick={() => setWorkspaceMode("admin")}>Admin</button>
+          <button className={`${styles.tab} ${workspaceMode === "account" ? styles.activeTab : ""}`} type="button" onClick={() => setWorkspaceMode("account")}>My account</button>
+        </div>
+      ) : null}
+
+      {isAdmin && workspaceMode === "admin" ? <AdminDashboard isOwner={isOwner} /> : null}
+      {workspaceMode === "account" && account?.role === "instructor" ? <InstructorDashboard account={account} /> : null}
+      {workspaceMode === "account" && account?.role === "organizer" ? <OrganizerDashboard /> : null}
     </section>
   );
 }
@@ -211,6 +247,8 @@ function OnboardingForm({
 
 function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
   const [tab, setTab] = useState<"profile" | "media" | "inquiries" | "membership">("profile");
+  const [focusInquiryId, setFocusInquiryId] = useState<string | null>(null);
+  const [focusFollowup, setFocusFollowup] = useState<"booking" | "completion" | null>(null);
   const [profile, setProfile] = useState<InstructorProfile | null>(null);
   const [settings, setSettings] = useState<InstructorPrivateSettings | null>(null);
   const [inquiries, setInquiries] = useState<MarketplaceInquiry[]>([]);
@@ -254,6 +292,31 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
   }, [account.id]);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("checkout") === "success") return;
+
+    const requestedTab = params.get("tab");
+    const requestedInquiry = params.get("inquiry");
+    const requestedFollowup = params.get("followup");
+    const validInquiry = requestedInquiry && /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(requestedInquiry)
+      ? requestedInquiry
+      : null;
+    const validFollowup = requestedFollowup === "booking" || requestedFollowup === "completion"
+      ? requestedFollowup
+      : null;
+
+    if (validInquiry) {
+      setTab("inquiries");
+      setFocusInquiryId(validInquiry);
+      setFocusFollowup(validFollowup);
+      return;
+    }
+    if (["profile", "media", "inquiries", "membership"].includes(requestedTab ?? "")) {
+      setTab(requestedTab as "profile" | "media" | "inquiries" | "membership");
+    }
+  }, [account.id]);
+
+  useEffect(() => {
     if (new URLSearchParams(window.location.search).get("checkout") !== "success") return;
 
     setTab("membership");
@@ -291,6 +354,27 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
     window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
   }, [checkoutPending, profile?.status, settings?.subscription_status]);
 
+  function chooseTab(name: "profile" | "media" | "inquiries" | "membership") {
+    setTab(name);
+    setFocusInquiryId(null);
+    setFocusFollowup(null);
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", name);
+    url.searchParams.delete("inquiry");
+    url.searchParams.delete("followup");
+    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+  }
+
+  function clearInquiryFocus() {
+    setFocusInquiryId(null);
+    setFocusFollowup(null);
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", "inquiries");
+    url.searchParams.delete("inquiry");
+    url.searchParams.delete("followup");
+    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+  }
+
   return (
     <>
       <div className={styles.tabs} role="tablist" aria-label="Instructor account sections">
@@ -301,7 +385,7 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
             type="button"
             role="tab"
             aria-selected={tab === name}
-            onClick={() => setTab(name)}
+            onClick={() => chooseTab(name)}
           >
             {name[0].toUpperCase() + name.slice(1)}
           </button>
@@ -314,7 +398,16 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
         <InstructorProfileForm profile={profile} settings={settings} onSaved={() => void load()} />
       ) : null}
       {!loading && profile && tab === "media" ? <ProfileMediaManager profile={profile} /> : null}
-      {!loading && tab === "inquiries" ? <InquiryList inquiries={inquiries} perspective="instructor" onChange={() => void load()} /> : null}
+      {!loading && tab === "inquiries" ? (
+        <InquiryList
+          inquiries={inquiries}
+          perspective="instructor"
+          focusInquiryId={focusInquiryId}
+          focusFollowup={focusFollowup}
+          onChange={() => void load()}
+          onFeedbackSubmitted={clearInquiryFocus}
+        />
+      ) : null}
       {!loading && profile && tab === "membership" ? (
         <MembershipCard profile={profile} settings={settings} checkoutPending={checkoutPending} />
       ) : null}
@@ -851,15 +944,165 @@ type AdminNotificationJob = {
   created_at: string;
 };
 
-function AdminDashboard() {
+type AdminAccess = {
+  account_id: string;
+  email: string | null;
+  full_name: string | null;
+  is_owner: boolean;
+  granted_at: string;
+};
+
+type AdminFollowupResponse = {
+  id: number;
+  inquiry_id: string;
+  stage: "booking" | "completion";
+  response: string;
+  confirmed_event_date: string | null;
+  private_comment: string | null;
+  submitted_at: string;
+};
+
+type AdminAnalytics = {
+  summary: {
+    inquiries: number;
+    instructors: number;
+    companies: number;
+    booked: number;
+    in_progress: number;
+    not_booked: number;
+    completed: number;
+    did_not_happen: number;
+    cohort_booked: number;
+    cohort_completed: number;
+  };
+  instructors: Array<{
+    instructor_key: string;
+    instructor_name: string;
+    inquiries: number;
+    companies: number;
+    booked: number;
+    completed: number;
+    latest_inquiry_at: string;
+  }>;
+  companies: Array<{
+    company_key: string;
+    company_name: string;
+    contact_email: string | null;
+    inquiries: number;
+    instructors: number;
+    booked: number;
+    completed: number;
+    latest_inquiry_at: string;
+  }>;
+  instructor_companies: Array<{
+    instructor_key: string;
+    instructor_name: string;
+    company_key: string;
+    company_name: string;
+    contact_email: string | null;
+    inquiries: number;
+    booked: number;
+    completed: number;
+    latest_inquiry_at: string;
+  }>;
+  series: Array<{
+    period_start: string;
+    inquiries: number;
+    booked: number;
+    completed: number;
+  }>;
+};
+
+type AdminRangePreset = "today" | "7d" | "30d" | "12m" | "all" | "custom";
+
+const emptyAdminAnalytics: AdminAnalytics = {
+  summary: {
+    inquiries: 0,
+    instructors: 0,
+    companies: 0,
+    booked: 0,
+    in_progress: 0,
+    not_booked: 0,
+    completed: 0,
+    did_not_happen: 0,
+    cohort_booked: 0,
+    cohort_completed: 0
+  },
+  instructors: [],
+  companies: [],
+  instructor_companies: [],
+  series: []
+};
+
+function dateInputValue(date: Date) {
+  const offset = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 10);
+}
+
+function adminRange(
+  preset: AdminRangePreset,
+  customStart: string,
+  customEnd: string
+): { start: string | null; end: string | null; bucket: "day" | "week" | "month" | "year" } {
+  if (preset === "all") return { start: null, end: null, bucket: "month" };
+
+  const now = new Date();
+  const end = new Date(now);
+  end.setHours(24, 0, 0, 0);
+  const start = new Date(now);
+  start.setHours(0, 0, 0, 0);
+
+  if (preset === "7d") start.setDate(start.getDate() - 6);
+  if (preset === "30d") start.setDate(start.getDate() - 29);
+  if (preset === "12m") start.setFullYear(start.getFullYear() - 1);
+  if (preset === "custom") {
+    const customStartDate = new Date(`${customStart}T00:00:00`);
+    const customEndDate = new Date(`${customEnd}T00:00:00`);
+    customEndDate.setDate(customEndDate.getDate() + 1);
+    const days = Math.max(1, (customEndDate.getTime() - customStartDate.getTime()) / 86_400_000);
+    return {
+      start: customStartDate.toISOString(),
+      end: customEndDate.toISOString(),
+      bucket: days > 730 ? "year" : days > 120 ? "month" : days > 45 ? "week" : "day"
+    };
+  }
+
+  return {
+    start: start.toISOString(),
+    end: end.toISOString(),
+    bucket: preset === "12m" ? "month" : "day"
+  };
+}
+
+function percent(numerator: number, denominator: number) {
+  if (!denominator) return "0%";
+  return `${Math.round((numerator / denominator) * 100)}%`;
+}
+
+function AdminDashboard({ isOwner }: { isOwner: boolean }) {
+  const [tab, setTab] = useState<"overview" | "profiles" | "delivery" | "access">("overview");
   const [profiles, setProfiles] = useState<InstructorProfile[]>([]);
   const [inquiries, setInquiries] = useState<MarketplaceInquiry[]>([]);
   const [jobs, setJobs] = useState<AdminNotificationJob[]>([]);
+  const [media, setMedia] = useState<ProfileMedia[]>([]);
+  const [admins, setAdmins] = useState<AdminAccess[]>([]);
+  const [followupResponses, setFollowupResponses] = useState<AdminFollowupResponse[]>([]);
+  const [analytics, setAnalytics] = useState<AdminAnalytics>(emptyAdminAnalytics);
   const [slugs, setSlugs] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState<Record<string, string>>({});
+  const [rangePreset, setRangePreset] = useState<AdminRangePreset>("30d");
+  const [customStart, setCustomStart] = useState(() => {
+    const date = new Date();
+    date.setDate(date.getDate() - 29);
+    return dateInputValue(date);
+  });
+  const [customEnd, setCustomEnd] = useState(() => dateInputValue(new Date()));
+  const [grantEmail, setGrantEmail] = useState("");
   const [loading, setLoading] = useState(true);
+  const [analyticsLoading, setAnalyticsLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
 
   function suggestedSlug(profile: InstructorProfile) {
     return [profile.display_name, profile.city, profile.region]
@@ -870,29 +1113,57 @@ function AdminDashboard() {
       .replace(/^-|-$/g, "");
   }
 
-  async function load() {
+  async function loadOperations() {
     const client = getMarketplaceClient();
     if (!client) return;
     setLoading(true);
     setError(null);
-    const [profileResult, inquiryResult, jobResult] = await Promise.all([
+    const [profileResult, inquiryResult, jobResult, mediaResult, adminResult, feedbackResult] = await Promise.all([
       client.from("instructor_profiles").select("*").order("updated_at", { ascending: false }),
       client.from("inquiries").select("*").order("created_at", { ascending: false }).limit(100),
-      client.from("inquiry_notification_jobs").select("id,channel,notification_type,status,attempts,last_error,created_at").order("created_at", { ascending: false }).limit(100)
+      client.from("inquiry_notification_jobs").select("id,channel,notification_type,status,attempts,last_error,created_at").order("created_at", { ascending: false }).limit(100),
+      client.from("profile_media").select("*").order("sort_order"),
+      client.rpc("list_marketplace_admins"),
+      client.from("inquiry_followup_responses").select("id,inquiry_id,stage,response,confirmed_event_date,private_comment,submitted_at").order("submitted_at", { ascending: false }).limit(100)
     ]);
-    const loadError = profileResult.error ?? inquiryResult.error ?? jobResult.error;
+    const loadError = profileResult.error ?? inquiryResult.error ?? jobResult.error ?? mediaResult.error ?? adminResult.error ?? feedbackResult.error;
     if (loadError) setError(loadError.message);
     const loadedProfiles = (profileResult.data as InstructorProfile[] | null) ?? [];
     setProfiles(loadedProfiles);
     setInquiries((inquiryResult.data as MarketplaceInquiry[] | null) ?? []);
     setJobs((jobResult.data as AdminNotificationJob[] | null) ?? []);
+    setMedia((mediaResult.data as ProfileMedia[] | null) ?? []);
+    setAdmins((adminResult.data as AdminAccess[] | null) ?? []);
+    setFollowupResponses((feedbackResult.data as AdminFollowupResponse[] | null) ?? []);
     setSlugs((current) => Object.fromEntries(loadedProfiles.map((profile) => [profile.id, current[profile.id] ?? profile.slug ?? suggestedSlug(profile)])));
     setLoading(false);
   }
 
+  async function loadAnalytics() {
+    const client = getMarketplaceClient();
+    if (!client) return;
+    setAnalyticsLoading(true);
+    setError(null);
+    const range = adminRange(rangePreset, customStart, customEnd);
+    const { data, error: analyticsError } = await client.rpc("get_marketplace_admin_analytics", {
+      p_start: range.start,
+      p_end: range.end,
+      p_bucket: range.bucket,
+      p_time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone || "America/New_York"
+    });
+    if (analyticsError) setError(analyticsError.message);
+    else setAnalytics((data as AdminAnalytics | null) ?? emptyAdminAnalytics);
+    setAnalyticsLoading(false);
+  }
+
   useEffect(() => {
-    void load();
+    void loadOperations();
   }, []);
+
+  useEffect(() => {
+    if (rangePreset === "custom" && (!customStart || !customEnd || customStart > customEnd)) return;
+    void loadAnalytics();
+  }, [rangePreset, customStart, customEnd]);
 
   async function review(profileId: string, decision: "approve" | "return_to_draft" | "suspend") {
     const client = getMarketplaceClient();
@@ -907,79 +1178,299 @@ function AdminDashboard() {
     });
     setBusyId(null);
     if (reviewError) setError(reviewError.message);
-    else await load();
+    else {
+      setMessage(decision === "approve" ? "Instructor approved for membership checkout." : "Instructor profile updated.");
+      await loadOperations();
+    }
+  }
+
+  async function grantAdmin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const client = getMarketplaceClient();
+    if (!client) return;
+    setBusyId("grant-admin");
+    setError(null);
+    setMessage(null);
+    const { error: grantError } = await client.rpc("grant_marketplace_admin", { p_email: grantEmail.trim() });
+    setBusyId(null);
+    if (grantError) setError(grantError.message);
+    else {
+      setGrantEmail("");
+      setMessage("Admin access granted.");
+      await loadOperations();
+    }
+  }
+
+  async function revokeAdmin(accountId: string) {
+    const client = getMarketplaceClient();
+    if (!client) return;
+    setBusyId(accountId);
+    setError(null);
+    setMessage(null);
+    const { error: revokeError } = await client.rpc("revoke_marketplace_admin", { p_account_id: accountId });
+    setBusyId(null);
+    if (revokeError) setError(revokeError.message);
+    else {
+      setMessage("Admin access revoked.");
+      await loadOperations();
+    }
+  }
+
+  function mediaUrl(item: ProfileMedia) {
+    if (item.external_url) return item.external_url;
+    const client = getMarketplaceClient();
+    if (!client || !item.storage_path) return "";
+    return client.storage.from("instructor-media").getPublicUrl(item.storage_path).data.publicUrl;
   }
 
   const pending = profiles.filter((profile) => profile.status === "pending_review");
   const deliveryFailures = jobs.filter((job) => job.status === "failed");
 
-  if (loading) return <div className={styles.loading}>Loading marketplace operations...</div>;
+  const summary = analytics.summary;
 
   return (
     <>
+      <div className={styles.tabs} role="tablist" aria-label="Admin dashboard sections">
+        {(isOwner
+          ? (["overview", "profiles", "delivery", "access"] as const)
+          : (["overview", "profiles", "delivery"] as const)
+        ).map((name) => (
+          <button key={name} className={`${styles.tab} ${tab === name ? styles.activeTab : ""}`} type="button" onClick={() => setTab(name)}>
+            {name[0].toUpperCase() + name.slice(1)}
+          </button>
+        ))}
+      </div>
       {error ? <p className={styles.error}>{error}</p> : null}
-      <div className={styles.grid}>
-        <article className={styles.card}><p className={styles.eyebrow}>Pending review</p><h2>{pending.length}</h2></article>
-        <article className={styles.card}><p className={styles.eyebrow}>Inquiry records</p><h2>{inquiries.length}</h2></article>
-        <article className={styles.card}><p className={styles.eyebrow}>Notification jobs</p><h2>{jobs.length}</h2></article>
-        <article className={styles.card}><p className={styles.eyebrow}>Delivery failures</p><h2>{deliveryFailures.length}</h2></article>
-      </div>
+      {message ? <p className={styles.success}>{message}</p> : null}
+      {loading ? <div className={styles.loading}>Loading marketplace operations...</div> : null}
 
-      <div className={styles.card}>
-        <h2>Profiles awaiting review</h2>
-        <p className={styles.muted}>Approval unlocks a 30-day free trial, followed by the $14.99 monthly membership. Stripe publishes the profile after the instructor completes checkout with a payment method.</p>
-        {!pending.length ? <p className={styles.notice}>No profiles are waiting for review.</p> : null}
-        <div className={styles.list}>
-          {pending.map((profile) => (
-            <article className={styles.listItem} key={profile.id}>
-              <div className={styles.buttonRow}><h3>{profile.display_name}</h3><span className={styles.status}>{profile.status.replace("_", " ")}</span></div>
-              <p>{[profile.business_name, profile.city, profile.region].filter(Boolean).join(" · ")}</p>
-              <p>{profile.bio || "No bio provided."}</p>
-              <p>Events: {profile.event_types.length ? profile.event_types.join(", ") : "None selected"}</p>
-              <div className={styles.grid}>
-                <label className={styles.field}>
-                  <span>Public profile slug</span>
-                  <input value={slugs[profile.id] ?? ""} onChange={(event) => setSlugs((current) => ({ ...current, [profile.id]: event.target.value }))} />
-                </label>
-                <label className={styles.field}>
-                  <span>Review note</span>
-                  <input value={notes[profile.id] ?? ""} onChange={(event) => setNotes((current) => ({ ...current, [profile.id]: event.target.value }))} />
-                </label>
+      {!loading && tab === "overview" ? (
+        <>
+          <div className={`${styles.card} ${styles.filterBar}`}>
+            <div>
+              <h2>Marketplace performance</h2>
+              <p className={styles.muted}>Every submitted contact form counts as one inquiry. Booking activity uses the date it was reported, and completed gigs use the confirmed event date.</p>
+            </div>
+            <label className={styles.field}>
+              <span>Time frame</span>
+              <select value={rangePreset} onChange={(event) => setRangePreset(event.target.value as AdminRangePreset)}>
+                <option value="today">Today</option>
+                <option value="7d">Last 7 days</option>
+                <option value="30d">Last 30 days</option>
+                <option value="12m">Last 12 months</option>
+                <option value="all">All time</option>
+                <option value="custom">Custom</option>
+              </select>
+            </label>
+            {rangePreset === "custom" ? (
+              <>
+                <label className={styles.field}><span>Start</span><input type="date" value={customStart} onChange={(event) => setCustomStart(event.target.value)} /></label>
+                <label className={styles.field}><span>End</span><input type="date" value={customEnd} onChange={(event) => setCustomEnd(event.target.value)} /></label>
+              </>
+            ) : null}
+          </div>
+
+          {analyticsLoading ? <div className={styles.loading}>Calculating marketplace results...</div> : (
+            <>
+              <div className={styles.metricGrid}>
+                <article className={styles.metricCard}><span>Inquiries</span><strong>{summary.inquiries}</strong></article>
+                <article className={styles.metricCard}><span>Instructors contacted</span><strong>{summary.instructors}</strong></article>
+                <article className={styles.metricCard}><span>Companies</span><strong>{summary.companies}</strong></article>
+                <article className={styles.metricCard}><span>Bookings reported</span><strong>{summary.booked}</strong><small>{percent(summary.cohort_booked, summary.inquiries)} conversion among selected inquiries</small></article>
+                <article className={styles.metricCard}><span>Completed gigs</span><strong>{summary.completed}</strong><small>{percent(summary.cohort_completed, summary.cohort_booked)} completion among selected bookings</small></article>
+                <article className={styles.metricCard}><span>In progress</span><strong>{summary.in_progress}</strong></article>
               </div>
+
+              <div className={styles.card}>
+                <h2>Activity over time</h2>
+                {!analytics.series.length ? <p className={styles.notice}>No inquiry activity in this time frame.</p> : (
+                  <div className={styles.tableWrap}>
+                    <table className={styles.dataTable}>
+                      <thead><tr><th>Period</th><th>Inquiries</th><th>Booked</th><th>Completed</th></tr></thead>
+                      <tbody>{analytics.series.map((row) => (
+                        <tr key={row.period_start}><td>{new Date(`${row.period_start}T12:00:00`).toLocaleDateString()}</td><td>{row.inquiries}</td><td>{row.booked}</td><td>{row.completed}</td></tr>
+                      ))}</tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              <div className={styles.card}>
+                <h2>Performance by instructor</h2>
+                <p className={styles.muted}>Booking and completion columns show the current results for inquiries submitted during this time frame.</p>
+                <div className={styles.tableWrap}>
+                  <table className={styles.dataTable}>
+                    <thead><tr><th>Instructor</th><th>Inquiries</th><th>Companies</th><th>Booked</th><th>Completed</th><th>Booking rate</th></tr></thead>
+                    <tbody>{analytics.instructors.map((row) => (
+                      <tr key={row.instructor_key}><td>{row.instructor_name}</td><td>{row.inquiries}</td><td>{row.companies}</td><td>{row.booked}</td><td>{row.completed}</td><td>{percent(row.booked, row.inquiries)}</td></tr>
+                    ))}</tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className={styles.card}>
+                <h2>Inquiries by instructor and company</h2>
+                <p className={styles.muted}>Use this view to see how many times each company or organizer contacted a specific instructor.</p>
+                <div className={styles.tableWrap}>
+                  <table className={styles.dataTable}>
+                    <thead><tr><th>Instructor</th><th>Company</th><th>Inquiries</th><th>Booked</th><th>Completed</th><th>Latest inquiry</th></tr></thead>
+                    <tbody>{analytics.instructor_companies.map((row) => (
+                      <tr key={`${row.instructor_key}:${row.company_key}`}>
+                        <td>{row.instructor_name}</td>
+                        <td>{row.company_name}{row.contact_email ? <small>{row.contact_email}</small> : null}</td>
+                        <td>{row.inquiries}</td><td>{row.booked}</td><td>{row.completed}</td>
+                        <td>{new Date(row.latest_inquiry_at).toLocaleDateString()}</td>
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className={styles.card}>
+                <h2>Performance by company or organizer</h2>
+                <div className={styles.tableWrap}>
+                  <table className={styles.dataTable}>
+                    <thead><tr><th>Company</th><th>Inquiries</th><th>Instructors</th><th>Booked</th><th>Completed</th><th>Latest inquiry</th></tr></thead>
+                    <tbody>{analytics.companies.map((row) => (
+                      <tr key={row.company_key}><td>{row.company_name}{row.contact_email ? <small>{row.contact_email}</small> : null}</td><td>{row.inquiries}</td><td>{row.instructors}</td><td>{row.booked}</td><td>{row.completed}</td><td>{new Date(row.latest_inquiry_at).toLocaleDateString()}</td></tr>
+                    ))}</tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
+
+          <div className={styles.card}>
+            <h2>Recent inquiries</h2>
+            <div className={styles.tableWrap}>
+              <table className={styles.dataTable}>
+                <thead><tr><th>Submitted</th><th>Company</th><th>Instructor</th><th>Event</th><th>Booking</th><th>Completion</th></tr></thead>
+                <tbody>{inquiries.slice(0, 30).map((inquiry) => (
+                  <tr key={inquiry.id}>
+                    <td>{new Date(inquiry.created_at).toLocaleDateString()}</td>
+                    <td>{inquiry.company_name || inquiry.contact_name || "Individual organizer"}</td>
+                    <td>{inquiry.instructor_name || "Instructor"}</td>
+                    <td>{[inquiry.event_type, inquiry.event_date].filter(Boolean).join(" · ")}</td>
+                    <td><span className={styles.status}>{inquiry.booking_outcome.replaceAll("_", " ")}</span></td>
+                    <td><span className={styles.status}>{inquiry.completion_status.replaceAll("_", " ")}</span></td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className={styles.card}>
+            <h2>Recent instructor feedback</h2>
+            {!followupResponses.length ? <p className={styles.notice}>No instructor follow-up responses yet.</p> : (
+              <div className={styles.list}>{followupResponses.slice(0, 20).map((response) => {
+                const inquiry = inquiries.find((item) => item.id === response.inquiry_id);
+                return (
+                  <article className={styles.listItem} key={response.id}>
+                    <div className={styles.buttonRow}><strong>{inquiry?.instructor_name || "Instructor"}</strong><span className={styles.status}>{response.stage}: {response.response.replaceAll("_", " ")}</span></div>
+                    <p>{[inquiry?.company_name || inquiry?.contact_name, response.confirmed_event_date].filter(Boolean).join(" · ")}</p>
+                    {response.private_comment ? <p>{response.private_comment}</p> : <p>No additional comment.</p>}
+                  </article>
+                );
+              })}</div>
+            )}
+          </div>
+        </>
+      ) : null}
+
+      {!loading && tab === "profiles" ? (
+        <>
+          <div className={styles.card}>
+            <h2>Profiles awaiting review</h2>
+            <p className={styles.muted}>Review the profile copy and all uploaded media before approval. Approval unlocks membership checkout and the 30-day free trial.</p>
+            {!pending.length ? <p className={styles.notice}>No profiles are waiting for review.</p> : null}
+            <div className={styles.list}>
+              {pending.map((profile) => {
+                const profileMedia = media.filter((item) => item.instructor_profile_id === profile.id);
+                return (
+                  <article className={styles.listItem} key={profile.id}>
+                    <div className={styles.buttonRow}><h3>{profile.display_name}</h3><span className={styles.status}>{profile.status.replace("_", " ")}</span></div>
+                    <p>{[profile.business_name, profile.city, profile.region].filter(Boolean).join(" · ")}</p>
+                    <p>{profile.bio || "No bio provided."}</p>
+                    <p>Events: {profile.event_types.length ? profile.event_types.join(", ") : "None selected"}</p>
+                    {!profileMedia.length ? <p className={styles.error}>No profile media has been uploaded.</p> : (
+                      <div className={styles.mediaGrid}>{profileMedia.map((item) => (
+                        <div className={styles.mediaItem} key={item.id}>
+                          {item.media_type === "video" || item.media_type === "welcome_video" ? (
+                            <video className={styles.mediaPreview} src={mediaUrl(item)} controls preload="metadata" />
+                          ) : (
+                            // Uploaded user content has a runtime URL that Next Image cannot optimize during static export.
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img className={styles.mediaPreview} src={mediaUrl(item)} alt={item.caption || item.media_type} />
+                          )}
+                          <span className={styles.status}>{item.media_type.replace("_", " ")}</span>
+                        </div>
+                      ))}</div>
+                    )}
+                    <div className={styles.grid}>
+                      <label className={styles.field}><span>Public profile slug</span><input value={slugs[profile.id] ?? ""} onChange={(event) => setSlugs((current) => ({ ...current, [profile.id]: event.target.value }))} /></label>
+                      <label className={styles.field}><span>Review note</span><input value={notes[profile.id] ?? ""} onChange={(event) => setNotes((current) => ({ ...current, [profile.id]: event.target.value }))} /></label>
+                    </div>
+                    <div className={styles.buttonRow}>
+                      <button className={styles.button} disabled={busyId === profile.id} type="button" onClick={() => void review(profile.id, "approve")}>Approve for payment</button>
+                      <button className={styles.dangerButton} disabled={busyId === profile.id} type="button" onClick={() => void review(profile.id, "return_to_draft")}>Request changes</button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className={styles.card}>
+            <h2>All instructor profiles</h2>
+            <div className={styles.tableWrap}>
+              <table className={styles.dataTable}>
+                <thead><tr><th>Instructor</th><th>Location</th><th>Status</th><th>Action</th></tr></thead>
+                <tbody>{profiles.map((profile) => (
+                  <tr key={profile.id}>
+                    <td>{profile.display_name}</td><td>{[profile.city, profile.region].filter(Boolean).join(", ")}</td><td><span className={styles.status}>{profile.status.replaceAll("_", " ")}</span></td>
+                    <td>{["approved", "published"].includes(profile.status) ? <button className={styles.dangerButton} disabled={busyId === profile.id} type="button" onClick={() => void review(profile.id, "suspend")}>Suspend</button> : null}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      ) : null}
+
+      {!loading && tab === "delivery" ? (
+        <div className={styles.card}>
+          <div className={styles.buttonRow}><h2>Notification delivery</h2><span className={styles.status}>{deliveryFailures.length} failed</span></div>
+          <div className={styles.list}>
+            {jobs.slice(0, 100).map((job) => (
+              <article className={styles.listItem} key={job.id}>
+                <div className={styles.buttonRow}><strong>{job.channel.toUpperCase()} · {job.notification_type.replaceAll("_", " ")}</strong><span className={styles.status}>{job.status}</span></div>
+                <p>{new Date(job.created_at).toLocaleString()} · {job.attempts} attempt{job.attempts === 1 ? "" : "s"}</p>
+                {job.last_error ? <p className={styles.error}>{job.last_error}</p> : null}
+              </article>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {!loading && tab === "access" && isOwner ? (
+        <div className={styles.card}>
+          <h2>Admin access</h2>
+          <p className={styles.muted}>Only people listed here can open the admin dashboard or query marketplace reports. A new admin must sign in once before you grant access.</p>
+          <form className={styles.filterBar} onSubmit={grantAdmin}>
+            <label className={styles.field}><span>Account email</span><input type="email" required value={grantEmail} onChange={(event) => setGrantEmail(event.target.value)} placeholder="person@example.com" /></label>
+            <button className={styles.button} disabled={busyId === "grant-admin"} type="submit">{busyId === "grant-admin" ? "Granting..." : "Grant admin access"}</button>
+          </form>
+          <div className={styles.list}>{admins.map((admin) => (
+            <article className={styles.listItem} key={admin.account_id}>
+              <div><h3>{admin.full_name || admin.email || "Administrator"}</h3><p>{admin.email}</p></div>
               <div className={styles.buttonRow}>
-                <button className={styles.button} disabled={busyId === profile.id} type="button" onClick={() => void review(profile.id, "approve")}>Approve for payment</button>
-                <button className={styles.dangerButton} disabled={busyId === profile.id} type="button" onClick={() => void review(profile.id, "return_to_draft")}>Return to draft</button>
+                <span className={styles.status}>{admin.is_owner ? "Owner" : "Admin"}</span>
+                {!admin.is_owner ? <button className={styles.dangerButton} disabled={busyId === admin.account_id} type="button" onClick={() => void revokeAdmin(admin.account_id)}>Revoke access</button> : null}
               </div>
             </article>
-          ))}
+          ))}</div>
         </div>
-      </div>
-
-      <div className={styles.card}>
-        <h2>Recent inquiries</h2>
-        <div className={styles.list}>
-          {inquiries.slice(0, 20).map((inquiry) => (
-            <article className={styles.listItem} key={inquiry.id}>
-              <div className={styles.buttonRow}><strong>{inquiry.contact_name || "Planner"} to {inquiry.instructor_name || "instructor"}</strong><span className={styles.status}>{inquiry.status}</span></div>
-              <p>{[inquiry.event_type, inquiry.event_date, inquiry.event_city, inquiry.event_region].filter(Boolean).join(" · ")}</p>
-              <p>Outcome: {inquiry.booking_outcome.replace("_", " ")}</p>
-            </article>
-          ))}
-        </div>
-      </div>
-
-      <div className={styles.card}>
-        <h2>Notification delivery</h2>
-        <div className={styles.list}>
-          {jobs.slice(0, 30).map((job) => (
-            <article className={styles.listItem} key={job.id}>
-              <div className={styles.buttonRow}><strong>{job.channel.toUpperCase()} · {job.notification_type.replace("_", " ")}</strong><span className={styles.status}>{job.status}</span></div>
-              <p>{new Date(job.created_at).toLocaleString()} · {job.attempts} attempt{job.attempts === 1 ? "" : "s"}</p>
-              {job.last_error ? <p className={styles.error}>{job.last_error}</p> : null}
-            </article>
-          ))}
-        </div>
-      </div>
+      ) : null}
     </>
   );
 }
@@ -1019,14 +1510,32 @@ function OrganizerDashboard() {
 function InquiryList({
   inquiries,
   perspective,
-  onChange
+  onChange,
+  focusInquiryId = null,
+  focusFollowup = null,
+  onFeedbackSubmitted
 }: {
   inquiries: MarketplaceInquiry[];
   perspective: "organizer" | "instructor";
   onChange: () => void;
+  focusInquiryId?: string | null;
+  focusFollowup?: "booking" | "completion" | null;
+  onFeedbackSubmitted?: () => void;
 }) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [comments, setComments] = useState<Record<string, string>>({});
+  const [eventDates, setEventDates] = useState<Record<string, string>>(() => Object.fromEntries(
+    inquiries.map((inquiry) => [inquiry.id, inquiry.booking_event_date || inquiry.event_date || ""])
+  ));
+
+  useEffect(() => {
+    if (!focusInquiryId || !inquiries.some((inquiry) => inquiry.id === focusInquiryId)) return;
+    const timer = window.setTimeout(() => {
+      document.getElementById(`inquiry-${focusInquiryId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 100);
+    return () => window.clearTimeout(timer);
+  }, [focusInquiryId, inquiries]);
 
   async function setStatus(id: string, status: string) {
     const client = getMarketplaceClient();
@@ -1059,6 +1568,33 @@ function InquiryList({
     else onChange();
   }
 
+  async function submitInstructorFeedback(
+    inquiry: MarketplaceInquiry,
+    stage: "booking" | "completion",
+    response: string
+  ) {
+    const client = getMarketplaceClient();
+    if (!client) return;
+    const requestId = `${inquiry.id}:${stage}`;
+    setBusyId(requestId);
+    setError(null);
+    const { error: actionError } = await client.rpc("submit_instructor_inquiry_feedback", {
+      p_inquiry_id: inquiry.id,
+      p_stage: stage,
+      p_response: response,
+      p_private_comment: comments[requestId]?.trim() || null,
+      p_confirmed_event_date: stage === "booking" && response === "booked"
+        ? eventDates[inquiry.id] || inquiry.event_date
+        : null
+    });
+    setBusyId(null);
+    if (actionError) setError(actionError.message);
+    else {
+      onChange();
+      onFeedbackSubmitted?.();
+    }
+  }
+
   if (!inquiries.length) {
     return <p className={styles.notice}>{perspective === "instructor" ? "No inquiries yet. New inquiries will appear here and arrive by email." : "You have not contacted an instructor yet."}</p>;
   }
@@ -1066,8 +1602,15 @@ function InquiryList({
   return (
     <div className={styles.list}>
       {error ? <p className={styles.error}>{error}</p> : null}
+      {focusInquiryId && !inquiries.some((inquiry) => inquiry.id === focusInquiryId) ? (
+        <p className={styles.error}>That inquiry is not available in this instructor account.</p>
+      ) : null}
       {inquiries.map((inquiry) => (
-        <article className={styles.listItem} key={inquiry.id}>
+        <article
+          className={`${styles.listItem} ${focusInquiryId === inquiry.id ? styles.focusedItem : ""}`}
+          id={`inquiry-${inquiry.id}`}
+          key={inquiry.id}
+        >
           <div className={styles.buttonRow}>
             <span className={styles.status}>{inquiry.status.replace("_", " ")}</span>
             <span className={styles.muted}>{new Date(inquiry.created_at).toLocaleDateString()}</span>
@@ -1086,13 +1629,71 @@ function InquiryList({
             {perspective === "organizer" && !["withdrawn", "booked", "not_booked", "closed"].includes(inquiry.status) ? (
               <button className={styles.dangerButton} disabled={busyId === inquiry.id} type="button" onClick={() => void setStatus(inquiry.id, "withdrawn")}>Withdraw inquiry</button>
             ) : null}
-            {inquiry.booking_outcome === "unknown" || inquiry.booking_outcome === "still_deciding" ? (
+            {perspective === "organizer" && (inquiry.booking_outcome === "unknown" || inquiry.booking_outcome === "still_deciding") ? (
               <>
                 <button className={styles.button} disabled={busyId === inquiry.id} type="button" onClick={() => void reportOutcome(inquiry.id, "booked")}>Booked</button>
                 <button className={styles.dangerButton} disabled={busyId === inquiry.id} type="button" onClick={() => void reportOutcome(inquiry.id, "not_booked")}>Not booked</button>
               </>
             ) : null}
           </div>
+
+          {perspective === "instructor" ? (
+            <div className={`${styles.feedbackPanel} ${focusInquiryId === inquiry.id && focusFollowup === "booking" ? styles.focusedFeedback : ""}`}>
+              <div>
+                <strong>Did this inquiry turn into a booking?</strong>
+                <p>Current result: {inquiry.booking_outcome.replaceAll("_", " ")}</p>
+              </div>
+              <label className={styles.field}>
+                <span>Confirmed event date</span>
+                <input disabled={inquiry.completion_status !== "unknown"} type="date" value={eventDates[inquiry.id] ?? inquiry.event_date ?? ""} onChange={(event) => setEventDates((current) => ({ ...current, [inquiry.id]: event.target.value }))} />
+              </label>
+              <label className={styles.field}>
+                <span>Private comments (optional)</span>
+                <textarea
+                  disabled={inquiry.completion_status !== "unknown"}
+                  maxLength={2000}
+                  placeholder="Your feedback helps us improve Hire Line Dancers."
+                  value={comments[`${inquiry.id}:booking`] ?? ""}
+                  onChange={(event) => setComments((current) => ({ ...current, [`${inquiry.id}:booking`]: event.target.value }))}
+                />
+              </label>
+              <p className={styles.help}>Comments are visible only to you and Hire Line Dancers administrators.</p>
+              {inquiry.completion_status !== "unknown" ? <p className={styles.notice}>The booking result is locked because event completion has already been recorded.</p> : null}
+              <div className={styles.buttonRow}>
+                <button className={styles.button} disabled={inquiry.completion_status !== "unknown" || busyId === `${inquiry.id}:booking`} type="button" onClick={() => void submitInstructorFeedback(inquiry, "booking", "booked")}>Yes, booked</button>
+                <button className={styles.dangerButton} disabled={inquiry.completion_status !== "unknown" || busyId === `${inquiry.id}:booking`} type="button" onClick={() => void submitInstructorFeedback(inquiry, "booking", "not_booked")}>No</button>
+                <button className={styles.secondaryButton} disabled={inquiry.completion_status !== "unknown" || busyId === `${inquiry.id}:booking`} type="button" onClick={() => void submitInstructorFeedback(inquiry, "booking", "still_deciding")}>In progress</button>
+              </div>
+            </div>
+          ) : null}
+
+          {perspective === "instructor" && inquiry.booking_outcome === "booked" ? (() => {
+            const bookingDate = inquiry.booking_event_date || inquiry.event_date;
+            const eventHasArrived = !bookingDate || bookingDate <= dateInputValue(new Date());
+            return (
+              <div className={`${styles.feedbackPanel} ${focusInquiryId === inquiry.id && focusFollowup === "completion" ? styles.focusedFeedback : ""}`}>
+                <div>
+                  <strong>Did the booked event happen?</strong>
+                  <p>Current result: {inquiry.completion_status.replaceAll("_", " ")}</p>
+                </div>
+                {!eventHasArrived ? <p className={styles.notice}>This question opens after the event date, {new Date(`${bookingDate}T00:00:00`).toLocaleDateString()}.</p> : null}
+                <label className={styles.field}>
+                  <span>Private comments (optional)</span>
+                  <textarea
+                    maxLength={2000}
+                    placeholder="Tell us what went well or what could be better."
+                    value={comments[`${inquiry.id}:completion`] ?? ""}
+                    onChange={(event) => setComments((current) => ({ ...current, [`${inquiry.id}:completion`]: event.target.value }))}
+                  />
+                </label>
+                <p className={styles.help}>Comments are visible only to you and Hire Line Dancers administrators.</p>
+                <div className={styles.buttonRow}>
+                  <button className={styles.button} disabled={!eventHasArrived || busyId === `${inquiry.id}:completion`} type="button" onClick={() => void submitInstructorFeedback(inquiry, "completion", "completed")}>Yes, it happened</button>
+                  <button className={styles.dangerButton} disabled={!eventHasArrived || busyId === `${inquiry.id}:completion`} type="button" onClick={() => void submitInstructorFeedback(inquiry, "completion", "did_not_happen")}>No</button>
+                </div>
+              </div>
+            );
+          })() : null}
         </article>
       ))}
     </div>

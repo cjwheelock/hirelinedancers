@@ -40,6 +40,7 @@ The relevant migrations are:
 - `202608020001_add_instructor_favorite_song.sql`
 - `202608020010_marketplace_accounts_and_inquiries.sql`
 - `202608020011_payments_and_notification_workers.sql`
+- `202608040001_admin_analytics_and_inquiry_followups.sql`
 
 Do not recreate the old `instructor_applications` or minimal `inquiries` tables by hand. Migration `202608020010` establishes the marketplace schema and upgrades an older inquiry table if one exists. Migration `202608020011` adds approve-then-pay membership state, webhook idempotency, and notification worker functions.
 
@@ -121,7 +122,17 @@ set role = 'admin'
 where email = 'YOUR_ADMIN_EMAIL';
 ```
 
-After that, the administrator can review instructor profiles through the account workspace and `review_instructor_profile`.
+Then register that account as the permanent marketplace owner:
+
+```sql
+insert into public.marketplace_admins (account_id, is_owner, granted_by)
+select id, true, id
+from public.accounts
+where email = 'YOUR_ADMIN_EMAIL'
+on conflict (account_id) do update set is_owner = true;
+```
+
+After that, the owner can review instructor profiles, open marketplace reports, and grant or revoke additional admin access from `/admin/`. Additional administrators keep their organizer or instructor account type. They must sign in once before the owner can grant access by email.
 
 ## 5. Instructor lifecycle
 
@@ -257,7 +268,7 @@ supabase functions deploy process-inquiry-notifications
 
 ## 10. Configure inquiry delivery
 
-Verify the Resend sending domain before using the production From address. Instructor inquiry emails use the organizer email as `Reply-To`.
+Verify the Resend sending domain before using the production From address. New instructor inquiry emails use the organizer email as `Reply-To`. Booking and event-completion follow-ups link to a private, authenticated response form instead.
 
 SMS is optional. Enable it only when:
 
@@ -290,6 +301,11 @@ Before launch, verify:
 12. The worker sends email with the correct `Reply-To`.
 13. Optional SMS sends only for an opted-in instructor.
 14. Temporary provider failures reschedule a job and terminal failures stop after six attempts.
+15. Only listed administrators can open `/admin/` or query marketplace analytics.
+16. Daily, weekly, monthly, annual, and custom admin reporting totals match raw inquiry records.
+17. A booking follow-up is sent seven days after an unanswered inquiry, exactly once.
+18. A completion follow-up is sent two days after the confirmed date of a booked event, exactly once.
+19. Instructor feedback comments are visible to the instructor and administrators, but not to the organizer.
 
 Run a production build after setting browser environment values:
 

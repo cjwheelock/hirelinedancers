@@ -8,5 +8,5 @@ export const metadata: Metadata = {
 };
 
 export default function AdminPage() {
-  return <AccountWorkspace />;
+  return <AccountWorkspace adminOnly />;
 }

@@ -78,7 +78,12 @@ Stripe refund events are not treated as subscription cancellation. When honoring
 
 Internal worker protected by the named Supabase secret key `automations` in the `apikey` header. It atomically claims up to 25 jobs with `FOR UPDATE SKIP LOCKED`, recovers locks older than 10 minutes, and retries temporary failures with exponential backoff. Six provider attempts are allowed. Missing provider secrets defer work without consuming an attempt.
 
-Email is sent through Resend with the organizer address in `Reply-To`. The email request uses a provider idempotency key. Optional SMS is sent through Twilio and tells the instructor to check email. Each provider request has a 15-second timeout. Provider acceptance is recorded as `sent`. The existing `delivered` state is reserved for future Resend and Twilio delivery webhooks.
+New-inquiry email is sent through Resend with the organizer address in `Reply-To`. The worker also queues two email follow-ups through the same durable job system:
+
+- Seven days after an unanswered inquiry, the instructor is asked whether it was booked: Yes, No, or In progress.
+- Two days after the confirmed date of a booked event, the instructor is asked whether the event happened: Yes or No.
+
+Follow-up links open the authenticated instructor inquiry page. Private comments are available only to the instructor and marketplace administrators. The email request uses a provider idempotency key. Optional SMS is sent through Twilio and tells the instructor to check email. Each provider request has a 15-second timeout. Provider acceptance is recorded as `sent`. The existing `delivered` state is reserved for future Resend and Twilio delivery webhooks.
 
 Database submission limits reduce notification abuse: five inquiries per organizer per hour, 20 per organizer per day, a 10-minute duplicate cooldown for the same event and instructor, and 30 inquiries per instructor target per hour. Configure Resend and Twilio spend alerts and account-level caps as an additional control.
 

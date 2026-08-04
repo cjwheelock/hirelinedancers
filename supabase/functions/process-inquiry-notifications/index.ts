@@ -3,8 +3,11 @@ import type { SupabaseClient } from "npm:@supabase/supabase-js@^2";
 
 type AdminClient = SupabaseClient;
 
+type NotificationType = "new_inquiry" | "booking_followup" | "completion_followup";
+
 type NotificationJob = {
   job_id: number;
+  notification_type: NotificationType | string;
   channel: "email" | "sms";
   attempt_number: number;
   inquiry_recipient_id: string;
@@ -72,7 +75,51 @@ function retryableStatus(status: number): boolean {
   return status === 408 || status === 409 || status === 425 || status === 429 || status >= 500;
 }
 
+function normalizedNotificationType(job: NotificationJob): NotificationType {
+  if (job.notification_type === "booking_followup" || job.notification_type === "completion_followup") {
+    return job.notification_type;
+  }
+  return "new_inquiry";
+}
+
+function inquiryFeedbackUrl(job: NotificationJob, followup: "booking" | "completion"): string {
+  const configuredAppUrl = Deno.env.get("APP_URL")?.trim() || "https://hirelinedancers.com";
+  const base = configuredAppUrl.endsWith("/") ? configuredAppUrl : `${configuredAppUrl}/`;
+  const url = new URL("account/", base);
+  url.searchParams.set("tab", "inquiries");
+  url.searchParams.set("inquiry", job.inquiry_id);
+  url.searchParams.set("followup", followup);
+  return url.toString();
+}
+
 function emailText(job: NotificationJob): string {
+  const notificationType = normalizedNotificationType(job);
+  if (notificationType === "booking_followup") {
+    return [
+      `Hi ${job.instructor_name},`,
+      "",
+      `${job.organizer_name}${job.company_name ? ` from ${job.company_name}` : ""} contacted you through Hire Line Dancers one week ago about a ${job.event_type || "line dance"} event.`,
+      "",
+      "Did this inquiry turn into a booking? Choose Yes, No, or In progress. Your private comments help us improve Hire Line Dancers.",
+      "",
+      `Event date: ${display(job.event_date)}`,
+      `Location: ${display(job.event_location)}`,
+      "",
+      `Share the result: ${inquiryFeedbackUrl(job, "booking")}`,
+    ].join("\n");
+  }
+  if (notificationType === "completion_followup") {
+    return [
+      `Hi ${job.instructor_name},`,
+      "",
+      `We hope your ${job.event_type || "line dance"} event on ${display(job.event_date)} went well.`,
+      "",
+      "Did the event happen? Choose Yes or No. Your private comments help us improve Hire Line Dancers.",
+      "",
+      `Share how it went: ${inquiryFeedbackUrl(job, "completion")}`,
+    ].join("\n");
+  }
+
   return [
     `Hi ${job.instructor_name},`,
     "",
@@ -100,6 +147,33 @@ function emailText(job: NotificationJob): string {
 }
 
 function emailHtml(job: NotificationJob): string {
+  const notificationType = normalizedNotificationType(job);
+  if (notificationType !== "new_inquiry") {
+    const isBooking = notificationType === "booking_followup";
+    const heading = isBooking ? "Did this inquiry turn into a booking?" : "Did the event happen?";
+    const description = isBooking
+      ? `${job.organizer_name}${job.company_name ? ` from ${job.company_name}` : ""} contacted you one week ago about a ${job.event_type || "line dance"} event.`
+      : `We hope your ${job.event_type || "line dance"} event on ${display(job.event_date)} went well.`;
+    const prompt = isBooking
+      ? "Choose Yes, No, or In progress."
+      : "Choose Yes or No.";
+    const href = inquiryFeedbackUrl(job, isBooking ? "booking" : "completion");
+    return `<!doctype html>
+    <html lang="en">
+      <body style="margin:0;background:#fbfaf5;color:#1c2a44;font-family:Arial,sans-serif;line-height:1.55">
+        <div style="max-width:640px;margin:0 auto;padding:32px 20px">
+          <div style="border-top:8px solid #e7a33c;background:#ffffff;padding:30px">
+            <p style="margin:0 0 18px">Hi ${escapeHtml(job.instructor_name)},</p>
+            <h1 style="margin:0 0 16px;font-size:28px;line-height:1.15">${escapeHtml(heading)}</h1>
+            <p style="margin:0 0 12px">${escapeHtml(description)}</p>
+            <p style="margin:0 0 24px">${escapeHtml(prompt)} Your private comments help us improve Hire Line Dancers.</p>
+            <a href="${escapeHtml(href)}" style="display:inline-block;padding:14px 20px;background:#e7a33c;border:2px solid #1c2a44;color:#1c2a44;font-weight:700;text-decoration:none">Share the result</a>
+          </div>
+        </div>
+      </body>
+    </html>`;
+  }
+
   const rows: Array<[string, string]> = [
     ["Event type", display(job.event_type)],
     ["Event date", display(job.event_date)],
@@ -157,8 +231,12 @@ async function sendEmail(job: NotificationJob): Promise<string> {
       body: JSON.stringify({
         from,
         to: [job.delivered_to_email],
-        reply_to: job.organizer_email,
-        subject: `New ${job.event_type || "event"} inquiry from ${job.organizer_name}`,
+        ...(normalizedNotificationType(job) === "new_inquiry" ? { reply_to: job.organizer_email } : {}),
+        subject: normalizedNotificationType(job) === "booking_followup"
+          ? "Did this inquiry turn into a booking?"
+          : normalizedNotificationType(job) === "completion_followup"
+          ? "How did your line dance event go?"
+          : `New ${job.event_type || "event"} inquiry from ${job.organizer_name}`,
         text: emailText(job),
         html: emailHtml(job),
       }),
@@ -190,9 +268,15 @@ async function sendSms(job: NotificationJob): Promise<string> {
     throw new ConfigurationError("Configure TWILIO_MESSAGING_SERVICE_SID or TWILIO_FROM_NUMBER");
   }
 
+  const smsBody = normalizedNotificationType(job) === "booking_followup"
+    ? `Hire Line Dancers: Did this inquiry become a booking? Update it at ${inquiryFeedbackUrl(job, "booking")}`
+    : normalizedNotificationType(job) === "completion_followup"
+    ? `Hire Line Dancers: Did your event happen? Update it at ${inquiryFeedbackUrl(job, "completion")}`
+    : "Hire Line Dancers: You have a new inquiry to teach. Check your inbox and reply to the organizer by email. Manage text alerts at https://hirelinedancers.com/account/.";
+
   const form = new URLSearchParams({
     To: job.delivered_to_phone_e164,
-    Body: "Hire Line Dancers: You have a new inquiry to teach. Check your inbox and reply to the organizer by email. Manage text alerts at https://hirelinedancers.com/account/.",
+    Body: smsBody,
   });
   if (messagingServiceSid) form.set("MessagingServiceSid", messagingServiceSid);
   else form.set("From", fromNumber!);
@@ -332,7 +416,13 @@ export default {
     const body = await req.json().catch(() => ({})) as { limit?: number };
     const requestedLimit = Number.isInteger(body.limit) ? Number(body.limit) : 10;
     const limit = Math.max(1, Math.min(requestedLimit, 25));
-    const { data, error } = await ctx.supabaseAdmin.rpc("claim_inquiry_notification_jobs", {
+    const { error: enqueueError } = await ctx.supabaseAdmin.rpc("enqueue_due_inquiry_followups");
+    if (enqueueError) {
+      console.error("Unable to enqueue due inquiry follow-ups", enqueueError.code, enqueueError.message);
+      return Response.json({ error: "Unable to enqueue inquiry follow-ups" }, { status: 500 });
+    }
+
+    const { data, error } = await ctx.supabaseAdmin.rpc("claim_inquiry_notification_jobs_v2", {
       p_limit: limit,
       p_lock_timeout: "10 minutes",
     });

@@ -57,6 +57,92 @@
   gap: 20px;
 }
 
+.metricGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 24px;
+}
+
+.metricCard {
+  display: grid;
+  gap: 8px;
+  min-height: 150px;
+  align-content: space-between;
+  padding: 20px;
+  border: 2px solid #1c2a44;
+  background: #fbfaf5;
+}
+
+.metricCard span {
+  color: #57607a;
+  font: 700 0.74rem/1.3 "IBM Plex Mono", monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.metricCard strong {
+  color: #1c2a44;
+  font-family: Anton, Impact, sans-serif;
+  font-size: 3rem;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.metricCard small {
+  color: #6d7488;
+}
+
+.filterBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-end;
+}
+
+.filterBar > :first-child {
+  flex: 1 1 280px;
+}
+
+.filterBar .field {
+  min-width: 170px;
+}
+
+.tableWrap {
+  width: 100%;
+  overflow-x: auto;
+  margin-top: 20px;
+}
+
+.dataTable {
+  width: 100%;
+  min-width: 680px;
+  border-collapse: collapse;
+  background: #fff;
+}
+
+.dataTable th,
+.dataTable td {
+  padding: 13px 14px;
+  border-bottom: 1px solid #c6c8d0;
+  text-align: left;
+  vertical-align: top;
+}
+
+.dataTable th {
+  background: #1c2a44;
+  color: #fbfaf5;
+  font: 700 0.72rem/1.3 "IBM Plex Mono", monospace;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.dataTable td small {
+  display: block;
+  margin-top: 4px;
+  color: #6d7488;
+}
+
 .stack {
   display: grid;
   gap: 18px;
@@ -300,6 +386,29 @@
   background: #fff;
 }
 
+.focusedItem {
+  border-color: #b5472b;
+  box-shadow: 0 0 0 4px rgb(181 71 43 / 14%);
+}
+
+.feedbackPanel {
+  display: grid;
+  gap: 14px;
+  margin-top: 8px;
+  padding: 18px;
+  border: 1px solid #9ba0af;
+  background: #f1efe8;
+}
+
+.feedbackPanel p {
+  margin: 5px 0 0;
+}
+
+.focusedFeedback {
+  border: 2px solid #b5472b;
+  background: #fff8ed;
+}
+
 .listItem h3,
 .listItem p {
   margin: 0;
@@ -376,6 +485,7 @@
   }
 
   .grid,
+  .metricGrid,
   .roleGrid,
   .checkGrid,
   .mediaGrid {

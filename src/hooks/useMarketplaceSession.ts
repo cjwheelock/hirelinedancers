@@ -11,6 +11,8 @@ import {
 type SessionState = {
   session: Session | null;
   account: MarketplaceAccount | null;
+  isAdmin: boolean;
+  isOwner: boolean;
   loading: boolean;
   error: string | null;
 };
@@ -19,6 +21,8 @@ export function useMarketplaceSession() {
   const [state, setState] = useState<SessionState>({
     session: null,
     account: null,
+    isAdmin: false,
+    isOwner: false,
     loading: true,
     error: null
   });
@@ -26,21 +30,29 @@ export function useMarketplaceSession() {
   const loadAccount = useCallback(async (session: Session | null) => {
     const client = getMarketplaceClient();
     if (!client || !session) {
-      setState({ session, account: null, loading: false, error: null });
+      setState({ session, account: null, isAdmin: false, isOwner: false, loading: false, error: null });
       return;
     }
 
-    const { data, error } = await client
-      .from("accounts")
-      .select("id,email,full_name,role,company_name,phone_e164,sms_opt_in,onboarding_completed_at")
-      .eq("id", session.user.id)
-      .maybeSingle();
+    const [accountResult, adminResult, ownerResult] = await Promise.all([
+      client
+        .from("accounts")
+        .select("id,email,full_name,role,company_name,phone_e164,sms_opt_in,onboarding_completed_at")
+        .eq("id", session.user.id)
+        .maybeSingle(),
+      client.rpc("current_marketplace_admin_status"),
+      client.rpc("current_marketplace_owner_status")
+    ]);
+
+    const account = (accountResult.data as MarketplaceAccount | null) ?? null;
 
     setState({
       session,
-      account: (data as MarketplaceAccount | null) ?? null,
+      account,
+      isAdmin: Boolean(adminResult.data) || account?.role === "admin",
+      isOwner: Boolean(ownerResult.data) || account?.role === "admin",
       loading: false,
-      error: error?.message ?? null
+      error: accountResult.error?.message ?? adminResult.error?.message ?? ownerResult.error?.message ?? null
     });
   }, []);
 
@@ -50,6 +62,8 @@ export function useMarketplaceSession() {
       setState({
         session: null,
         account: null,
+        isAdmin: false,
+        isOwner: false,
         loading: false,
         error: "Supabase is not configured for this build."
       });
@@ -60,7 +74,7 @@ export function useMarketplaceSession() {
     void client.auth.getSession().then(({ data, error }) => {
       if (!active) return;
       if (error) {
-        setState({ session: null, account: null, loading: false, error: error.message });
+        setState({ session: null, account: null, isAdmin: false, isOwner: false, loading: false, error: error.message });
         return;
       }
       void loadAccount(data.session);
