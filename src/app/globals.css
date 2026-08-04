@@ -1016,6 +1016,17 @@ main { display: block; }
   margin: 0 auto;
 }
 .about-intro h2 { max-width: 15ch; font-size: clamp(36px, 4.8vw, 62px); text-wrap: balance; }
+.about-founder { min-width: 0; }
+.about-instagram-reel {
+  display: block;
+  width: 100%;
+  max-width: 420px;
+  aspect-ratio: 9 / 16;
+  margin-top: clamp(28px, 4vw, 42px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+}
 .about-prose { display: grid; gap: 22px; padding-top: 30px; }
 .about-prose p { color: var(--ink-2); font-size: clamp(17px, 1.45vw, 20px); line-height: 1.72; text-wrap: pretty; }
 .about-prose a { color: var(--sunset-deep); font-weight: 700; text-underline-offset: 3px; }

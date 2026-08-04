@@ -68,9 +68,17 @@ export default function AboutPage() {
 
         <section className="about-intro section" aria-labelledby="shared-experience-title">
           <div className="about-intro-grid">
-            <div>
+            <div className="about-founder">
               <p className="eyebrow">A shared experience</p>
               <h2 id="shared-experience-title">Hi, I&rsquo;m CJ.</h2>
+              <iframe
+                className="about-instagram-reel"
+                src="https://www.instagram.com/reel/DbmgUcPAlKC/embed/"
+                title="CJ introducing Hire Line Dancers on Instagram"
+                allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+                allowFullScreen
+                loading="lazy"
+              />
             </div>
             <div className="about-prose">
               <p>
