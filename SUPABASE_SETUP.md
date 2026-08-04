@@ -11,7 +11,7 @@ The migrations and Edge Function source are in this repository. Creating or chan
 3. A database trigger creates one `accounts` row for each Supabase Auth user.
 4. Account onboarding assigns the user an `organizer` or `instructor` role.
 5. Instructors complete a private workspace, upload media, and submit a profile for review.
-6. An administrator approves the profile. Approval enables the fixed $14.99 monthly Stripe Checkout flow.
+6. An administrator approves the profile. Approval enables Stripe Checkout with a payment method required, 30 days free, then the fixed $14.99 monthly membership.
 7. A signature-verified Stripe webhook publishes profiles with active or trialing memberships and unpublishes profiles when the membership ends. Profile content is preserved.
 8. Signed-in instructors open Stripe Customer Portal to cancel, update payment methods, or review invoices.
 9. Organizers can browse without signing in. They must sign in and finish organizer onboarding before the authenticated `submit_inquiry` database function accepts an inquiry.
@@ -156,16 +156,22 @@ The bucket is public so approved profile media can render on the public director
 
 The server flow uses Stripe Checkout Sessions, not a Payment Link.
 
-The external Stripe account structure is pending owner review. Two options remain:
+The dedicated Stripe sandbox account is named `Hire a Line Dancer`. As of August 4, 2026, it contains:
 
-- Use the existing OMG Goals, LLC Stripe account with a dedicated Hire Line Dancers Product and Price.
-- Create a separate Stripe account or business structure if accounting, branding, or risk separation requires it.
+- Account: `acct_1T446hLOrJYSNwve`
+- Product: `prod_V0muMszWESoxub`
+- Monthly Price: `price_1U0lL5LOrJYSNwvel9UaZQef`
+- Customer Portal configuration: `bpc_1U0lR6LOrJYSNwvei82AsCOD`
+- Manual 100 percent, once-only coupon: `W4HOTg2J`
+- Webhook destination: `we_1U0lYkLOrJYSNwveYV3TCOMm`
 
-The current code safely supports a shared Stripe account by processing only the exact `STRIPE_PRICE_ID` and by adding `product_line=hire_line_dancers` metadata. No Stripe Product, Price, account, or webhook endpoint has been created by this repository.
+Cards, Link, Apple Pay, and Google Pay are enabled. The Portal allows payment-method updates, invoice history, and cancellation at the end of the billing period. It does not allow plan or quantity changes.
 
-After the account decision:
+The Supabase project currently uses the sandbox Stripe key, Price, Portal configuration, and webhook secret. Sandbox checkout cannot charge a real card. Before accepting payments, the owner must complete Stripe business verification and payout setup, then create matching live-mode resources and replace all four Stripe secrets in Supabase.
 
-1. Create one recurring USD Price for exactly $14.99 per month.
+For live mode:
+
+1. Create one recurring USD Price for exactly $14.99 per month. Checkout supplies the universal 30-day trial, so the Price itself should not have a trial setting.
 2. Save its `price_...` identifier as the `STRIPE_PRICE_ID` Edge Function secret.
 3. Configure a webhook endpoint at:
 
@@ -186,7 +192,7 @@ https://YOUR_PROJECT_REF.supabase.co/functions/v1/stripe-webhook
 
 5. Save the endpoint signing secret as `STRIPE_WEBHOOK_SIGNING_SECRET`.
 
-The exact browser-invoked Checkout function is `create-instructor-checkout`. It requires a valid user JWT, an owned profile with status `approved`, and the verified fixed monthly Price.
+The exact browser-invoked Checkout function is `create-instructor-checkout`. It requires a valid user JWT, an owned profile with status `approved`, and the verified fixed monthly Price. It requires a payment method, gives a first-time instructor one 30-day trial, and prevents a second trial after that instructor has had a Stripe subscription.
 
 Enable Stripe Customer Portal for payment-method updates, invoice history, and subscription cancellation. The authenticated `create-billing-portal` function verifies ownership and the exact Hire Line Dancers Price before creating a Portal Session. A dedicated Portal configuration is recommended when Hire Line Dancers shares a Stripe account with another product line.
 

@@ -49,6 +49,8 @@ export type InstructorPrivateSettings = {
   minimum_rate_cents: number | null;
   minimum_hours: number | null;
   payment_methods: string[];
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
   subscription_status: string;
   response_reminders_enabled: boolean;
 };

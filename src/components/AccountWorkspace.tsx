@@ -215,12 +215,13 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
   const [settings, setSettings] = useState<InstructorPrivateSettings | null>(null);
   const [inquiries, setInquiries] = useState<MarketplaceInquiry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [checkoutPending, setCheckoutPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function load() {
+  async function load(silent = false) {
     const client = getMarketplaceClient();
     if (!client) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     setError(null);
 
     const { data: profileData, error: profileError } = await client
@@ -252,6 +253,44 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
     void load();
   }, [account.id]);
 
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("checkout") !== "success") return;
+
+    setTab("membership");
+    setCheckoutPending(true);
+    let stopped = false;
+    let attempts = 0;
+    let timer: number | undefined;
+
+    async function pollForMembership() {
+      await load(true);
+      attempts += 1;
+      if (!stopped && attempts < 6) {
+        timer = window.setTimeout(() => void pollForMembership(), 1500);
+      } else if (!stopped) {
+        setCheckoutPending(false);
+      }
+    }
+
+    timer = window.setTimeout(() => void pollForMembership(), 500);
+    return () => {
+      stopped = true;
+      if (timer) window.clearTimeout(timer);
+    };
+  }, [account.id]);
+
+  useEffect(() => {
+    if (!checkoutPending) return;
+    const membershipConfirmed = profile?.status === "published"
+      || ["trialing", "active", "past_due", "unpaid", "paused"].includes(settings?.subscription_status ?? "");
+    if (!membershipConfirmed) return;
+
+    setCheckoutPending(false);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("checkout");
+    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+  }, [checkoutPending, profile?.status, settings?.subscription_status]);
+
   return (
     <>
       <div className={styles.tabs} role="tablist" aria-label="Instructor account sections">
@@ -276,7 +315,9 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
       ) : null}
       {!loading && profile && tab === "media" ? <ProfileMediaManager profile={profile} /> : null}
       {!loading && tab === "inquiries" ? <InquiryList inquiries={inquiries} perspective="instructor" onChange={() => void load()} /> : null}
-      {!loading && profile && tab === "membership" ? <MembershipCard profile={profile} settings={settings} /> : null}
+      {!loading && profile && tab === "membership" ? (
+        <MembershipCard profile={profile} settings={settings} checkoutPending={checkoutPending} />
+      ) : null}
     </>
   );
 }
@@ -703,7 +744,15 @@ function ProfileMediaManager({ profile }: { profile: InstructorProfile }) {
   );
 }
 
-function MembershipCard({ profile, settings }: { profile: InstructorProfile; settings: InstructorPrivateSettings | null }) {
+function MembershipCard({
+  profile,
+  settings,
+  checkoutPending,
+}: {
+  profile: InstructorProfile;
+  settings: InstructorPrivateSettings | null;
+  checkoutPending: boolean;
+}) {
   const [busy, setBusy] = useState<"checkout" | "portal" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const checkoutRequestKey = useRef<string | null>(null);
@@ -750,21 +799,32 @@ function MembershipCard({ profile, settings }: { profile: InstructorProfile; set
     window.location.assign(data.url);
   }
 
+  const trialEligible = !settings?.stripe_subscription_id;
   const canManage = profile.status === "published"
-    || ["trialing", "active", "past_due", "paused"].includes(settings?.subscription_status ?? "");
+    || ["trialing", "active", "past_due", "unpaid", "paused"].includes(settings?.subscription_status ?? "");
 
   return (
     <div className={styles.card}>
       <p className={styles.eyebrow}>Instructor membership</p>
-      <h2>$14.99 per month</h2>
-      <p>Your membership starts only after your profile is approved. It includes the first-year booking guarantee described in the refund policy.</p>
+      <h2>{trialEligible ? "First 30 days free, then $14.99 per month" : "$14.99 per month"}</h2>
+      {trialEligible ? (
+        <p>Your membership starts only after your profile is approved. Stripe securely collects your payment method at checkout, but you will not be charged until your 30-day free trial ends. Cancel before then and you will not be charged. Your membership also includes the first-year booking guarantee described in the refund policy.</p>
+      ) : (
+        <p>Restart your instructor membership for $14.99 per month. The introductory free month is available once per instructor. Your first-year booking guarantee remains governed by the refund policy.</p>
+      )}
       <p><span className={styles.status}>{settings?.subscription_status ?? "inactive"}</span></p>
       {profile.status === "approved" ? (
         <>
-          <p>Your profile has been approved. Activate membership to publish it in the directory.</p>
-          <button className={styles.button} type="button" disabled={busy !== null} onClick={() => void activateMembership()}>
-            {busy === "checkout" ? "Opening secure checkout..." : "Activate membership"}
-          </button>
+          {checkoutPending ? (
+            <p className={styles.notice}>Stripe received your checkout. We are confirming your membership now. This usually takes a few seconds.</p>
+          ) : (
+            <>
+              <p>Your profile has been approved. {trialEligible ? "Start your free month" : "Restart your membership"} to publish it in the directory.</p>
+              <button className={styles.button} type="button" disabled={busy !== null} onClick={() => void activateMembership()}>
+                {busy === "checkout" ? "Opening secure checkout..." : trialEligible ? "Start my free month" : "Restart membership"}
+              </button>
+            </>
+          )}
         </>
       ) : null}
       {profile.status === "draft" || profile.status === "pending_review" ? (
@@ -867,7 +927,7 @@ function AdminDashboard() {
 
       <div className={styles.card}>
         <h2>Profiles awaiting review</h2>
-        <p className={styles.muted}>Approval unlocks the $14.99 monthly membership checkout. Stripe publishes the profile only after successful payment.</p>
+        <p className={styles.muted}>Approval unlocks a 30-day free trial, followed by the $14.99 monthly membership. Stripe publishes the profile after the instructor completes checkout with a payment method.</p>
         {!pending.length ? <p className={styles.notice}>No profiles are waiting for review.</p> : null}
         <div className={styles.list}>
           {pending.map((profile) => (

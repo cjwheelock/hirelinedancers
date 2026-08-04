@@ -2,6 +2,7 @@ import { withSupabase } from "npm:@supabase/server@^1";
 import Stripe from "npm:stripe@^22";
 
 const MONTHLY_PRICE_CENTS = 1499;
+const TRIAL_PERIOD_DAYS = 30;
 
 function requiredEnv(name: string): string {
   const value = Deno.env.get(name)?.trim();
@@ -178,12 +179,14 @@ export default {
       successUrl.searchParams.set("checkout", "success");
       const cancelUrl = new URL("/account/", baseUrl);
       cancelUrl.searchParams.set("checkout", "canceled");
+      const trialEligible = !settings.stripe_subscription_id;
 
       const session = await stripe.checkout.sessions.create({
         mode: "subscription",
         customer: customerId,
         client_reference_id: profile.id,
         line_items: [{ price: priceId, quantity: 1 }],
+        payment_method_collection: "always",
         success_url: successUrl.toString(),
         cancel_url: cancelUrl.toString(),
         metadata: {
@@ -192,6 +195,14 @@ export default {
           product_line: "hire_line_dancers",
         },
         subscription_data: {
+          ...(trialEligible ? {
+            trial_period_days: TRIAL_PERIOD_DAYS,
+            trial_settings: {
+              end_behavior: {
+                missing_payment_method: "cancel" as const,
+              },
+            },
+          } : {}),
           metadata: {
             instructor_profile_id: profile.id,
             account_id: accountId,

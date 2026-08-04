@@ -13,7 +13,7 @@ and party planners find line dance instructors near them.
 - One headshot, up to three additional images, one welcome video, and up to three teaching or dancing videos
 - Authenticated inquiry forms, inquiry status tracking, and self-reported booking outcomes
 - Durable Resend email and optional Twilio SMS notification jobs
-- Personally reviewed approve-then-pay Stripe Checkout flow at $14.99 per month
+- Personally reviewed approve-then-activate Stripe Checkout flow with 30 days free, then $14.99 per month
 - Stripe Customer Portal and signature-verified membership webhooks
 - Legal pages, buyer cost guide, blog, RSS feed, `sitemap.xml`, `robots.txt`, `llms.txt`, schema markup, and `CNAME`
 - Auto-deploy to GitHub Pages via GitHub Actions

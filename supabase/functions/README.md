@@ -14,8 +14,9 @@ The function:
 2. Requires the caller to own an instructor profile whose status is exactly `approved`.
 3. Reads the fixed Stripe Price ID from a server secret.
 4. Verifies that the Price is active, recurring monthly, USD, and exactly $14.99.
-5. Reuses an unexpired Checkout Session when possible.
-6. Creates Stripe Checkout in subscription mode with the instructor UUID in Checkout and Subscription metadata.
+5. Requires a payment method and gives first-time instructors a single 30-day free trial.
+6. Reuses an unexpired Checkout Session when possible.
+7. Creates Stripe Checkout in subscription mode with the instructor UUID in Checkout and Subscription metadata.
 
 The browser should send a stable random value in the `Idempotency-Key` header when retrying the same action. The value must contain 8 to 64 ASCII letters, numbers, underscores, or hyphens.
 
@@ -198,7 +199,7 @@ limit 50;
 
 ## Operational caveats
 
-- Stripe must contain an active recurring Price for exactly $14.99 USD per month, and `STRIPE_PRICE_ID` must reference it.
+- Stripe must contain an active recurring Price for exactly $14.99 USD per month, and `STRIPE_PRICE_ID` must reference it. The Checkout function applies the 30-day trial and requires a payment method.
 - Configure Stripe Customer Portal for payment-method updates, invoice history, and subscription cancellation before showing the production Manage membership button.
 - Configure Stripe to send the listed events to `/functions/v1/stripe-webhook` and copy that endpoint's signing secret into Supabase.
 - Verify the Resend sending domain before using the production From address.

@@ -4,7 +4,7 @@ export default function TermsPage() {
   return (
     <section className="page-shell article-page">
       <h1>Terms of Service</h1>
-      <p>Last updated: August 2, 2026.</p>
+      <p>Last updated: August 4, 2026.</p>
       <h2>Marketplace role</h2>
       <p>Hire Line Dancers is a directory and lead-generation service. Instructors are independent providers, not employees or agents of Hire Line Dancers.</p>
       <p>Event organizers and instructors communicate and contract directly. They are responsible for confirming rates, availability, insurance, travel fees, safety requirements, contracts, deposits, refunds, payment terms, and event details. Hire Line Dancers does not process or guarantee payments between organizers and instructors.</p>
@@ -12,7 +12,8 @@ export default function TermsPage() {
       <p>You must provide accurate information, protect access to your account, and use the service only for legitimate event or teaching needs. Organizers may browse without an account but must sign in before sending an inquiry. An inquiry is not a booking and does not require an instructor to accept an event.</p>
       <p>Instructors should make reasonable efforts to respond to inquiries within the response window shown on their profile, including when they are unavailable. Hire Line Dancers does not guarantee a particular number of inquiries or bookings.</p>
       <h2>Instructor membership</h2>
-      <p>Approved instructors may activate a membership for $14.99 per month. The membership renews automatically each month until canceled. Billing is processed by Stripe. Any applicable taxes may be added. Cancellation takes effect at the end of the current paid period unless the law requires otherwise.</p>
+      <p>Approved instructors may activate a membership with a 30-day free trial, followed by $14.99 per month. A valid payment method is required when the trial begins. Unless canceled, the first charge occurs when the 30-day trial ends, and the membership renews automatically each month after that. Billing is processed by Stripe. Any applicable taxes may be added.</p>
+      <p>You may cancel through your account before the trial ends to avoid the first charge. After a paid period begins, cancellation takes effect at the end of the current paid period unless the law requires otherwise.</p>
       <p>The first-year booking guarantee is governed by the separate <a href="/legal/refund-policy/">refund policy</a>. Other payments are nonrefundable except where required by law or expressly stated.</p>
       <h2>Profile content</h2>
       <p>Instructor-submitted content may be displayed on profiles, city pages, event pages, and marketing surfaces for the purpose of operating and promoting the directory.</p>
