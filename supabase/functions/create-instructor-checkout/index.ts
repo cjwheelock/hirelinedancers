@@ -2,7 +2,7 @@ import { withSupabase } from "npm:@supabase/server@^1";
 import Stripe from "npm:stripe@^22";
 
 const MONTHLY_PRICE_CENTS = 1499;
-const TRIAL_PERIOD_DAYS = 30;
+const CHECKOUT_TERMS_VERSION = "2026-08-promo-codes";
 
 function requiredEnv(name: string): string {
   const value = Deno.env.get(name)?.trim();
@@ -31,6 +31,14 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
+function stripeErrorCode(error: unknown): string | null {
+  if (!error || typeof error !== "object") return null;
+  const candidate = error as { code?: unknown; raw?: { code?: unknown } };
+  if (typeof candidate.code === "string") return candidate.code;
+  if (typeof candidate.raw?.code === "string") return candidate.raw.code;
+  return null;
+}
+
 const stripe = new Stripe(requiredEnv("STRIPE_SECRET_KEY"));
 
 export default {
@@ -50,6 +58,7 @@ export default {
     if (!accountId) return json({ error: "Authentication required" }, 401);
 
     const priceId = requiredEnv("STRIPE_PRICE_ID");
+    const requireTermsConsent = Deno.env.get("STRIPE_REQUIRE_TERMS_CONSENT")?.trim().toLowerCase() === "true";
     const key = requestKey(req);
     const now = new Date().toISOString();
 
@@ -100,24 +109,6 @@ export default {
       return json({ error: "Unable to prepare checkout" }, 500);
     }
 
-    const { data: matchingAttempt } = await ctx.supabaseAdmin
-      .from("stripe_checkout_attempts")
-      .select("checkout_url, stripe_checkout_session_id, expires_at")
-      .eq("instructor_profile_id", profile.id)
-      .eq("request_key", key)
-      .eq("status", "open")
-      .gt("expires_at", now)
-      .maybeSingle();
-
-    if (matchingAttempt) {
-      return json({
-        url: matchingAttempt.checkout_url,
-        sessionId: matchingAttempt.stripe_checkout_session_id,
-        requestId: key,
-        reused: true,
-      });
-    }
-
     const { data: openAttempt } = await ctx.supabaseAdmin
       .from("stripe_checkout_attempts")
       .select("checkout_url, stripe_checkout_session_id, request_key, expires_at")
@@ -127,12 +118,43 @@ export default {
       .maybeSingle();
 
     if (openAttempt) {
-      return json({
-        url: openAttempt.checkout_url,
-        sessionId: openAttempt.stripe_checkout_session_id,
-        requestId: openAttempt.request_key,
-        reused: true,
-      });
+      try {
+        const existingSession = await stripe.checkout.sessions.retrieve(openAttempt.stripe_checkout_session_id);
+        if (
+          existingSession.status === "open"
+          && existingSession.metadata?.checkout_terms_version === CHECKOUT_TERMS_VERSION
+        ) {
+          return json({
+            url: openAttempt.checkout_url,
+            sessionId: openAttempt.stripe_checkout_session_id,
+            requestId: openAttempt.request_key,
+            reused: true,
+          });
+        }
+
+        if (existingSession.status === "open") {
+          await stripe.checkout.sessions.expire(existingSession.id);
+        }
+      } catch (error) {
+        if (stripeErrorCode(error) === "resource_missing") {
+          console.warn("Existing Checkout Session is unavailable in the current Stripe mode");
+        } else {
+          const message = error instanceof Error ? error.message : "Unknown Stripe error";
+          console.error("Unable to verify an existing Checkout Session", message);
+          return json({ error: "Unable to verify an existing checkout" }, 502);
+        }
+      }
+
+      const { error: closeAttemptError } = await ctx.supabaseAdmin
+        .from("stripe_checkout_attempts")
+        .update({ status: "expired" })
+        .eq("stripe_checkout_session_id", openAttempt.stripe_checkout_session_id)
+        .eq("status", "open");
+
+      if (closeAttemptError) {
+        console.error("Unable to close an outdated Checkout attempt", closeAttemptError.code);
+        return json({ error: "Unable to prepare checkout" }, 500);
+      }
     }
 
     try {
@@ -150,6 +172,19 @@ export default {
       }
 
       let customerId = settings.stripe_customer_id as string | null;
+      if (customerId) {
+        try {
+          const existingCustomer = await stripe.customers.retrieve(customerId);
+          if (existingCustomer.deleted) customerId = null;
+        } catch (error) {
+          if (stripeErrorCode(error) === "resource_missing") {
+            customerId = null;
+          } else {
+            throw error;
+          }
+        }
+      }
+
       if (!customerId) {
         const customer = await stripe.customers.create({
           email: settings.inquiry_email,
@@ -174,39 +209,54 @@ export default {
         }
       }
 
+      const subscriptions = await stripe.subscriptions.list({
+        customer: customerId,
+        status: "all",
+        limit: 100,
+      });
+      const blockingSubscription = subscriptions.data.find((subscription) => (
+        ["incomplete", "trialing", "active", "past_due", "unpaid", "paused"].includes(subscription.status)
+        && subscription.items.data.some((item) => item.price.id === priceId)
+      ));
+
+      if (blockingSubscription) {
+        console.warn("Stripe already has a membership for this instructor", blockingSubscription.id);
+        return json({
+          error: "This instructor already has a membership",
+          code: "membership_exists",
+        }, 409);
+      }
+
       const baseUrl = appUrl();
       const successUrl = new URL("/account/", baseUrl);
       successUrl.searchParams.set("checkout", "success");
       const cancelUrl = new URL("/account/", baseUrl);
       cancelUrl.searchParams.set("checkout", "canceled");
-      const trialEligible = !settings.stripe_subscription_id;
 
       const session = await stripe.checkout.sessions.create({
         mode: "subscription",
         customer: customerId,
         client_reference_id: profile.id,
         line_items: [{ price: priceId, quantity: 1 }],
+        allow_promotion_codes: true,
         payment_method_collection: "always",
+        ...(requireTermsConsent ? {
+          consent_collection: { terms_of_service: "required" as const },
+        } : {}),
         success_url: successUrl.toString(),
         cancel_url: cancelUrl.toString(),
         metadata: {
           instructor_profile_id: profile.id,
           account_id: accountId,
           product_line: "hire_line_dancers",
+          checkout_terms_version: CHECKOUT_TERMS_VERSION,
         },
         subscription_data: {
-          ...(trialEligible ? {
-            trial_period_days: TRIAL_PERIOD_DAYS,
-            trial_settings: {
-              end_behavior: {
-                missing_payment_method: "cancel" as const,
-              },
-            },
-          } : {}),
           metadata: {
             instructor_profile_id: profile.id,
             account_id: accountId,
             product_line: "hire_line_dancers",
+            checkout_terms_version: CHECKOUT_TERMS_VERSION,
           },
         },
       }, {
@@ -233,7 +283,6 @@ export default {
 
       if (saveError) {
         if (saveError.code === "23505") {
-          await stripe.checkout.sessions.expire(session.id).catch(() => undefined);
           const { data: winner } = await ctx.supabaseAdmin
             .from("stripe_checkout_attempts")
             .select("checkout_url, stripe_checkout_session_id, request_key")
@@ -243,6 +292,9 @@ export default {
             .maybeSingle();
 
           if (winner) {
+            if (winner.stripe_checkout_session_id !== session.id) {
+              await stripe.checkout.sessions.expire(session.id).catch(() => undefined);
+            }
             return json({
               url: winner.checkout_url,
               sessionId: winner.stripe_checkout_session_id,
@@ -250,6 +302,8 @@ export default {
               reused: true,
             });
           }
+
+          await stripe.checkout.sessions.expire(session.id).catch(() => undefined);
         }
 
         console.error("Unable to save Checkout attempt", saveError.code);

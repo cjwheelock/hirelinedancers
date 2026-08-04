@@ -11,7 +11,7 @@ The migrations and Edge Function source are in this repository. Creating or chan
 3. A database trigger creates one `accounts` row for each Supabase Auth user.
 4. Account onboarding assigns the user an `organizer` or `instructor` role.
 5. Instructors complete a private workspace, upload media, and submit a profile for review.
-6. An administrator approves the profile. Approval enables Stripe Checkout with a payment method required, 30 days free, then the fixed $14.99 monthly membership.
+6. An administrator approves the profile. Approval enables Stripe Checkout with a payment method required for the fixed $14.99 monthly membership. Checkout accepts valid Stripe promotion codes.
 7. A signature-verified Stripe webhook publishes profiles with active or trialing memberships and unpublishes profiles when the membership ends. Profile content is preserved.
 8. Signed-in instructors open Stripe Customer Portal to cancel, update payment methods, or review invoices.
 9. Organizers can browse without signing in. They must sign in and finish organizer onboarding before the authenticated `submit_inquiry` database function accepts an inquiry.
@@ -175,23 +175,27 @@ The dedicated Stripe sandbox account is named `Hire a Line Dancer`. As of August
 - Monthly Price: `price_1U0lL5LOrJYSNwvel9UaZQef`
 - Customer Portal configuration: `bpc_1U0lR6LOrJYSNwvei82AsCOD`
 - Manual 100 percent, once-only coupon: `W4HOTg2J`
+- Customer-facing sandbox promotion code: `FREEMONTH`
 - Webhook destination: `we_1U0lYkLOrJYSNwveYV3TCOMm`
 
 Cards, Link, Apple Pay, and Google Pay are enabled. The Portal allows payment-method updates, invoice history, and cancellation at the end of the billing period. It does not allow plan or quantity changes.
 
 The Supabase project currently uses the sandbox Stripe key, Price, Portal configuration, and webhook secret. Sandbox checkout cannot charge a real card. Before accepting payments, the owner must complete Stripe business verification and payout setup, then create matching live-mode resources and replace all four Stripe secrets in Supabase.
 
+The current `Hire a Line Dancer` Stripe account is an Atlas incorporation sandbox. Its **Exit sandbox** flow requires forming a new company through Stripe Atlas. Do not use that path for production unless creating a separate legal entity is intentional. The existing verified `OMG Career, LLC` account is the current production candidate, but the owner must confirm that it is the correct legal entity before Hire Line Dancer products, prices, webhooks, and payouts are added there.
+
 For live mode:
 
-1. Create one recurring USD Price for exactly $14.99 per month. Checkout supplies the universal 30-day trial, so the Price itself should not have a trial setting.
-2. Save its `price_...` identifier as the `STRIPE_PRICE_ID` Edge Function secret.
-3. Configure a webhook endpoint at:
+1. Create one recurring USD Price for exactly $14.99 per month. The Price itself should not have a trial setting.
+2. Create a 100 percent off coupon with duration `once`, scope it to the Hire Line Dancers Product, and create the customer-facing promotion code `FREEMONTH`. Restrict the code to first-time customers. Because Checkout accepts promotion codes, audit and archive any other active codes that should not apply to this Product.
+3. Save the Price's `price_...` identifier as the `STRIPE_PRICE_ID` Edge Function secret.
+4. Configure a webhook endpoint at:
 
 ```text
 https://YOUR_PROJECT_REF.supabase.co/functions/v1/stripe-webhook
 ```
 
-4. Subscribe it to:
+5. Subscribe it to:
 
    - `checkout.session.completed`
    - `invoice.paid`
@@ -202,11 +206,29 @@ https://YOUR_PROJECT_REF.supabase.co/functions/v1/stripe-webhook
    - `customer.subscription.paused`
    - `customer.subscription.resumed`
 
-5. Save the endpoint signing secret as `STRIPE_WEBHOOK_SIGNING_SECRET`.
+6. Save the endpoint signing secret as `STRIPE_WEBHOOK_SIGNING_SECRET`.
 
-The exact browser-invoked Checkout function is `create-instructor-checkout`. It requires a valid user JWT, an owned profile with status `approved`, and the verified fixed monthly Price. It requires a payment method, gives a first-time instructor one 30-day trial, and prevents a second trial after that instructor has had a Stripe subscription.
+Before enabling paid Checkout, set the Terms of Use and Privacy Policy URLs in Stripe Public details. Then add `consent_collection.terms_of_service = required` to Checkout after confirming the live account accepts it. The account page already places the recurring price, Terms of Use, and Refund Policy beside the activation button.
+
+Enable Stripe's **Limit customers to one subscription** Checkout setting and keep the Customer Portal login link enabled. The Checkout function also queries Stripe for an existing membership on the configured Price before it creates a new Session.
+
+The exact browser-invoked Checkout function is `create-instructor-checkout`. It requires a valid user JWT, an owned profile with status `approved`, and the verified fixed monthly Price. It requires a payment method and enables Stripe's promotion-code field. No trial is added automatically.
 
 Enable Stripe Customer Portal for payment-method updates, invoice history, and subscription cancellation. The authenticated `create-billing-portal` function verifies ownership and the exact Hire Line Dancers Price before creating a Portal Session. A dedicated Portal configuration is recommended when Hire Line Dancers shares a Stripe account with another product line.
+
+Before switching Supabase from sandbox to live Stripe secrets, inspect and resolve every sandbox billing reference. Active sandbox statuses can correctly block Checkout even though their Customer and Subscription IDs do not exist in live mode. Also expire every open sandbox Checkout Session before deploying the no-default-trial flow. Use:
+
+```sql
+select instructor_profile_id, subscription_status, stripe_customer_id, stripe_subscription_id
+from public.instructor_private_settings
+where subscription_status in ('trialing', 'active', 'past_due', 'unpaid', 'paused');
+
+select stripe_checkout_session_id, expires_at
+from public.stripe_checkout_attempts
+where status = 'open';
+```
+
+Reset or migrate sandbox billing fields only after deciding how to preserve founding and guarantee history. Expire each returned open Session with the sandbox Stripe key, mark the matching attempt `expired`, and confirm that the second query returns no rows.
 
 The account UI includes a **Manage membership** button for published instructors and memberships with status `trialing`, `active`, `past_due`, `unpaid`, or `paused`. It invokes `create-billing-portal` and redirects the browser to the returned `url`.
 
@@ -243,6 +265,12 @@ Optional dedicated Customer Portal configuration:
 
 ```text
 STRIPE_BILLING_PORTAL_CONFIGURATION_ID=bpc_...
+```
+
+After setting valid Terms and Privacy URLs in Stripe Public details, enable Stripe's required terms checkbox:
+
+```text
+STRIPE_REQUIRE_TERMS_CONSENT=true
 ```
 
 SMS is currently paused, so no Twilio secrets are required. The following names are reserved for a future reviewed SMS launch:

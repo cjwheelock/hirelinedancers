@@ -14,9 +14,10 @@ The function:
 2. Requires the caller to own an instructor profile whose status is exactly `approved`.
 3. Reads the fixed Stripe Price ID from a server secret.
 4. Verifies that the Price is active, recurring monthly, USD, and exactly $14.99.
-5. Requires a payment method and gives first-time instructors a single 30-day free trial.
-6. Reuses an unexpired Checkout Session when possible.
-7. Creates Stripe Checkout in subscription mode with the instructor UUID in Checkout and Subscription metadata.
+5. Requires a payment method and enables Stripe's promotion-code field without adding a default trial.
+6. Checks Stripe for an existing non-canceled membership on the configured Price before creating a Session.
+7. Reuses an unexpired Checkout Session when possible.
+8. Creates Stripe Checkout in subscription mode with the instructor UUID in Checkout and Subscription metadata.
 
 The browser should send a stable random value in the `Idempotency-Key` header when retrying the same action. The value must contain 8 to 64 ASCII letters, numbers, underscores, or hyphens.
 
@@ -150,6 +151,12 @@ STRIPE_BILLING_PORTAL_CONFIGURATION_ID=bpc_...
 
 When this value is omitted, Stripe uses the account's default Customer Portal configuration.
 
+After setting valid Terms and Privacy URLs in the live Stripe account's Public details, require Stripe's terms checkbox with:
+
+```text
+STRIPE_REQUIRE_TERMS_CONSENT=true
+```
+
 Supabase provides `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEYS`, `SUPABASE_SECRET_KEYS`, and `SUPABASE_JWKS` to hosted Edge Functions. For local development with `@supabase/server`, singular `SUPABASE_PUBLISHABLE_KEY` and `SUPABASE_SECRET_KEY` values are also supported.
 
 Do not put any secret listed here into `NEXT_PUBLIC_*` variables or browser code.
@@ -238,7 +245,10 @@ limit 50;
 
 ## Operational caveats
 
-- Stripe must contain an active recurring Price for exactly $14.99 USD per month, and `STRIPE_PRICE_ID` must reference it. The Checkout function applies the 30-day trial and requires a payment method.
+- Stripe must contain an active recurring Price for exactly $14.99 USD per month, and `STRIPE_PRICE_ID` must reference it. The Checkout function requires a payment method and accepts valid Stripe promotion codes.
+- In live mode, create a Product-scoped, 100 percent once-only coupon and the first-time-customer promotion code `FREEMONTH`. Audit other active promotion codes when using a shared Stripe account.
+- Enable Stripe's **Limit customers to one subscription** setting, keep the Portal login link enabled, and retain the server-side existing-subscription check.
+- Configure live Public details with the Terms and Privacy URLs before enabling Stripe's required terms checkbox.
 - Configure Stripe Customer Portal for payment-method updates, invoice history, and subscription cancellation before showing the production Manage membership button.
 - Configure Stripe to send the listed events to `/functions/v1/stripe-webhook` and copy that endpoint's signing secret into Supabase.
 - Verify the Resend sending domain before using the production From address.

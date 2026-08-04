@@ -843,19 +843,15 @@ function MembershipCard({
     window.location.assign(data.url);
   }
 
-  const trialEligible = !settings?.stripe_subscription_id;
+  const hasPriorSubscription = Boolean(settings?.stripe_subscription_id);
   const canManage = profile.status === "published"
     || ["trialing", "active", "past_due", "unpaid", "paused"].includes(settings?.subscription_status ?? "");
 
   return (
     <div className={styles.card}>
       <p className={styles.eyebrow}>Instructor membership</p>
-      <h2>{trialEligible ? "First 30 days free, then $14.99 per month" : "$14.99 per month"}</h2>
-      {trialEligible ? (
-        <p>Your membership starts only after your profile is approved. Stripe securely collects your payment method at checkout, but you will not be charged until your 30-day free trial ends. Cancel before then and you will not be charged. Your membership also includes the first-year booking guarantee described in the refund policy.</p>
-      ) : (
-        <p>Restart your instructor membership for $14.99 per month. The introductory free month is available once per instructor. Your first-year booking guarantee remains governed by the refund policy.</p>
-      )}
+      <h2>$14.99 per month</h2>
+      <p>Activate your instructor membership after your profile is approved. Stripe securely processes payment, and your membership renews monthly until canceled. Eligible founding memberships include the first-year booking guarantee described in the refund policy.</p>
       <p><span className={styles.status}>{settings?.subscription_status ?? "inactive"}</span></p>
       {profile.status === "approved" ? (
         <>
@@ -863,10 +859,11 @@ function MembershipCard({
             <p className={styles.notice}>Stripe received your checkout. We are confirming your membership now. This usually takes a few seconds.</p>
           ) : (
             <>
-              <p>Your profile has been approved. {trialEligible ? "Start your free month" : "Restart your membership"} to publish it in the directory.</p>
+              <p>Your profile has been approved. {hasPriorSubscription ? "Restart your membership" : "Activate your membership"} to publish it in the directory.</p>
               <button className={styles.button} type="button" disabled={busy !== null} onClick={() => void activateMembership()}>
-                {busy === "checkout" ? "Opening secure checkout..." : trialEligible ? "Start my free month" : "Restart membership"}
+                {busy === "checkout" ? "Opening secure checkout..." : hasPriorSubscription ? "Restart membership" : "Activate membership"}
               </button>
+              <p className={styles.muted}>By selecting this button, you agree to the <a href="/legal/terms/">Terms of Use</a>, acknowledge the <a href="/legal/refund-policy/">Refund Policy</a>, and authorize a recurring $14.99 monthly charge until you cancel.</p>
             </>
           )}
         </>
@@ -1779,7 +1776,7 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
         <>
           <div className={styles.card}>
             <h2>Profiles awaiting review</h2>
-            <p className={styles.muted}>Review the profile copy and all uploaded media before approval. Approval unlocks membership checkout and the 30-day free trial.</p>
+            <p className={styles.muted}>Review the profile copy and all uploaded media before approval. Approval unlocks membership checkout.</p>
             {!pending.length ? <p className={styles.notice}>No profiles are waiting for review.</p> : null}
             <div className={styles.list}>
               {pending.map((profile) => {
