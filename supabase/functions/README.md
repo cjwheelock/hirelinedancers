@@ -1,6 +1,6 @@
 # Hire Line Dancers server functions
 
-These functions implement the approved-instructor payment flow and inquiry notifications. They keep Stripe, Resend, Twilio, and Supabase secret keys on the server.
+These functions implement the approved-instructor payment flow, manual refund verification, and inquiry notifications. They keep Stripe, Resend, and Supabase secret keys on the server. SMS is currently paused. The dormant Twilio implementation remains in the worker for possible future use.
 
 ## Functions
 
@@ -72,20 +72,49 @@ Each Stripe event ID is inserted transactionally. Duplicate deliveries return `d
 
 An active or trialing membership changes an `approved` profile to `published`. An inactive, unpaid, paused, or canceled membership changes a `published` profile back to `approved`. The profile and media remain stored. An administrator-set `suspended` profile is never republished automatically. Reapproving a suspended or draft profile publishes it immediately when its canonical membership is still active or trialing. `past_due` leaves the current profile visibility unchanged so a separate billing grace policy can be applied later.
 
-Stripe refund events are not treated as subscription cancellation. When honoring the booking guarantee, the operator must refund the appropriate charge and cancel the membership subscription. The cancellation webhook controls directory visibility.
+Stripe refund events are not treated as subscription cancellation. Refunding and canceling are separate operator actions. If the subscription should end after a guarantee refund, cancel it separately in Stripe. The cancellation webhook controls directory visibility.
+
+### `verify-instructor-refund`
+
+Authenticated marketplace-owner endpoint. It does not issue refunds. The owner first reviews a guarantee claim, approves the amount, and manually issues the refund in the Stripe Dashboard. The admin workflow then sends the resulting Stripe Refund ID to this function.
+
+The function:
+
+1. Requires a valid Supabase user JWT and marketplace-owner access.
+2. Requires an approved or refund-pending guarantee claim.
+3. Retrieves the Refund and its Charge directly from Stripe.
+4. Verifies that the Stripe customer belongs to the selected instructor.
+5. Verifies that the invoice includes the exact `STRIPE_PRICE_ID` membership Price.
+6. Records the verified Refund ID, amount, status, and Stripe references through a service-only database function.
+
+Example with `supabase-js`:
+
+```ts
+const { data, error } = await supabase.functions.invoke(
+  "verify-instructor-refund",
+  {
+    method: "POST",
+    body: { claimId, refundId },
+  },
+);
+```
+
+The Refund ID must begin with `re_`. Rechecking the same matching refund is idempotent. A verified refund does not cancel the instructor subscription or alter its billing state.
 
 ### `process-inquiry-notifications`
 
 Internal worker protected by the named Supabase secret key `automations` in the `apikey` header. It atomically claims up to 25 jobs with `FOR UPDATE SKIP LOCKED`, recovers locks older than 10 minutes, and retries temporary failures with exponential backoff. Six provider attempts are allowed. Missing provider secrets defer work without consuming an attempt.
 
-New-inquiry email is sent through Resend with the organizer address in `Reply-To`. The worker also queues two email follow-ups through the same durable job system:
+New-inquiry email is sent through Resend with the organizer address in `Reply-To`. The worker also queues two email follow-ups through the same durable job system. Follow-up messages use `SUPPORT_EMAIL` in `Reply-To`, with `hello@hirelinedancers.com` as the fallback:
 
 - Seven days after an unanswered inquiry, the instructor is asked whether it was booked: Yes, No, or In progress.
 - Two days after the confirmed date of a booked event, the instructor is asked whether the event happened: Yes or No.
 
-Follow-up links open the authenticated instructor inquiry page. Private comments are available only to the instructor and marketplace administrators. The email request uses a provider idempotency key. Optional SMS is sent through Twilio and tells the instructor to check email. Each provider request has a 15-second timeout. Provider acceptance is recorded as `sent`. The existing `delivered` state is reserved for future Resend and Twilio delivery webhooks.
+Follow-up links open the authenticated instructor inquiry page. Private comments are available only to the instructor and marketplace administrators. The email request uses a provider idempotency key. Each provider request has a 15-second timeout. Resend acceptance is recorded as `sent`. The existing `delivered` state is reserved for a future signed delivery webhook.
 
-Database submission limits reduce notification abuse: five inquiries per organizer per hour, 20 per organizer per day, a 10-minute duplicate cooldown for the same event and instructor, and 30 inquiries per instructor target per hour. Configure Resend and Twilio spend alerts and account-level caps as an additional control.
+SMS is temporarily paused. Migration `202608040002_email_only_and_guarantee_refunds.sql` disables SMS preferences, cancels queued SMS work, and creates email-only recipients and jobs. The worker also rejects any SMS job that reaches it while the pause is active. The Twilio sender and consent checks remain in source so a future reviewed implementation can reuse them.
+
+Database submission limits reduce notification abuse: five inquiries per organizer per hour, 20 per organizer per day, a 10-minute duplicate cooldown for the same event and instructor, and 30 inquiries per instructor target per hour. Configure Resend spend alerts and account-level caps as an additional control.
 
 ## Required secrets
 
@@ -98,9 +127,12 @@ STRIPE_PRICE_ID=price_...
 STRIPE_WEBHOOK_SIGNING_SECRET=whsec_...
 RESEND_API_KEY=re_...
 RESEND_FROM_EMAIL=Hire Line Dancers <inquiries@mail.hirelinedancers.com>
+SUPPORT_EMAIL=hello@hirelinedancers.com
 ```
 
-Optional SMS secrets:
+`SUPPORT_EMAIL` receives replies to booking and completion follow-ups. If it is omitted, the worker uses `hello@hirelinedancers.com`. Resend handles outbound sending only, so configure an inbound mailbox or forwarding rule separately for that address.
+
+SMS is paused, so no Twilio secrets are required. These names remain reserved for a future reviewed SMS launch:
 
 ```text
 TWILIO_ACCOUNT_SID=AC...
@@ -108,7 +140,7 @@ TWILIO_AUTH_TOKEN=...
 TWILIO_MESSAGING_SERVICE_SID=MG...
 ```
 
-Use `TWILIO_FROM_NUMBER=+1...` instead of `TWILIO_MESSAGING_SERVICE_SID` only when sending from a specific Twilio number.
+Use `TWILIO_FROM_NUMBER=+1...` instead of `TWILIO_MESSAGING_SERVICE_SID` only if SMS is restored and a specific Twilio number is used.
 
 Optional dedicated Stripe Customer Portal configuration:
 
@@ -126,6 +158,7 @@ Do not put any secret listed here into `NEXT_PUBLIC_*` variables or browser code
 
 - `create-instructor-checkout`: keep JWT verification enabled. The function also uses `auth: "user"`.
 - `create-billing-portal`: keep JWT verification enabled. The function also uses `auth: "user"`.
+- `verify-instructor-refund`: keep JWT verification enabled. The function also uses `auth: "user"` and enforces marketplace-owner access.
 - `stripe-webhook`: deploy with JWT verification disabled. The function uses `auth: "none"` and verifies Stripe itself.
 - `process-inquiry-notifications`: deploy with JWT verification disabled. The function uses `auth: "secret:automations"` and requires the named `automations` Supabase secret key in `apikey`.
 
@@ -137,6 +170,7 @@ These settings are pinned in `supabase/config.toml`. `process-inquiry-notificati
 supabase db push
 supabase functions deploy create-instructor-checkout
 supabase functions deploy create-billing-portal
+supabase functions deploy verify-instructor-refund
 supabase functions deploy stripe-webhook
 supabase functions deploy process-inquiry-notifications
 ```
@@ -149,9 +183,9 @@ supabase secrets set --env-file supabase/functions/.env.production
 
 Keep that environment file outside Git.
 
-No Stripe Product, Price, webhook endpoint, Resend domain, Twilio sender, or Supabase Cron job is created by these files. Those account changes require an authorized operator.
+No Stripe Product, Price, webhook endpoint, Resend domain, inbound support mailbox, or Supabase Cron job is created by these files. Those account changes require an authorized operator.
 
-The Stripe account structure is pending owner review. The code supports using the existing OMG Goals, LLC Stripe account with a dedicated Hire Line Dancers Product and Price because it filters every event by the exact `STRIPE_PRICE_ID` and attaches `product_line=hire_line_dancers` metadata. A separate Stripe account remains an external accounting and business decision.
+The current sandbox uses a dedicated Hire a Line Dancer Stripe account. The code still isolates the product line by filtering every membership and refund against the exact `STRIPE_PRICE_ID` and by attaching `product_line=hire_line_dancers` metadata.
 
 ## Cron invocation
 
@@ -208,7 +242,8 @@ limit 50;
 - Configure Stripe Customer Portal for payment-method updates, invoice history, and subscription cancellation before showing the production Manage membership button.
 - Configure Stripe to send the listed events to `/functions/v1/stripe-webhook` and copy that endpoint's signing secret into Supabase.
 - Verify the Resend sending domain before using the production From address.
-- Twilio SMS requires instructor consent, an approved sender, and applicable US A2P registration. SMS remains disabled unless an instructor has opted in and all Twilio secrets are configured.
+- SMS is paused at both the database and worker layers. Do not describe or expose SMS controls until a compliant sender, consent flow, policy update, and reviewed release restore the feature.
 - Use the named `automations` Supabase secret key for Cron. The default or a differently named secret key will not satisfy this worker's authentication mode.
-- Resend idempotency protects retries within its documented window. Twilio Message creation does not provide the same guarantee, so an ambiguous network timeout can rarely produce a duplicate SMS.
-- `sent` means the provider accepted the request. Add signed Resend and Twilio status webhook functions before reporting true `delivered`, `bounced`, or `undelivered` states.
+- Resend idempotency protects retries within its documented window.
+- `sent` means Resend accepted the request. Add a signed Resend status webhook before reporting true `delivered` or `bounced` states.
+- `verify-instructor-refund` verifies a refund that already exists in Stripe. It never creates a refund and never cancels a subscription.

@@ -9,3 +9,6 @@ verify_jwt = false
 
 [functions.process-inquiry-notifications]
 verify_jwt = false
+
+[functions.verify-instructor-refund]
+verify_jwt = true

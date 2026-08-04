@@ -2,7 +2,7 @@
 
 Hire Line Dancers uses Supabase Auth, Postgres, Storage, and Edge Functions. The browser can display public instructor profiles, but profile management, inquiries, and membership activation require a signed-in user.
 
-The migrations and Edge Function source are in this repository. Creating or changing Supabase, Google, Stripe, Resend, and Twilio resources is an external account action and is not completed by the code alone.
+The migrations and Edge Function source are in this repository. Creating or changing Supabase, Google, Stripe, and Resend resources is an external account action and is not completed by the code alone. SMS notifications are paused. The Twilio implementation is retained for possible future use, but Twilio is not required for the current product.
 
 ## Architecture
 
@@ -15,8 +15,8 @@ The migrations and Edge Function source are in this repository. Creating or chan
 7. A signature-verified Stripe webhook publishes profiles with active or trialing memberships and unpublishes profiles when the membership ends. Profile content is preserved.
 8. Signed-in instructors open Stripe Customer Portal to cancel, update payment methods, or review invoices.
 9. Organizers can browse without signing in. They must sign in and finish organizer onboarding before the authenticated `submit_inquiry` database function accepts an inquiry.
-10. Each inquiry creates durable email and optional SMS jobs. The internal notification worker claims jobs safely, sends them, and records provider acceptance or retry state.
-11. Organizers and instructors communicate by email. The notification email uses the organizer as `Reply-To`.
+10. Each inquiry creates a durable email job. The internal notification worker claims jobs safely, sends them, and records provider acceptance or retry state. SMS jobs are not created while SMS is paused.
+11. Organizers and instructors communicate by email. New-inquiry email uses the organizer as `Reply-To`. Booking and completion follow-ups use `SUPPORT_EMAIL` as `Reply-To`.
 
 Anonymous application inserts, anonymous inquiry inserts, anonymous media uploads, and Stripe Payment Links are not part of this architecture.
 
@@ -41,8 +41,9 @@ The relevant migrations are:
 - `202608020010_marketplace_accounts_and_inquiries.sql`
 - `202608020011_payments_and_notification_workers.sql`
 - `202608040001_admin_analytics_and_inquiry_followups.sql`
+- `202608040002_email_only_and_guarantee_refunds.sql`
 
-Do not recreate the old `instructor_applications` or minimal `inquiries` tables by hand. Migration `202608020010` establishes the marketplace schema and upgrades an older inquiry table if one exists. Migration `202608020011` adds approve-then-pay membership state, webhook idempotency, and notification worker functions.
+Do not recreate the old `instructor_applications` or minimal `inquiries` tables by hand. Migration `202608020010` establishes the marketplace schema and upgrades an older inquiry table if one exists. Migration `202608020011` adds approve-then-pay membership state, webhook idempotency, and notification worker functions. Migration `202608040002` pauses SMS delivery, adds founding and guarantee records, adds claim and refund audit records, and provides owner-only claim operations plus service-only Stripe refund recording.
 
 ## 2. Configure browser environment variables
 
@@ -150,7 +151,7 @@ draft -> pending_review -> approved -> published
 
 When a membership becomes inactive, unpaid, paused, or canceled, a published profile returns to `approved`. The profile row and uploaded media are not deleted. A `past_due` event leaves visibility unchanged until a billing grace policy is chosen. Reapproving a profile publishes it immediately when its canonical membership remains active or trialing.
 
-A Stripe refund does not automatically cancel a subscription. When honoring the booking guarantee, refund the appropriate charge and cancel the membership subscription. The cancellation webhook controls directory visibility.
+A Stripe refund does not automatically cancel a subscription. Refunding and canceling are separate operator decisions. If a membership should end after a guarantee refund, cancel it separately in Stripe. The cancellation webhook, not the refund record, controls directory visibility.
 
 ## 6. Storage
 
@@ -209,6 +210,21 @@ Enable Stripe Customer Portal for payment-method updates, invoice history, and s
 
 The account UI includes a **Manage membership** button for published instructors and memberships with status `trialing`, `active`, `past_due`, `unpaid`, or `paused`. It invokes `create-billing-portal` and redirects the browser to the returned `url`.
 
+### Founding guarantee and refund operations
+
+Migration `202608040002_email_only_and_guarantee_refunds.sql` assigns the first 100 qualifying instructors a permanent founding number when their first membership becomes `trialing` or `active`. It stores the original guarantee start, end, and claim deadline separately from current subscription state, so restarting a subscription does not restart the guarantee period.
+
+Guarantee claims are handled manually so the owner can speak with the instructor and collect feedback. The admin workflow is:
+
+1. Find the instructor by name, email, or city.
+2. Log the request and review profile, contact, response, booking, and eligibility information.
+3. Approve or deny the claim. Approval does not move money.
+4. If approved, issue the refund manually in the Stripe Dashboard.
+5. Copy the resulting Stripe Refund ID, beginning with `re_`, into the admin workflow.
+6. Invoke `verify-instructor-refund`. The function retrieves the refund directly from Stripe, verifies the customer and the exact Hire Line Dancers Price, then records the verified result in Postgres.
+
+The application never issues a refund automatically. It also never treats a refund as a cancellation. If the subscription should end, cancel it separately in Stripe and let the existing subscription webhook update membership and profile visibility.
+
 ## 8. Edge Function secrets
 
 Set these in Supabase Edge Function secrets:
@@ -220,6 +236,7 @@ STRIPE_PRICE_ID=price_...
 STRIPE_WEBHOOK_SIGNING_SECRET=whsec_...
 RESEND_API_KEY=re_...
 RESEND_FROM_EMAIL=Hire Line Dancers <inquiries@mail.hirelinedancers.com>
+SUPPORT_EMAIL=hello@hirelinedancers.com
 ```
 
 Optional dedicated Customer Portal configuration:
@@ -228,7 +245,7 @@ Optional dedicated Customer Portal configuration:
 STRIPE_BILLING_PORTAL_CONFIGURATION_ID=bpc_...
 ```
 
-Optional Twilio SMS:
+SMS is currently paused, so no Twilio secrets are required. The following names are reserved for a future reviewed SMS launch:
 
 ```text
 TWILIO_ACCOUNT_SID=AC...
@@ -236,7 +253,7 @@ TWILIO_AUTH_TOKEN=...
 TWILIO_MESSAGING_SERVICE_SID=MG...
 ```
 
-Use `TWILIO_FROM_NUMBER=+1...` instead of a Messaging Service SID only when sending from a specific Twilio number.
+Use `TWILIO_FROM_NUMBER=+1...` instead of a Messaging Service SID only if SMS is restored and a specific Twilio number is used.
 
 For production, load secrets through the dashboard or:
 
@@ -252,6 +269,7 @@ Keep that environment file outside Git. Hosted Edge Functions receive Supabase U
 
 - `create-instructor-checkout`: `verify_jwt = true`
 - `create-billing-portal`: `verify_jwt = true`
+- `verify-instructor-refund`: `verify_jwt = true`
 - `stripe-webhook`: `verify_jwt = false`, because Stripe authenticates with its signature
 - `process-inquiry-notifications`: `verify_jwt = false`, because the function requires the named `automations` Supabase secret key in `apikey`
 
@@ -260,6 +278,7 @@ Deploy:
 ```bash
 supabase functions deploy create-instructor-checkout
 supabase functions deploy create-billing-portal
+supabase functions deploy verify-instructor-refund
 supabase functions deploy stripe-webhook
 supabase functions deploy process-inquiry-notifications
 ```
@@ -268,18 +287,15 @@ supabase functions deploy process-inquiry-notifications
 
 ## 10. Configure inquiry delivery
 
-Verify the Resend sending domain before using the production From address. New instructor inquiry emails use the organizer email as `Reply-To`. Booking and event-completion follow-ups link to a private, authenticated response form instead.
+Verify the Resend sending domain before using the production From address. New instructor inquiry emails use the organizer email as `Reply-To`. Booking and event-completion follow-ups link to a private, authenticated response form and use `SUPPORT_EMAIL` as `Reply-To`. If `SUPPORT_EMAIL` is not set, the worker uses `hello@hirelinedancers.com`.
 
-SMS is optional. Enable it only when:
+Resend sends outbound email only. Receiving mail at `hello@hirelinedancers.com` also requires an inbound mailbox or forwarding rule with the domain host. Configure and test that routing separately.
 
-- the instructor provides an E.164 phone number
-- the instructor opts into SMS notifications
-- a compliant Twilio sender is configured
-- applicable US A2P registration and consent requirements are satisfied
+SMS is temporarily paused. The current migration disables SMS preferences, cancels queued SMS work, stores no phone destination on new inquiry recipients, and creates only email jobs. The worker also rejects any SMS job that reaches it while the pause is active. Twilio code and historical consent records remain available for a future reviewed launch.
 
-The worker records `sent` when Resend or Twilio accepts a request. It does not claim that the recipient received it. Signed delivery webhook functions can be added later for `delivered`, `bounced`, and `undelivered` states. Provider requests time out after 15 seconds. Missing provider secrets leave jobs queued for a later attempt instead of failing them permanently.
+The worker records `sent` when Resend accepts a request. It does not claim that the recipient received it. A signed Resend delivery webhook can be added later for `delivered` and `bounced` states. Provider requests time out after 15 seconds. Missing email provider secrets leave jobs queued for a later attempt instead of failing them permanently.
 
-The database limits each organizer to five inquiries per hour and 20 per day, blocks a matching instructor and event resubmission for 10 minutes, and limits each instructor target to 30 inquiries per hour. Also configure Resend and Twilio spend alerts and account-level caps.
+The database limits each organizer to five inquiries per hour and 20 per day, blocks a matching instructor and event resubmission for 10 minutes, and limits each instructor target to 30 inquiries per hour. Also configure Resend spend alerts and account-level caps.
 
 Create a Supabase secret key named exactly `automations`. Schedule `process-inquiry-notifications` once per minute with Supabase Cron, `pg_net`, and Vault. The complete example, including a 30-second HTTP timeout and response monitoring query, is in `supabase/functions/README.md`.
 
@@ -298,14 +314,17 @@ Before launch, verify:
 9. An active test subscription publishes the profile.
 10. A canceled test subscription returns the profile to `approved` without deleting its content.
 11. An authenticated organizer can submit an inquiry to a published or static launch profile.
-12. The worker sends email with the correct `Reply-To`.
-13. Optional SMS sends only for an opted-in instructor.
+12. New-inquiry email uses the organizer as `Reply-To`, while booking and completion follow-ups use `SUPPORT_EMAIL`.
+13. A submitted inquiry creates one email job and no SMS job. Any preexisting queued SMS job is canceled or rejected without a Twilio request.
 14. Temporary provider failures reschedule a job and terminal failures stop after six attempts.
 15. Only listed administrators can open `/admin/` or query marketplace analytics.
 16. Daily, weekly, monthly, annual, and custom admin reporting totals match raw inquiry records.
 17. A booking follow-up is sent seven days after an unanswered inquiry, exactly once.
 18. A completion follow-up is sent two days after the confirmed date of a booked event, exactly once.
 19. Instructor feedback comments are visible to the instructor and administrators, but not to the organizer.
+20. The first 100 qualifying memberships receive unique, permanent founding numbers and a restarted subscription does not reset the original guarantee dates.
+21. Only the marketplace owner can log and review a guarantee claim or invoke refund verification from the admin workflow.
+22. A Stripe test refund for the exact membership Price can be verified and recorded once. Verification does not issue money or change subscription status.
 
 Run a production build after setting browser environment values:
 

@@ -6,7 +6,6 @@ import { useMarketplaceSession } from "@/hooks/useMarketplaceSession";
 import {
   getMarketplaceClient,
   loginUrl,
-  normalizePhone,
   readableError,
   type AccountRole,
   type InstructorPrivateSettings,
@@ -156,8 +155,6 @@ function OnboardingForm({
   const [role, setRole] = useState<AccountRole>("organizer");
   const [name, setName] = useState(initialName);
   const [company, setCompany] = useState("");
-  const [phone, setPhone] = useState("");
-  const [smsOptIn, setSmsOptIn] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -165,15 +162,6 @@ function OnboardingForm({
     event.preventDefault();
     const client = getMarketplaceClient();
     if (!client) return;
-    const normalizedPhone = normalizePhone(phone);
-    if (phone.trim() && !normalizedPhone) {
-      setError("Enter a mobile number in international format, such as +14155551234.");
-      return;
-    }
-    if (smsOptIn && !normalizedPhone) {
-      setError("Add a valid mobile number before enabling text alerts.");
-      return;
-    }
 
     setBusy(true);
     setError(null);
@@ -181,8 +169,8 @@ function OnboardingForm({
       p_role: role,
       p_full_name: name.trim(),
       p_company_name: company.trim() || null,
-      p_phone_e164: normalizedPhone,
-      p_sms_opt_in: smsOptIn
+      p_phone_e164: null,
+      p_sms_opt_in: false
     });
     setBusy(false);
     if (rpcError) {
@@ -219,24 +207,6 @@ function OnboardingForm({
         <span>{role === "organizer" ? "Company or organization (optional)" : "Business name (optional)"}</span>
         <input autoComplete="organization" value={company} onChange={(event) => setCompany(event.target.value)} />
       </label>
-      {role === "instructor" ? (
-        <>
-          <label className={styles.field}>
-            <span>Mobile number (optional)</span>
-            <input
-              type="tel"
-              autoComplete="tel"
-              placeholder="+14155551234"
-              value={phone}
-              onChange={(event) => setPhone(event.target.value)}
-            />
-          </label>
-          <label className={styles.check}>
-            <input type="checkbox" checked={smsOptIn} onChange={(event) => setSmsOptIn(event.target.checked)} />
-            <span>Text me when I receive a new inquiry. Message and data rates may apply. Turn alerts off any time in your account.</span>
-          </label>
-        </>
-      ) : null}
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
       <button className={styles.button} disabled={busy} type="submit">
         {busy ? "Saving..." : "Open my account"}
@@ -445,8 +415,6 @@ function InstructorProfileForm({
     liability_insurance_status: profile.liability_insurance_status,
     preferred_response_hours: profile.preferred_response_hours.toString(),
     inquiry_email: settings?.inquiry_email ?? "",
-    inquiry_phone_e164: settings?.inquiry_phone_e164 ?? "",
-    sms_notifications_enabled: settings?.sms_notifications_enabled ?? false,
     minimum_rate: settings?.minimum_rate_cents ? (settings.minimum_rate_cents / 100).toString() : "",
     minimum_hours: settings?.minimum_hours?.toString() ?? ""
   });
@@ -470,15 +438,6 @@ function InstructorProfileForm({
   async function save(submitForReview: boolean) {
     const client = getMarketplaceClient();
     if (!client) return;
-    const phone = normalizePhone(form.inquiry_phone_e164);
-    if (form.inquiry_phone_e164.trim() && !phone) {
-      setError("Enter the text notification number in international format, such as +14155551234.");
-      return;
-    }
-    if (form.sms_notifications_enabled && !phone) {
-      setError("Add a valid mobile number before enabling text notifications.");
-      return;
-    }
     if (submitForReview && (!form.bio.trim() || !form.city.trim() || !form.region.trim() || !form.event_types.length)) {
       setError("Add a bio, location, and at least one event type before submitting for review.");
       return;
@@ -521,8 +480,8 @@ function InstructorProfileForm({
     const { error: settingsError } = await client.from("instructor_private_settings").upsert({
       instructor_profile_id: profile.id,
       inquiry_email: form.inquiry_email.trim(),
-      inquiry_phone_e164: phone,
-      sms_notifications_enabled: form.sms_notifications_enabled,
+      inquiry_phone_e164: null,
+      sms_notifications_enabled: false,
       minimum_rate_cents: form.minimum_rate ? Math.round(Number(form.minimum_rate) * 100) : null,
       minimum_hours: form.minimum_hours ? Number(form.minimum_hours) : null
     });
@@ -663,10 +622,6 @@ function InstructorProfileForm({
           <small>Inquiry alerts go to the email verified through your account sign-in.</small>
         </label>
         <label className={styles.field}>
-          <span>Text notification number</span>
-          <input disabled={!canEdit} type="tel" placeholder="+14155551234" value={form.inquiry_phone_e164} onChange={(e) => setValue("inquiry_phone_e164", e.target.value)} />
-        </label>
-        <label className={styles.field}>
           <span>Typical minimum rate in dollars</span>
           <input disabled={!canEdit} type="number" min="0" step="1" value={form.minimum_rate} onChange={(e) => setValue("minimum_rate", e.target.value)} />
         </label>
@@ -675,10 +630,6 @@ function InstructorProfileForm({
           <input disabled={!canEdit} type="number" min="0.5" max="24" step="0.5" value={form.minimum_hours} onChange={(e) => setValue("minimum_hours", e.target.value)} />
         </label>
       </div>
-      <label className={styles.check}>
-        <input disabled={!canEdit} type="checkbox" checked={form.sms_notifications_enabled} onChange={(e) => setValue("sms_notifications_enabled", e.target.checked)} />
-        <span>Text me when a new inquiry arrives. Message and data rates may apply. Turn alerts off any time in your account.</span>
-      </label>
 
       {message ? <p className={styles.success}>{message}</p> : null}
       {error ? <p className={styles.error}>{error}</p> : null}
@@ -952,6 +903,46 @@ type AdminAccess = {
   granted_at: string;
 };
 
+type AdminInstructorMembership = {
+  instructor_profile_id: string;
+  account_id: string;
+  display_name: string;
+  business_name: string | null;
+  account_email: string | null;
+  inquiry_email: string | null;
+  city: string | null;
+  region: string | null;
+  profile_status: string;
+  subscription_status: string;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+  stripe_livemode: boolean | null;
+  founding_member_number: number | null;
+  founding_status: string;
+  guarantee_status: string;
+  guarantee_started_at: string | null;
+  guarantee_ends_at: string | null;
+  claim_deadline_at: string | null;
+  guarantee_admin_note: string | null;
+  qualifying_booking_count: number;
+  claim_id: string | null;
+  claim_status: string | null;
+  claim_received_at: string | null;
+  claim_received_via: string | null;
+  claimant_email: string | null;
+  requested_amount_cents: number | null;
+  approved_refund_amount_cents: number | null;
+  profile_complete_confirmed: boolean | null;
+  contact_details_current_confirmed: boolean | null;
+  response_requirement_confirmed: boolean | null;
+  claim_admin_note: string | null;
+  decision_reason: string | null;
+  verified_refund_cents: number;
+  refund_count: number;
+  refunded: boolean;
+  latest_refunded_at: string | null;
+};
+
 type AdminFollowupResponse = {
   id: number;
   inquiry_id: string;
@@ -1079,8 +1070,415 @@ function percent(numerator: number, denominator: number) {
   return `${Math.round((numerator / denominator) * 100)}%`;
 }
 
+function statusLabel(value: string | null) {
+  return (value || "not started").replaceAll("_", " ");
+}
+
+function money(cents: number | null | undefined) {
+  if (cents == null) return "Not entered";
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
+}
+
+function adminDate(value: string | null) {
+  return value ? new Date(value).toLocaleDateString() : "Not set";
+}
+
+function dollarsToCents(value: string) {
+  if (!value.trim()) return null;
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+  return Math.round(amount * 100);
+}
+
+function stripeCustomerUrl(customerId: string, livemode: boolean | null) {
+  const mode = livemode === true ? "" : "/test";
+  return `https://dashboard.stripe.com${mode}/customers/${encodeURIComponent(customerId)}`;
+}
+
+async function edgeFunctionError(error: unknown) {
+  if (error && typeof error === "object" && "context" in error) {
+    const context = (error as { context?: unknown }).context;
+    if (context instanceof Response) {
+      const payload = await context.clone().json().catch(() => null) as { error?: unknown } | null;
+      if (typeof payload?.error === "string") return payload.error;
+    }
+  }
+  return readableError(error);
+}
+
+function MembershipGuaranteeAdmin({ isOwner }: { isOwner: boolean }) {
+  const [search, setSearch] = useState("");
+  const [rows, setRows] = useState<AdminInstructorMembership[]>([]);
+  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  const [foundingStatus, setFoundingStatus] = useState("unassigned");
+  const [guaranteeStatus, setGuaranteeStatus] = useState("not_started");
+  const [guaranteeNote, setGuaranteeNote] = useState("");
+  const [claimSource, setClaimSource] = useState("email");
+  const [claimantEmail, setClaimantEmail] = useState("");
+  const [requestedAmount, setRequestedAmount] = useState("");
+  const [instructorMessage, setInstructorMessage] = useState("");
+  const [claimNote, setClaimNote] = useState("");
+  const [reviewStatus, setReviewStatus] = useState("in_review");
+  const [approvedAmount, setApprovedAmount] = useState("");
+  const [profileConfirmed, setProfileConfirmed] = useState(false);
+  const [contactConfirmed, setContactConfirmed] = useState(false);
+  const [responseConfirmed, setResponseConfirmed] = useState(false);
+  const [reviewNote, setReviewNote] = useState("");
+  const [decisionReason, setDecisionReason] = useState("");
+  const [refundId, setRefundId] = useState("");
+  const [refundIssuedConfirmed, setRefundIssuedConfirmed] = useState(false);
+
+  const selected = useMemo(
+    () => rows.find((row) => row.instructor_profile_id === selectedProfileId) ?? null,
+    [rows, selectedProfileId]
+  );
+
+  async function loadMemberships(query = search) {
+    const client = getMarketplaceClient();
+    if (!client) return;
+    setLoading(true);
+    setError(null);
+    const { data, error: searchError } = await client.rpc("admin_search_instructors", {
+      p_search: query.trim() || null,
+      p_limit: 100,
+      p_offset: 0
+    });
+    if (searchError) {
+      setError(searchError.message);
+      setRows([]);
+    } else {
+      const nextRows = (data as AdminInstructorMembership[] | null) ?? [];
+      setRows(nextRows);
+      setSelectedProfileId((current) => (
+        current && nextRows.some((row) => row.instructor_profile_id === current)
+          ? current
+          : nextRows[0]?.instructor_profile_id ?? null
+      ));
+    }
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    void loadMemberships("");
+  }, []);
+
+  useEffect(() => {
+    if (!selected) return;
+    setFoundingStatus(selected.founding_status || "unassigned");
+    setGuaranteeStatus(selected.guarantee_status || "not_started");
+    setGuaranteeNote(selected.guarantee_admin_note ?? "");
+    setClaimSource(selected.claim_received_via ?? "email");
+    setClaimantEmail(selected.claimant_email ?? selected.inquiry_email ?? selected.account_email ?? "");
+    setRequestedAmount(selected.requested_amount_cents == null ? "" : (selected.requested_amount_cents / 100).toString());
+    setClaimNote(selected.claim_admin_note ?? "");
+    setReviewStatus(
+      ["approved", "denied", "withdrawn", "refund_pending"].includes(selected.claim_status ?? "")
+        ? selected.claim_status as string
+        : "in_review"
+    );
+    setApprovedAmount(selected.approved_refund_amount_cents == null ? "" : (selected.approved_refund_amount_cents / 100).toString());
+    setProfileConfirmed(Boolean(selected.profile_complete_confirmed));
+    setContactConfirmed(Boolean(selected.contact_details_current_confirmed));
+    setResponseConfirmed(Boolean(selected.response_requirement_confirmed));
+    setReviewNote(selected.claim_admin_note ?? "");
+    setDecisionReason(selected.decision_reason ?? "");
+    setInstructorMessage("");
+    setRefundId("");
+    setRefundIssuedConfirmed(false);
+  }, [selected]);
+
+  async function searchMemberships(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setMessage(null);
+    await loadMemberships(search);
+  }
+
+  async function saveGuarantee(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const client = getMarketplaceClient();
+    if (!client || !selected || !isOwner) return;
+    setBusy("guarantee");
+    setError(null);
+    setMessage(null);
+    const { error: updateError } = await client.rpc("admin_update_instructor_guarantee", {
+      p_instructor_profile_id: selected.instructor_profile_id,
+      p_founding_status: foundingStatus,
+      p_guarantee_status: guaranteeStatus,
+      p_admin_note: guaranteeNote.trim() || null
+    });
+    setBusy(null);
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+    setMessage("Founding and guarantee status saved.");
+    await loadMemberships(search);
+  }
+
+  async function logClaim(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const client = getMarketplaceClient();
+    if (!client || !selected || !isOwner) return;
+    const requestedCents = dollarsToCents(requestedAmount);
+    if (requestedAmount.trim() && requestedCents == null) {
+      setError("Enter a valid requested refund amount.");
+      return;
+    }
+    setBusy("claim");
+    setError(null);
+    setMessage(null);
+    const { error: claimError } = await client.rpc("admin_log_guarantee_claim", {
+      p_instructor_profile_id: selected.instructor_profile_id,
+      p_received_via: claimSource,
+      p_claimant_email: claimantEmail.trim() || null,
+      p_requested_amount_cents: requestedCents,
+      p_instructor_message: instructorMessage.trim() || null,
+      p_admin_note: claimNote.trim() || null
+    });
+    setBusy(null);
+    if (claimError) {
+      setError(claimError.message);
+      return;
+    }
+    setMessage("Refund claim logged for review.");
+    await loadMemberships(search);
+  }
+
+  async function reviewClaim(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const client = getMarketplaceClient();
+    if (!client || !selected?.claim_id || !isOwner) return;
+    const approvedCents = dollarsToCents(approvedAmount);
+    if (["approved", "refund_pending"].includes(reviewStatus) && approvedCents == null) {
+      setError("Enter the approved refund amount before approving this claim.");
+      return;
+    }
+    setBusy("review");
+    setError(null);
+    setMessage(null);
+    const { error: reviewError } = await client.rpc("admin_review_guarantee_claim", {
+      p_claim_id: selected.claim_id,
+      p_status: reviewStatus,
+      p_profile_complete_confirmed: profileConfirmed,
+      p_contact_details_current_confirmed: contactConfirmed,
+      p_response_requirement_confirmed: responseConfirmed,
+      p_approved_refund_amount_cents: approvedCents,
+      p_admin_note: reviewNote.trim() || null,
+      p_decision_reason: decisionReason.trim() || null
+    });
+    setBusy(null);
+    if (reviewError) {
+      setError(reviewError.message);
+      return;
+    }
+    setMessage("Claim review saved. No money was moved.");
+    await loadMemberships(search);
+  }
+
+  async function verifyRefund(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const client = getMarketplaceClient();
+    if (!client || !selected?.claim_id || !isOwner) return;
+    if (!refundIssuedConfirmed) {
+      setError("Confirm that you already issued the refund in Stripe.");
+      return;
+    }
+    if (!/^re_[A-Za-z0-9]+$/.test(refundId.trim())) {
+      setError("Enter the Stripe refund ID beginning with re_.");
+      return;
+    }
+    setBusy("refund");
+    setError(null);
+    setMessage(null);
+    const { data, error: verifyError } = await client.functions.invoke("verify-instructor-refund", {
+      body: { claimId: selected.claim_id, refundId: refundId.trim() }
+    });
+    setBusy(null);
+    if (verifyError) {
+      setError(await edgeFunctionError(verifyError));
+      return;
+    }
+    if (data?.error) {
+      setError(String(data.error));
+      return;
+    }
+    setMessage(`Stripe verified ${money(Number(data?.amountCents ?? 0))}. Claim status: ${statusLabel(String(data?.claimStatus ?? "updated"))}.`);
+    setRefundId("");
+    setRefundIssuedConfirmed(false);
+    await loadMemberships(search);
+  }
+
+  return (
+    <div className={styles.membershipAdminLayout}>
+      <div className={styles.card}>
+        <p className={styles.eyebrow}>Instructor operations</p>
+        <h2>Memberships and guarantees</h2>
+        <p className={styles.muted}>Search by instructor name, business, email, city, or state. Refunds are issued manually in Stripe and verified here afterward.</p>
+        <form className={styles.membershipSearch} onSubmit={searchMemberships}>
+          <label className={styles.field}>
+            <span>Search instructors</span>
+            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Name, email, or city" />
+          </label>
+          <button className={styles.button} disabled={loading} type="submit">{loading ? "Searching..." : "Search"}</button>
+        </form>
+        {error ? <p className={styles.error} role="alert">{error}</p> : null}
+        {message ? <p className={styles.success}>{message}</p> : null}
+        {!loading && !rows.length ? <p className={styles.notice}>No instructors match this search.</p> : null}
+        <div className={styles.membershipResults}>
+          {rows.map((row) => (
+            <button
+              className={`${styles.membershipResult} ${selectedProfileId === row.instructor_profile_id ? styles.selectedMembershipResult : ""}`}
+              key={row.instructor_profile_id}
+              type="button"
+              onClick={() => setSelectedProfileId(row.instructor_profile_id)}
+            >
+              <span><strong>{row.display_name}</strong>{row.business_name ? <small>{row.business_name}</small> : null}</span>
+              <span><small>{[row.city, row.region].filter(Boolean).join(", ") || "Location not set"}</small><small>{row.account_email}</small></span>
+              <span className={styles.resultStatuses}>
+                <span className={styles.status}>{statusLabel(row.subscription_status)}</span>
+                {row.refunded ? <span className={styles.verifiedBadge}>Refund verified</span> : null}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {selected ? (
+        <div className={styles.membershipDetail}>
+          <div className={styles.card}>
+            <div className={styles.membershipHeader}>
+              <div>
+                <p className={styles.eyebrow}>Selected instructor</p>
+                <h2>{selected.display_name}</h2>
+                <p className={styles.muted}>{[selected.business_name, selected.city, selected.region].filter(Boolean).join(" · ")}</p>
+              </div>
+              {isOwner && selected.stripe_customer_id ? (
+                <a className={styles.secondaryButton} href={stripeCustomerUrl(selected.stripe_customer_id, selected.stripe_livemode)} target="_blank" rel="noreferrer">Open Stripe customer</a>
+              ) : isOwner ? <span className={styles.notice}>No Stripe customer yet.</span> : null}
+            </div>
+            <div className={styles.membershipSummary}>
+              <div><span>Profile</span><strong>{statusLabel(selected.profile_status)}</strong></div>
+              <div><span>Membership</span><strong>{statusLabel(selected.subscription_status)}</strong></div>
+              <div><span>Founding</span><strong>{selected.founding_member_number ? `#${selected.founding_member_number}, ${statusLabel(selected.founding_status)}` : statusLabel(selected.founding_status)}</strong></div>
+              <div><span>Guarantee</span><strong>{statusLabel(selected.guarantee_status)}</strong></div>
+              <div><span>Bookings</span><strong>{selected.qualifying_booking_count}</strong></div>
+              <div><span>Verified refunds</span><strong>{money(selected.verified_refund_cents)}</strong></div>
+            </div>
+            <dl className={styles.membershipFacts}>
+              <div><dt>Account email</dt><dd>{selected.account_email || "Not set"}</dd></div>
+              <div><dt>Inquiry email</dt><dd>{selected.inquiry_email || "Not set"}</dd></div>
+              <div><dt>Guarantee period</dt><dd>{adminDate(selected.guarantee_started_at)} to {adminDate(selected.guarantee_ends_at)}</dd></div>
+              <div><dt>Claim deadline</dt><dd>{adminDate(selected.claim_deadline_at)}</dd></div>
+            </dl>
+            {selected.refunded ? (
+              <p className={styles.verifiedRefund} role="status">
+                <span aria-hidden="true">✓</span>
+                <span><strong>Refund verified against Stripe</strong><small>{money(selected.verified_refund_cents)} verified on {adminDate(selected.latest_refunded_at)}</small></span>
+              </p>
+            ) : selected.verified_refund_cents > 0 ? (
+              <p className={styles.notice}>Stripe has verified {money(selected.verified_refund_cents)} in partial refunds. Claim status: {statusLabel(selected.claim_status)}.</p>
+            ) : null}
+            {!isOwner ? <p className={styles.notice}>Finance records are read-only for delegated administrators. Only the marketplace owner can change guarantees or verify refunds.</p> : null}
+          </div>
+
+          {isOwner ? (
+            <>
+              <form className={`${styles.card} ${styles.stack}`} onSubmit={saveGuarantee}>
+                <div><h3>Founding and guarantee status</h3><p className={styles.muted}>Founding numbers stay attached to the original instructor record.</p></div>
+                <div className={styles.grid}>
+                  <label className={styles.field}>
+                    <span>Founding status</span>
+                    <select disabled={selected.refunded || selected.verified_refund_cents > 0} value={foundingStatus} onChange={(event) => setFoundingStatus(event.target.value)}>
+                      <option value="unassigned">Unassigned</option>
+                      <option value="reserved">Reserved</option>
+                      <option value="active">Active</option>
+                      <option value="ended">Ended</option>
+                      <option value="not_available">Not available</option>
+                    </select>
+                  </label>
+                  <label className={styles.field}>
+                    <span>Guarantee status</span>
+                    <select disabled={selected.refunded || selected.verified_refund_cents > 0} value={guaranteeStatus} onChange={(event) => setGuaranteeStatus(event.target.value)}>
+                      {[
+                        "not_started", "covered", "claim_eligible", "fulfilled", "ineligible", "claim_received",
+                        "under_review", "approved", "denied", "expired"
+                      ].map((value) => <option value={value} key={value}>{statusLabel(value)}</option>)}
+                      <option disabled value="refunded">refunded (Stripe verified)</option>
+                    </select>
+                  </label>
+                </div>
+                <label className={styles.field}><span>Internal guarantee note</span><textarea disabled={selected.refunded || selected.verified_refund_cents > 0} maxLength={4000} value={guaranteeNote} onChange={(event) => setGuaranteeNote(event.target.value)} /></label>
+                <button className={styles.secondaryButton} disabled={busy !== null || selected.refunded || selected.verified_refund_cents > 0} type="submit">{busy === "guarantee" ? "Saving..." : "Save guarantee status"}</button>
+              </form>
+
+              <form className={`${styles.card} ${styles.stack}`} onSubmit={logClaim}>
+                <div><h3>Log a refund claim</h3><p className={styles.muted}>Use this after an instructor contacts you. This creates the review record and does not issue a refund.</p></div>
+                <div className={styles.grid}>
+                  <label className={styles.field}>
+                    <span>Received through</span>
+                    <select value={claimSource} onChange={(event) => setClaimSource(event.target.value)}>
+                      <option value="email">Email</option><option value="phone">Phone</option><option value="admin">Admin entry</option><option value="other">Other</option>
+                    </select>
+                  </label>
+                  <label className={styles.field}><span>Claimant email</span><input type="email" value={claimantEmail} onChange={(event) => setClaimantEmail(event.target.value)} /></label>
+                  <label className={styles.field}><span>Requested refund, dollars</span><input type="number" min="0.01" step="0.01" value={requestedAmount} onChange={(event) => setRequestedAmount(event.target.value)} /></label>
+                </div>
+                <label className={styles.field}><span>Instructor message</span><textarea maxLength={4000} value={instructorMessage} onChange={(event) => setInstructorMessage(event.target.value)} /></label>
+                <label className={styles.field}><span>Internal claim note</span><textarea maxLength={4000} value={claimNote} onChange={(event) => setClaimNote(event.target.value)} /></label>
+                <button className={styles.secondaryButton} disabled={busy !== null || selected.refunded || selected.verified_refund_cents > 0} type="submit">{busy === "claim" ? "Logging..." : selected.claim_id ? "Update claim intake" : "Log claim"}</button>
+              </form>
+
+              {selected.claim_id ? (
+                <form className={`${styles.card} ${styles.stack}`} onSubmit={reviewClaim}>
+                  <div className={styles.membershipHeader}>
+                    <div><h3>Review guarantee claim</h3><p className={styles.muted}>Claim received {adminDate(selected.claim_received_at)}. Current status: {statusLabel(selected.claim_status)}.</p></div>
+                    <span className={styles.status}>{statusLabel(selected.claim_status)}</span>
+                  </div>
+                  <div className={styles.grid}>
+                    <label className={styles.field}>
+                      <span>Review decision</span>
+                      <select disabled={selected.refunded || selected.verified_refund_cents > 0} value={reviewStatus} onChange={(event) => setReviewStatus(event.target.value)}>
+                        <option value="in_review">In review</option><option value="approved">Approved</option><option value="refund_pending">Refund pending</option><option value="denied">Denied</option><option value="withdrawn">Withdrawn</option>
+                      </select>
+                    </label>
+                    <label className={styles.field}><span>Approved refund, dollars</span><input disabled={selected.refunded || selected.verified_refund_cents > 0} type="number" min="0.01" step="0.01" value={approvedAmount} onChange={(event) => setApprovedAmount(event.target.value)} /></label>
+                  </div>
+                  <div className={styles.requirementChecklist}>
+                    <label className={styles.check}><input disabled={selected.refunded || selected.verified_refund_cents > 0} type="checkbox" checked={profileConfirmed} onChange={(event) => setProfileConfirmed(event.target.checked)} /><span>Profile completeness requirement confirmed</span></label>
+                    <label className={styles.check}><input disabled={selected.refunded || selected.verified_refund_cents > 0} type="checkbox" checked={contactConfirmed} onChange={(event) => setContactConfirmed(event.target.checked)} /><span>Contact details were current during the guarantee period</span></label>
+                    <label className={styles.check}><input disabled={selected.refunded || selected.verified_refund_cents > 0} type="checkbox" checked={responseConfirmed} onChange={(event) => setResponseConfirmed(event.target.checked)} /><span>Instructor response requirement confirmed</span></label>
+                  </div>
+                  <label className={styles.field}><span>Internal review note</span><textarea disabled={selected.refunded || selected.verified_refund_cents > 0} maxLength={4000} value={reviewNote} onChange={(event) => setReviewNote(event.target.value)} /></label>
+                  <label className={styles.field}><span>Decision reason</span><textarea disabled={selected.refunded || selected.verified_refund_cents > 0} maxLength={2000} value={decisionReason} onChange={(event) => setDecisionReason(event.target.value)} /></label>
+                  <button className={styles.secondaryButton} disabled={busy !== null || selected.refunded || selected.verified_refund_cents > 0} type="submit">{busy === "review" ? "Saving..." : "Save claim review"}</button>
+                </form>
+              ) : null}
+
+              {selected.claim_id && ["approved", "refund_pending", "partially_refunded", "refunded"].includes(selected.claim_status ?? "") ? (
+                <form className={`${styles.card} ${styles.stack} ${styles.refundVerificationCard}`} onSubmit={verifyRefund}>
+                  <div><p className={styles.eyebrow}>Final verification</p><h3>Record a refund issued in Stripe</h3></div>
+                  <p>This action never sends money or cancels a subscription. First issue the refund from the Stripe Dashboard, cancel the subscription there if the instructor wants to stop future charges, then paste the Stripe refund ID here. The server checks the customer, membership invoice, price, amount, and refund status before recording it.</p>
+                  {selected.stripe_customer_id ? <a className={styles.secondaryButton} href={stripeCustomerUrl(selected.stripe_customer_id, selected.stripe_livemode)} target="_blank" rel="noreferrer">Open customer in Stripe</a> : null}
+                  <label className={styles.check}><input disabled={selected.refunded} type="checkbox" checked={refundIssuedConfirmed} onChange={(event) => setRefundIssuedConfirmed(event.target.checked)} /><span>I already issued this refund in Stripe.</span></label>
+                  <label className={styles.field}><span>Stripe refund ID</span><input disabled={selected.refunded} required placeholder="re_..." value={refundId} onChange={(event) => setRefundId(event.target.value)} /></label>
+                  <button className={styles.button} disabled={busy !== null || selected.refunded || !refundIssuedConfirmed} type="submit">{busy === "refund" ? "Verifying with Stripe..." : "Verify and record refund"}</button>
+                </form>
+              ) : null}
+            </>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function AdminDashboard({ isOwner }: { isOwner: boolean }) {
-  const [tab, setTab] = useState<"overview" | "profiles" | "delivery" | "access">("overview");
+  const [tab, setTab] = useState<"overview" | "profiles" | "memberships" | "delivery" | "access">("overview");
   const [profiles, setProfiles] = useState<InstructorProfile[]>([]);
   const [inquiries, setInquiries] = useState<MarketplaceInquiry[]>([]);
   const [jobs, setJobs] = useState<AdminNotificationJob[]>([]);
@@ -1179,7 +1577,7 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
     setBusyId(null);
     if (reviewError) setError(reviewError.message);
     else {
-      setMessage(decision === "approve" ? "Instructor approved for membership checkout." : "Instructor profile updated.");
+      setMessage(decision === "approve" ? "Instructor approved or reactivated. Active memberships publish automatically." : "Instructor profile updated.");
       await loadOperations();
     }
   }
@@ -1232,8 +1630,8 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
     <>
       <div className={styles.tabs} role="tablist" aria-label="Admin dashboard sections">
         {(isOwner
-          ? (["overview", "profiles", "delivery", "access"] as const)
-          : (["overview", "profiles", "delivery"] as const)
+          ? (["overview", "profiles", "memberships", "delivery", "access"] as const)
+          : (["overview", "profiles", "memberships", "delivery"] as const)
         ).map((name) => (
           <button key={name} className={`${styles.tab} ${tab === name ? styles.activeTab : ""}`} type="button" onClick={() => setTab(name)}>
             {name[0].toUpperCase() + name.slice(1)}
@@ -1428,7 +1826,10 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
                 <tbody>{profiles.map((profile) => (
                   <tr key={profile.id}>
                     <td>{profile.display_name}</td><td>{[profile.city, profile.region].filter(Boolean).join(", ")}</td><td><span className={styles.status}>{profile.status.replaceAll("_", " ")}</span></td>
-                    <td>{["approved", "published"].includes(profile.status) ? <button className={styles.dangerButton} disabled={busyId === profile.id} type="button" onClick={() => void review(profile.id, "suspend")}>Suspend</button> : null}</td>
+                    <td>
+                      {["approved", "published"].includes(profile.status) ? <button className={styles.dangerButton} disabled={busyId === profile.id} type="button" onClick={() => void review(profile.id, "suspend")}>Suspend</button> : null}
+                      {profile.status === "suspended" ? <button className={styles.secondaryButton} disabled={busyId === profile.id} type="button" onClick={() => void review(profile.id, "approve")}>Reactivate</button> : null}
+                    </td>
                   </tr>
                 ))}</tbody>
               </table>
@@ -1436,6 +1837,8 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
           </div>
         </>
       ) : null}
+
+      {!loading && tab === "memberships" ? <MembershipGuaranteeAdmin isOwner={isOwner} /> : null}
 
       {!loading && tab === "delivery" ? (
         <div className={styles.card}>

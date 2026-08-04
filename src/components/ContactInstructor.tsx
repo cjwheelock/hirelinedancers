@@ -168,7 +168,7 @@ export function ContactInstructor() {
         <p className={styles.success}>
           {profile?.isStaticListing
             ? "Our team received your inquiry and will confirm that this launch listing is available before connecting you."
-            : "We sent the instructor an email and queued a text alert if they enabled texts. They will reply directly to your account email."}
+            : "We sent the instructor an email with your event details. They will reply directly to your account email."}
         </p>
         <p className={styles.subtitle}>Ask the instructor about availability, final pricing, contracts, insurance, payment terms, and any venue requirements.</p>
         <div className={styles.buttonRow} style={{ marginTop: 26 }}>

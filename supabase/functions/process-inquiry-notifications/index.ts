@@ -32,6 +32,10 @@ type NotificationJob = {
   inquiry_message: string | null;
 };
 
+// Keep the Twilio implementation available for a future reviewed launch, but
+// fail closed while the product is operating as email only.
+const SMS_DELIVERY_PAUSED = true;
+
 class ProviderError extends Error {
   constructor(message: string, readonly retryable: boolean) {
     super(message);
@@ -217,6 +221,7 @@ function emailHtml(job: NotificationJob): string {
 async function sendEmail(job: NotificationJob): Promise<string> {
   const apiKey = requiredEnv("RESEND_API_KEY");
   const from = requiredEnv("RESEND_FROM_EMAIL");
+  const supportEmail = Deno.env.get("SUPPORT_EMAIL")?.trim() || "hello@hirelinedancers.com";
   let response: Response;
 
   try {
@@ -231,7 +236,9 @@ async function sendEmail(job: NotificationJob): Promise<string> {
       body: JSON.stringify({
         from,
         to: [job.delivered_to_email],
-        ...(normalizedNotificationType(job) === "new_inquiry" ? { reply_to: job.organizer_email } : {}),
+        reply_to: normalizedNotificationType(job) === "new_inquiry"
+          ? job.organizer_email
+          : supportEmail,
         subject: normalizedNotificationType(job) === "booking_followup"
           ? "Did this inquiry turn into a booking?"
           : normalizedNotificationType(job) === "completion_followup"
@@ -375,6 +382,9 @@ async function deferJob(admin: AdminClient, job: NotificationJob, error: string)
 async function processJob(admin: AdminClient, job: NotificationJob): Promise<string> {
   try {
     if (job.channel === "sms") {
+      if (SMS_DELIVERY_PAUSED) {
+        throw new ProviderError("SMS notifications are temporarily paused", false);
+      }
       await requireCurrentSmsConsent(admin, job);
     }
     const providerMessageId = job.channel === "email"

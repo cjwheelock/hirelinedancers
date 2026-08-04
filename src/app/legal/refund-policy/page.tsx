@@ -12,7 +12,7 @@ export default function RefundPolicyPage() {
         <li>A booking means a paid event generated from a Hire Line Dancers inquiry.</li>
         <li>Refund requests must be submitted within 30 days after the first 12 months of membership end.</li>
       </ul>
-      <p>The free trial has no paid amount to refund. Refunds are limited to membership payments made during the first 12 months after the trial begins and do not cover external costs, travel, or lost revenue. A refunded membership ends the membership, including founding-member benefits.</p>
+      <p>The free trial has no paid amount to refund. Refunds are limited to membership payments made during the first 12 months after the trial begins and do not cover external costs, travel, or lost revenue. A verified guarantee refund closes the founding guarantee and its related founding benefits. It does not automatically cancel the paid membership. Instructors who want to stop future charges must cancel through the account billing portal or contact support for help.</p>
     </section>
   );
 }
