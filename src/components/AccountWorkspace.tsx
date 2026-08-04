@@ -549,11 +549,19 @@ function InstructorProfileForm({
   const canEdit = profile.status === "draft" || profile.status === "published";
   const canSubmitForReview = profile.status === "draft";
   const selectedMarket = cities.find((market) => market.city === form.city && market.state === form.region);
+  const allEventTypesSelected = eventTypes.every((item) => form.event_types.includes(item.slug));
 
   function selectMarket(slug: string) {
     const market = cities.find((item) => item.slug === slug);
     if (!market) return;
     setForm((current) => ({ ...current, city: market.city, region: market.state }));
+  }
+
+  function toggleAllEventTypes() {
+    setForm((current) => ({
+      ...current,
+      event_types: allEventTypesSelected ? [] : eventTypes.map((item) => item.slug)
+    }));
   }
 
   return (
@@ -616,6 +624,10 @@ function InstructorProfileForm({
       <fieldset className={styles.stack} disabled={!canEdit}>
         <legend className={styles.legend}>Events you accept</legend>
         <div className={styles.checkGrid}>
+          <label className={`${styles.check} ${styles.selectAllCheck}`}>
+            <input type="checkbox" checked={allEventTypesSelected} onChange={toggleAllEventTypes} />
+            <span>Select all event types</span>
+          </label>
           {eventTypes.map((item) => (
             <label className={styles.check} key={item.slug}>
               <input type="checkbox" checked={form.event_types.includes(item.slug)} onChange={() => toggleArray("event_types", item.slug)} />

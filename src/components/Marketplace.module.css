@@ -653,6 +653,13 @@
   accent-color: #b5472b;
 }
 
+.selectAllCheck {
+  grid-column: 1 / -1;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #b3b7c2;
+  font-weight: 700;
+}
+
 .help {
   margin: 4px 0 0;
   color: #6d7488;
