@@ -1,6 +1,7 @@
 import { createClient, type Session, type SupabaseClient, type User } from "@supabase/supabase-js";
 
 export type AccountRole = "organizer" | "instructor" | "admin";
+export type AccountIntent = Exclude<AccountRole, "admin">;
 
 export type MarketplaceAccount = {
   id: string;
@@ -130,8 +131,13 @@ export function callbackUrl(next = "/account/"): string {
   return url.toString();
 }
 
-export function loginUrl(next = "/account/"): string {
+export function cleanAccountIntent(value: string | null | undefined): AccountIntent | null {
+  return value === "instructor" || value === "organizer" ? value : null;
+}
+
+export function loginUrl(next = "/account/", intent?: AccountIntent): string {
   const query = new URLSearchParams({ next: cleanReturnPath(next) });
+  if (intent) query.set("role", intent);
   return `/login/?${query.toString()}`;
 }
 

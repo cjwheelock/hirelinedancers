@@ -125,7 +125,7 @@ export function ContactInstructor() {
         <h1 className={styles.title}>Sign in to send your inquiry</h1>
         <p className={styles.subtitle}>Profiles are open to everyone. An account is required only when you are ready to contact an instructor.</p>
         <div className={styles.buttonRow} style={{ marginTop: 28 }}>
-          <a className={styles.button} href={loginUrl(next)}>Sign in and continue</a>
+          <a className={styles.button} href={loginUrl(next, "organizer")}>Sign in and continue</a>
         </div>
       </section>
     );

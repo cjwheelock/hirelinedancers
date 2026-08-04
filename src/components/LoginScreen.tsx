@@ -1,8 +1,24 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { callbackUrl, cleanReturnPath, getMarketplaceClient, marketplaceConfigured, readableError } from "@/lib/marketplace";
+import {
+  callbackUrl,
+  cleanAccountIntent,
+  cleanReturnPath,
+  getMarketplaceClient,
+  marketplaceConfigured,
+  readableError,
+  type AccountIntent
+} from "@/lib/marketplace";
 import styles from "./Marketplace.module.css";
+
+function accountEntryPath(intent: AccountIntent | null, returnPath: string): string {
+  if (!intent) return returnPath;
+
+  const params = new URLSearchParams({ intent });
+  if (returnPath !== "/account/") params.set("returnTo", returnPath);
+  return `/account/?${params.toString()}`;
+}
 
 export function LoginScreen() {
   const [email, setEmail] = useState("");
@@ -10,15 +26,19 @@ export function LoginScreen() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [next, setNext] = useState("/account/");
+  const [intent, setIntent] = useState<AccountIntent | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const returnPath = cleanReturnPath(params.get("next"));
-    setNext(returnPath);
+    const requestedIntent = cleanAccountIntent(params.get("role"));
+    const entryPath = accountEntryPath(requestedIntent, returnPath);
+    setIntent(requestedIntent);
+    setNext(entryPath);
 
     const client = getMarketplaceClient();
     void client?.auth.getSession().then(({ data }) => {
-      if (data.session) window.location.replace(returnPath);
+      if (data.session) window.location.replace(entryPath);
     });
   }, []);
 
@@ -64,13 +84,23 @@ export function LoginScreen() {
     }
   }
 
+  const eyebrow = intent === "instructor" ? "For instructors" : intent === "organizer" ? "For organizers" : "Your account";
+  const title = intent === "instructor"
+    ? "Sign in to build your instructor profile"
+    : intent === "organizer"
+      ? "Sign in to contact instructors"
+      : "Sign in to Hire Line Dancers";
+  const subtitle = intent === "instructor"
+    ? "Create your instructor workspace, complete your public profile, add photos and videos, and submit it for review."
+    : intent === "organizer"
+      ? "Create a planner account to contact instructors and keep your event inquiries organized."
+      : "Browse instructors without an account. Sign in when you are ready to send an inquiry, or to manage your instructor profile.";
+
   return (
     <section className={`${styles.shell} ${styles.narrow}`}>
-      <p className={styles.eyebrow}>Your account</p>
-      <h1 className={styles.title}>Sign in to Hire Line Dancers</h1>
-      <p className={styles.subtitle}>
-        Browse instructors without an account. Sign in when you are ready to send an inquiry, or to manage your instructor profile.
-      </p>
+      <p className={styles.eyebrow}>{eyebrow}</p>
+      <h1 className={styles.title}>{title}</h1>
+      <p className={styles.subtitle}>{subtitle}</p>
 
       <div className={styles.card}>
         {!marketplaceConfigured ? (

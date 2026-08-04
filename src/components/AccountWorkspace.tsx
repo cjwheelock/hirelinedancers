@@ -1,12 +1,15 @@
 "use client";
 
 import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { eventTypes } from "@/data/site";
+import { cities, eventTypes } from "@/data/site";
 import { useMarketplaceSession } from "@/hooks/useMarketplaceSession";
 import {
+  cleanAccountIntent,
+  cleanReturnPath,
   getMarketplaceClient,
   loginUrl,
   readableError,
+  type AccountIntent,
   type AccountRole,
   type InstructorPrivateSettings,
   type InstructorProfile,
@@ -35,10 +38,35 @@ type ProfileMedia = {
   sort_order: number;
 };
 
+type InstructorTab = "profile" | "inquiries" | "membership";
+
 export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean }) {
   const { session, account, isAdmin, isOwner, loading, error, configured, refresh } = useMarketplaceSession();
   const [signingOut, setSigningOut] = useState(false);
   const [workspaceMode, setWorkspaceMode] = useState<"admin" | "account">("admin");
+  const [entryIntent, setEntryIntent] = useState<AccountIntent | null | undefined>(undefined);
+  const [entryReturnTo, setEntryReturnTo] = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setEntryIntent(cleanAccountIntent(params.get("intent")));
+    const requestedReturn = params.get("returnTo");
+    setEntryReturnTo(requestedReturn ? cleanReturnPath(requestedReturn) : null);
+  }, []);
+
+  useEffect(() => {
+    if (entryIntent === undefined || !account?.role) return;
+    if (account.role === entryIntent && entryReturnTo) {
+      window.location.replace(entryReturnTo);
+      return;
+    }
+
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has("intent") && !url.searchParams.has("returnTo")) return;
+    url.searchParams.delete("intent");
+    url.searchParams.delete("returnTo");
+    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+  }, [account?.role, entryIntent, entryReturnTo]);
 
   useEffect(() => {
     if (!isAdmin) {
@@ -61,7 +89,7 @@ export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean })
     window.location.replace("/");
   }
 
-  if (loading) return <div className={styles.loading}>Loading your account...</div>;
+  if (loading || entryIntent === undefined) return <div className={styles.loading}>Loading your account...</div>;
 
   if (!configured) {
     return (
@@ -74,16 +102,14 @@ export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean })
   }
 
   if (!session) {
-    const next = typeof window === "undefined"
-      ? (adminOnly ? "/admin/" : "/account/")
-      : `${window.location.pathname}${window.location.search}`;
+    const next = adminOnly ? "/admin/" : entryReturnTo ?? "/account/";
     return (
       <section className={`${styles.shell} ${styles.narrow}`}>
         <p className={styles.eyebrow}>Your account</p>
         <h1 className={styles.title}>Sign in to continue</h1>
         <p className={styles.subtitle}>Manage your instructor profile or keep track of the instructors you contacted.</p>
         <div className={styles.buttonRow} style={{ marginTop: 28 }}>
-          <a className={styles.button} href={loginUrl(next)}>Sign in</a>
+          <a className={styles.button} href={loginUrl(next, entryIntent ?? undefined)}>Sign in</a>
         </div>
       </section>
     );
@@ -101,16 +127,32 @@ export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean })
   }
 
   if (!account?.role && !isAdmin) {
+    const isInstructorEntry = entryIntent === "instructor";
+    const isOrganizerEntry = entryIntent === "organizer";
     return (
       <section className={`${styles.shell} ${styles.narrow}`}>
-        <p className={styles.eyebrow}>One quick step</p>
-        <h1 className={styles.title}>How will you use Hire Line Dancers?</h1>
-        <p className={styles.subtitle}>Choose the account workspace you need. You can contact support later if you need both.</p>
+        <p className={styles.eyebrow}>{isInstructorEntry ? "Instructor account" : isOrganizerEntry ? "Organizer account" : "One quick step"}</p>
+        <h1 className={styles.title}>{isInstructorEntry ? "Set up your instructor workspace" : isOrganizerEntry ? "Set up your organizer workspace" : "How will you use Hire Line Dancers?"}</h1>
+        <p className={styles.subtitle}>
+          {isInstructorEntry
+            ? "Add your account details, then complete your public instructor profile."
+            : isOrganizerEntry
+              ? "Add your account details, then you can contact instructors and track your inquiries."
+              : "Choose the account workspace you need. You can contact support later if you need both."}
+        </p>
         {error ? <p className={styles.error}>{error}</p> : null}
         <OnboardingForm
           email={session.user.email ?? ""}
           initialName={account?.full_name ?? session.user.user_metadata.full_name ?? ""}
-          onComplete={() => void refresh()}
+          fixedRole={entryIntent ?? undefined}
+          onComplete={async () => {
+            if (entryReturnTo) {
+              window.location.replace(entryReturnTo);
+              return;
+            }
+            await refresh();
+            window.history.replaceState({}, "", "/account/");
+          }}
         />
       </section>
     );
@@ -146,13 +188,15 @@ export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean })
 function OnboardingForm({
   email,
   initialName,
+  fixedRole,
   onComplete
 }: {
   email: string;
   initialName: string;
-  onComplete: () => void;
+  fixedRole?: AccountIntent;
+  onComplete: () => void | Promise<void>;
 }) {
-  const [role, setRole] = useState<AccountRole>("organizer");
+  const [role, setRole] = useState<AccountRole>(fixedRole ?? "organizer");
   const [name, setName] = useState(initialName);
   const [company, setCompany] = useState("");
   const [busy, setBusy] = useState(false);
@@ -177,23 +221,25 @@ function OnboardingForm({
       setError(rpcError.message);
       return;
     }
-    onComplete();
+    await onComplete();
   }
 
   return (
     <form className={`${styles.card} ${styles.stack}`} onSubmit={submit}>
-      <div className={styles.roleGrid}>
-        <label className={styles.roleOption}>
-          <input type="radio" name="role" checked={role === "organizer"} onChange={() => setRole("organizer")} />
-          <strong>I am planning an event</strong>
-          <span>Contact instructors and keep your inquiries organized.</span>
-        </label>
-        <label className={styles.roleOption}>
-          <input type="radio" name="role" checked={role === "instructor"} onChange={() => setRole("instructor")} />
-          <strong>I teach line dancing</strong>
-          <span>Build a profile, receive inquiries, and manage your availability.</span>
-        </label>
-      </div>
+      {!fixedRole ? (
+        <div className={styles.roleGrid}>
+          <label className={styles.roleOption}>
+            <input type="radio" name="role" checked={role === "organizer"} onChange={() => setRole("organizer")} />
+            <strong>I am planning an event</strong>
+            <span>Contact instructors and keep your inquiries organized.</span>
+          </label>
+          <label className={styles.roleOption}>
+            <input type="radio" name="role" checked={role === "instructor"} onChange={() => setRole("instructor")} />
+            <strong>I teach line dancing</strong>
+            <span>Build a profile, receive inquiries, and manage your availability.</span>
+          </label>
+        </div>
+      ) : null}
 
       <label className={styles.field}>
         <span>Full name</span>
@@ -209,14 +255,14 @@ function OnboardingForm({
       </label>
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
       <button className={styles.button} disabled={busy} type="submit">
-        {busy ? "Saving..." : "Open my account"}
+        {busy ? "Saving..." : role === "instructor" ? "Open instructor workspace" : "Open organizer workspace"}
       </button>
     </form>
   );
 }
 
 function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
-  const [tab, setTab] = useState<"profile" | "media" | "inquiries" | "membership">("profile");
+  const [tab, setTab] = useState<InstructorTab>("profile");
   const [focusInquiryId, setFocusInquiryId] = useState<string | null>(null);
   const [focusFollowup, setFocusFollowup] = useState<"booking" | "completion" | null>(null);
   const [profile, setProfile] = useState<InstructorProfile | null>(null);
@@ -281,8 +327,15 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
       setFocusFollowup(validFollowup);
       return;
     }
-    if (["profile", "media", "inquiries", "membership"].includes(requestedTab ?? "")) {
-      setTab(requestedTab as "profile" | "media" | "inquiries" | "membership");
+    if (requestedTab === "media") {
+      setTab("profile");
+      const url = new URL(window.location.href);
+      url.searchParams.set("tab", "profile");
+      window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+      return;
+    }
+    if (["profile", "inquiries", "membership"].includes(requestedTab ?? "")) {
+      setTab(requestedTab as InstructorTab);
     }
   }, [account.id]);
 
@@ -324,7 +377,7 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
     window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
   }, [checkoutPending, profile?.status, settings?.subscription_status]);
 
-  function chooseTab(name: "profile" | "media" | "inquiries" | "membership") {
+  function chooseTab(name: InstructorTab) {
     setTab(name);
     setFocusInquiryId(null);
     setFocusFollowup(null);
@@ -348,7 +401,7 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
   return (
     <>
       <div className={styles.tabs} role="tablist" aria-label="Instructor account sections">
-        {(["profile", "media", "inquiries", "membership"] as const).map((name) => (
+        {(["profile", "inquiries", "membership"] as const).map((name) => (
           <button
             key={name}
             className={`${styles.tab} ${tab === name ? styles.activeTab : ""}`}
@@ -367,7 +420,6 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
       {!loading && profile && tab === "profile" ? (
         <InstructorProfileForm profile={profile} settings={settings} onSaved={() => void load()} />
       ) : null}
-      {!loading && profile && tab === "media" ? <ProfileMediaManager profile={profile} /> : null}
       {!loading && tab === "inquiries" ? (
         <InquiryList
           inquiries={inquiries}
@@ -496,6 +548,13 @@ function InstructorProfileForm({
 
   const canEdit = profile.status === "draft" || profile.status === "published";
   const canSubmitForReview = profile.status === "draft";
+  const selectedMarket = cities.find((market) => market.city === form.city && market.state === form.region);
+
+  function selectMarket(slug: string) {
+    const market = cities.find((item) => item.slug === slug);
+    if (!market) return;
+    setForm((current) => ({ ...current, city: market.city, region: market.state }));
+  }
 
   return (
     <div className={`${styles.card} ${styles.stack}`}>
@@ -505,7 +564,7 @@ function InstructorProfileForm({
       </div>
       {!canEdit ? <p className={styles.notice}>Editing is paused while your profile is in review or awaiting membership activation.</p> : null}
 
-      <div className={styles.grid}>
+      <div className={`${styles.grid} ${styles.alignedGrid}`}>
         <label className={styles.field}>
           <span>Public name</span>
           <input disabled={!canEdit} required value={form.display_name} onChange={(e) => setValue("display_name", e.target.value)} />
@@ -516,21 +575,21 @@ function InstructorProfileForm({
         </label>
       </div>
       <label className={styles.field}>
-        <span>Profile headline</span>
-        <input disabled={!canEdit} maxLength={120} value={form.headline} onChange={(e) => setValue("headline", e.target.value)} placeholder="Beginner-friendly lessons that get the whole room moving" />
-      </label>
-      <label className={styles.field}>
         <span>About you</span>
         <textarea disabled={!canEdit} maxLength={2000} value={form.bio} onChange={(e) => setValue("bio", e.target.value)} />
       </label>
-      <div className={styles.grid}>
+
+      <ProfileMediaManager profile={profile} />
+
+      <div className={`${styles.grid} ${styles.alignedGrid}`}>
         <label className={styles.field}>
-          <span>City</span>
-          <input disabled={!canEdit} value={form.city} onChange={(e) => setValue("city", e.target.value)} />
-        </label>
-        <label className={styles.field}>
-          <span>State</span>
-          <input disabled={!canEdit} maxLength={2} value={form.region} onChange={(e) => setValue("region", e.target.value)} placeholder="CA" />
+          <span>City or metro area</span>
+          <select disabled={!canEdit} required value={selectedMarket?.slug ?? ""} onChange={(e) => selectMarket(e.target.value)}>
+            <option value="">Select one of our launch areas</option>
+            {cities.map((market) => (
+              <option key={market.slug} value={market.slug}>{market.city}, {market.state}</option>
+            ))}
+          </select>
         </label>
         <label className={styles.field}>
           <span>ZIP code</span>
@@ -539,14 +598,6 @@ function InstructorProfileForm({
         <label className={styles.field}>
           <span>Travel radius in miles</span>
           <input disabled={!canEdit} type="number" min="0" max="1000" value={form.travel_radius_miles} onChange={(e) => setValue("travel_radius_miles", e.target.value)} />
-        </label>
-        <label className={styles.field}>
-          <span>Years teaching</span>
-          <input disabled={!canEdit} type="number" min="0" max="80" value={form.years_teaching} onChange={(e) => setValue("years_teaching", e.target.value)} />
-        </label>
-        <label className={styles.field}>
-          <span>Largest group you teach</span>
-          <input disabled={!canEdit} type="number" min="1" max="10000" value={form.max_group_size} onChange={(e) => setValue("max_group_size", e.target.value)} />
         </label>
       </div>
 
@@ -574,7 +625,7 @@ function InstructorProfileForm({
         </div>
       </fieldset>
 
-      <div className={styles.grid}>
+      <div className={`${styles.grid} ${styles.alignedGrid}`}>
         <label className={styles.field}>
           <span>Favorite line dance song</span>
           <input disabled={!canEdit} value={form.favorite_song_name} onChange={(e) => setValue("favorite_song_name", e.target.value)} />
@@ -594,7 +645,7 @@ function InstructorProfileForm({
         </div>
       </fieldset>
 
-      <div className={styles.grid}>
+      <div className={`${styles.grid} ${styles.alignedGrid}`}>
         <label className={styles.field}>
           <span>Liability insurance</span>
           <select disabled={!canEdit} value={form.liability_insurance_status} onChange={(e) => setValue("liability_insurance_status", e.target.value as typeof form.liability_insurance_status)}>
@@ -615,7 +666,7 @@ function InstructorProfileForm({
 
       <h3>Private inquiry and pricing settings</h3>
       <p className={styles.help}>These details are not displayed on your public profile.</p>
-      <div className={styles.grid}>
+      <div className={`${styles.grid} ${styles.alignedGrid}`}>
         <label className={styles.field}>
           <span>Verified inquiry email</span>
           <input disabled type="email" value={form.inquiry_email} />
@@ -740,9 +791,9 @@ function ProfileMediaManager({ profile }: { profile: InstructorProfile }) {
   }
 
   return (
-    <div className={`${styles.card} ${styles.stack}`}>
+    <section className={`${styles.profileMediaSection} ${styles.stack}`} aria-labelledby="profile-media-heading">
       <div>
-        <h2>Profile photos and videos</h2>
+        <h2 id="profile-media-heading">Profile photos and videos</h2>
         <p className={styles.muted}>Add one headshot, up to three teaching photos, one welcome video, and up to three additional videos.</p>
       </div>
       <div className={styles.grid}>
@@ -784,7 +835,7 @@ function ProfileMediaManager({ profile }: { profile: InstructorProfile }) {
           </article>
         ))}
       </div>
-    </div>
+    </section>
   );
 }
 

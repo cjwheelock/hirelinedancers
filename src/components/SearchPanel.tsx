@@ -162,10 +162,13 @@ function PublicProfileCard({ profile, compact = false }: { profile: PublicProfil
         </div>
       </div>
 
-      <p className="muted">
-        {profile.years_teaching === null ? "Teaching experience listed on profile" : `${profile.years_teaching} years teaching`}
-        {profile.travel_radius_miles === null ? "" : ` · travels about ${profile.travel_radius_miles} miles`}
-      </p>
+      {profile.years_teaching !== null || profile.travel_radius_miles !== null ? (
+        <p className="muted">
+          {profile.years_teaching === null ? "" : `${profile.years_teaching} years teaching`}
+          {profile.years_teaching !== null && profile.travel_radius_miles !== null ? " · " : ""}
+          {profile.travel_radius_miles === null ? "" : `Travels about ${profile.travel_radius_miles} miles`}
+        </p>
+      ) : null}
 
       <p className="bio">{profile.headline || profile.bio || "Beginner-friendly line dance instruction for events and programs."}</p>
 

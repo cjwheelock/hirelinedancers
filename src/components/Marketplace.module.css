@@ -57,6 +57,16 @@
   gap: 20px;
 }
 
+.alignedGrid {
+  align-items: start;
+}
+
+.alignedGrid > .field > span {
+  display: flex;
+  min-height: 2.1rem;
+  align-items: flex-end;
+}
+
 .metricGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -648,6 +658,18 @@
   color: #6d7488;
   font-size: 0.86rem;
   line-height: 1.45;
+}
+
+.profileMediaSection {
+  margin: 8px 0;
+  padding: 28px 0;
+  border-top: 2px solid #1c2a44;
+  border-bottom: 2px solid #1c2a44;
+}
+
+.profileMediaSection h2,
+.profileMediaSection p {
+  margin-bottom: 0;
 }
 
 .mediaGrid {
