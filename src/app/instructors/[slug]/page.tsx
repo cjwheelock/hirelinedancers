@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Clock, MapPin, Users } from "lucide-react";
+import { InstructorContactLink } from "@/components/InstructorContactLink";
 import { SpotifyTrack } from "@/components/SpotifyTrack";
 import { eventTypes, instructors, site } from "@/data/site";
 import { profileJsonLd } from "@/lib/search";
@@ -161,8 +162,10 @@ export default async function InstructorPage({ params }: { params: Promise<{ slu
             <li>Song requests and accessibility needs discussed before the event</li>
             <li>Travel, venue access, sound, and insurance confirmed in advance</li>
           </ul>
-          <Link className="button primary" href="/instructors/">Find an instructor for your event</Link>
-          <Link className="button secondary" href="/instructors/join/">Create an instructor profile</Link>
+          <InstructorContactLink instructorIdentifier={instructor.slug} className="button primary">
+            Contact {instructor.name.split(" ")[0]}
+          </InstructorContactLink>
+          <Link className="button secondary" href="/instructors/">Browse other instructors</Link>
         </aside>
       </div>
     </section>
