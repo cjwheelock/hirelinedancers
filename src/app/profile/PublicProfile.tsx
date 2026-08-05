@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { InstructorContactLink } from "@/components/InstructorContactLink";
 import {
   CalendarCheck,
   Clock,
@@ -279,6 +278,7 @@ export function PublicProfile() {
   }
 
   const identifier = profile.slug || profile.id;
+  const contactHref = `/contact/?${new URLSearchParams({ instructor: identifier }).toString()}`;
   const headshot = media.find((item) => item.media_type === "headshot");
   const headshotUrl = headshot ? mediaUrl(headshot) : null;
   const location = [profile.city, profile.region].filter(Boolean).join(", ") || "Service area available on request";
@@ -377,7 +377,7 @@ export function PublicProfile() {
           <p className={styles.kicker}>Check availability</p>
           <h2>Tell {profile.display_name} about your event.</h2>
           <p>Send the date, location, group size, and event details. The instructor will reply directly with availability, rates, and next steps.</p>
-          <InstructorContactLink instructorIdentifier={identifier} className={styles.primaryButton}>Contact this instructor</InstructorContactLink>
+          <Link className={styles.primaryButton} href={contactHref}>Contact this instructor</Link>
           <p className={styles.finePrint}>You can browse without an account. Sign in is required when you send an inquiry so you can track its status.</p>
           <p className={styles.finePrint}>Hire Line Dancers does not handle instructor contracts or event payments. Confirm all terms directly before booking.</p>
           <p className={styles.response}><Clock size={15} aria-hidden="true" /> Preferred response window: about {profile.preferred_response_hours} hours</p>
