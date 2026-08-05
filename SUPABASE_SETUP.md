@@ -42,8 +42,11 @@ The relevant migrations are:
 - `202608020011_payments_and_notification_workers.sql`
 - `202608040001_admin_analytics_and_inquiry_followups.sql`
 - `202608040002_email_only_and_guarantee_refunds.sql`
+- `202608050002_instructor_lifetime_access_and_invitations.sql`
 
-Do not recreate the old `instructor_applications` or minimal `inquiries` tables by hand. Migration `202608020010` establishes the marketplace schema and upgrades an older inquiry table if one exists. Migration `202608020011` adds approve-then-pay membership state, webhook idempotency, and notification worker functions. Migration `202608040002` pauses SMS delivery, adds founding and guarantee records, adds claim and refund audit records, and provides owner-only claim operations plus service-only Stripe refund recording.
+Do not recreate the old `instructor_applications` or minimal `inquiries` tables by hand. Migration `202608020010` establishes the marketplace schema and upgrades an older inquiry table if one exists. Migration `202608020011` adds approve-then-pay membership state, webhook idempotency, and notification worker functions. Migration `202608040002` pauses SMS delivery, adds founding and guarantee records, adds claim and refund audit records, and provides owner-only claim operations plus service-only Stripe refund recording. Migration `202608050002` adds instructor invitations and permanent lifetime access that is stored separately from Stripe billing state.
+
+The production project has applied migration `202608050002_instructor_lifetime_access_and_invitations.sql` and all earlier migrations in this list.
 
 ## 2. Configure browser environment variables
 
@@ -149,7 +152,9 @@ draft -> pending_review -> approved -> published
 - `published`: Stripe reports an active or trialing membership, so the directory can show the profile.
 - `suspended`: an administrator has disabled the profile. Stripe events do not republish it automatically.
 
-When a membership becomes inactive, unpaid, paused, or canceled, a published profile returns to `approved`. The profile row and uploaded media are not deleted. A `past_due` event leaves visibility unchanged until a billing grace policy is chosen. Reapproving a profile publishes it immediately when its canonical membership remains active or trialing.
+When a membership becomes inactive, unpaid, paused, or canceled, a published profile returns to `approved`. The profile row and uploaded media are not deleted. A `past_due` event leaves visibility unchanged until a billing grace policy is chosen. Reapproving a profile publishes it immediately when its canonical membership remains active or trialing. Profiles with lifetime access publish after approval without a Stripe membership. Later Stripe events are recorded and ignored for those profiles, so cancellation or refund events cannot remove lifetime access or unpublish the profile.
+
+Administrators can send instructor invitations from the admin dashboard and optionally include lifetime access. The `send-instructor-invitation` function sends a private, expiring signup link through Resend. Invitation acceptance requires an authenticated account whose normalized email matches the invited email. Lifetime grants live in `instructor_lifetime_access`, which instructors cannot insert or edit through RLS or profile settings.
 
 A Stripe refund does not automatically cancel a subscription. Refunding and canceling are separate operator decisions. If a membership should end after a guarantee refund, cancel it separately in Stripe. The cancellation webhook, not the refund record, controls directory visibility.
 
@@ -168,7 +173,7 @@ The bucket is public so approved profile media can render on the public director
 
 The server flow uses Stripe Checkout Sessions, not a Payment Link.
 
-The dedicated Stripe sandbox account is named `Hire a Line Dancer`. As of August 4, 2026, it contains:
+The legacy Stripe sandbox on account `acct_1T446hLOrJYSNwve` contains the following test resources as of August 4, 2026. These identifiers are retained only for local and sandbox reference. Production Supabase does not use these Stripe secrets or resources.
 
 - Account: `acct_1T446hLOrJYSNwve`
 - Product: `prod_V0muMszWESoxub`
@@ -178,17 +183,40 @@ The dedicated Stripe sandbox account is named `Hire a Line Dancer`. As of August
 - Customer-facing sandbox promotion code: `FREEMONTH`
 - Webhook destination: `we_1U0lYkLOrJYSNwveYV3TCOMm`
 
-Cards, Link, Apple Pay, and Google Pay are enabled. The Portal allows payment-method updates, invoice history, and cancellation at the end of the billing period. It does not allow plan or quantity changes.
+In that sandbox, Cards, Link, Apple Pay, and Google Pay are enabled. The sandbox Portal allows payment-method updates, invoice history, and cancellation at the end of the billing period. It does not allow plan or quantity changes.
 
-The Supabase project currently uses the sandbox Stripe key, Price, Portal configuration, and webhook secret. Sandbox checkout cannot charge a real card. Before accepting payments, the owner must complete Stripe business verification and payout setup, then create matching live-mode resources and replace all four Stripe secrets in Supabase.
+On August 5, 2026, a separate `Hire Line Dancers` Stripe account was created and activated inside the `OMG Goals Inc.` Stripe Organization. This is the production account for the product line. It uses the existing corporation's exact legal and tax information and a connected payout bank account. No new corporation was formed through Stripe Atlas.
 
-The current `Hire a Line Dancer` Stripe account is an Atlas incorporation sandbox. Its **Exit sandbox** flow requires forming a new company through Stripe Atlas. Do not use that path for production unless creating a separate legal entity is intentional. The existing verified `OMG Career, LLC` account is the current production candidate, but the owner must confirm that it is the correct legal entity before Hire Line Dancer products, prices, webhooks, and payouts are added there.
+The live Stripe resources are:
+
+- Account: `acct_1U17IgPoYzwtbFuT`
+- Product: `prod_V1EDFGlsi5zmnJ`
+- Monthly Price: `price_1U1Bl5PoYzwtbFuTQ7Jw7WeN`
+- Customer Portal configuration: `bpc_1U1CG4PoYzwtbFuToKoH8q3u`
+- 100 percent, once-only coupon: `Z00npt3G`
+- First-time-customer promotion code: `FREEMONTH`
+- Promotion code object: `promo_1U1C0zPoYzwtbFuTOKJe5ni6`
+- Webhook destination: `we_1U1CVOPoYzwtbFuTNyyP9Cy0`
+
+Account `acct_1U17IgPoYzwtbFuT` has charges and payouts enabled. Stripe reports no currently due, past-due, or pending-verification requirements. Stripe Public details include the Hire Line Dancers Terms of Use, Privacy Policy, and support links. The live Customer Portal allows payment-method updates, invoice history, and cancellation at the end of the billing period, with plan and quantity changes disabled.
+
+The generic Stripe Checkout refund display is disabled. Hire Line Dancers instead offers the conditional 12-month founding-instructor guarantee described and linked from the account activation flow, Terms of Use, and Refund Policy. It is not a generic 14-day refund promise.
+
+The public Customer Portal login page is disabled and is not required. Signed-in instructors use the app's **Manage membership** action, which creates a short-lived authenticated Portal Session through `create-billing-portal` and returns the instructor to the account page.
+
+The production webhook is active. Its unsigned rejection smoke test and signed synthetic event smoke test passed. The live Stripe secret key, Product, Price, dedicated Portal configuration, expected mode, terms-consent setting, and webhook signing secret are installed in Supabase.
+
+`FREEMONTH` is restricted to first-time customers. Its underlying coupon is currently account-scoped, not Product-scoped. This is safe only while Hire Line Dancers is the sole active Product in this Stripe account. Before adding another active Product, replace the coupon and promotion code with a Product-restricted version, or otherwise restrict and retire the current account-scoped promotion.
+
+Do not use the restricted Atlas-created `OMG Goals, Inc.` account for production. Do not copy the old `OMG Career, LLC` legal entity into Hire Line Dancers unless a later legal review confirms that it is the correct entity. The production account was activated through Stripe's registered-business flow using `OMG Goals Inc.` rather than through Atlas.
+
+Production Supabase now uses the live Hire Line Dancers Stripe resources. Keep the legacy sandbox identifiers isolated from production. If sandbox development is moved to the new account later, recreate the test Product, Price, Portal configuration, promotion, and webhook there before changing sandbox-only secrets.
 
 For live mode:
 
 1. Create one recurring USD Price for exactly $14.99 per month. The Price itself should not have a trial setting.
-2. Create a 100 percent off coupon with duration `once`, scope it to the Hire Line Dancers Product, and create the customer-facing promotion code `FREEMONTH`. Restrict the code to first-time customers. Because Checkout accepts promotion codes, audit and archive any other active codes that should not apply to this Product.
-3. Save the Price's `price_...` identifier as the `STRIPE_PRICE_ID` Edge Function secret.
+2. Create a 100 percent off coupon with duration `once` and the customer-facing promotion code `FREEMONTH`. Restrict the code to first-time customers and, whenever the account has more than one active Product, restrict its coupon to the Hire Line Dancers Product. The current live coupon is account-scoped and must be replaced or restricted before another Product becomes active. Because Checkout accepts promotion codes, audit and archive any other active codes that should not apply to this Product.
+3. Save the Product's `prod_...` identifier as `STRIPE_PRODUCT_ID` and the Price's `price_...` identifier as `STRIPE_PRICE_ID`. Set `STRIPE_EXPECTED_MODE=live` for production.
 4. Configure a webhook endpoint at:
 
 ```text
@@ -208,15 +236,17 @@ https://YOUR_PROJECT_REF.supabase.co/functions/v1/stripe-webhook
 
 6. Save the endpoint signing secret as `STRIPE_WEBHOOK_SIGNING_SECRET`.
 
-Before enabling paid Checkout, set the Terms of Use and Privacy Policy URLs in Stripe Public details. Then add `consent_collection.terms_of_service = required` to Checkout after confirming the live account accepts it. The account page already places the recurring price, Terms of Use, and Refund Policy beside the activation button.
+Before enabling paid Checkout, set the Terms of Use, Privacy Policy, and support URLs in Stripe Public details. Then add `consent_collection.terms_of_service = required` to Checkout after confirming the live account accepts it. These links and required consent are configured for the live account. The account page places the recurring price, Terms of Use, Privacy Policy, and Refund Policy beside the activation button.
 
-Enable Stripe's **Limit customers to one subscription** Checkout setting and keep the Customer Portal login link enabled. The Checkout function also queries Stripe for an existing membership on the configured Price before it creates a new Session.
+Enable Stripe's **Limit customers to one subscription** Checkout setting. The public Customer Portal login page may remain disabled because the app creates authenticated Portal Sessions for signed-in instructors. The Checkout function also queries Stripe for an existing membership on the configured Price before it creates a new Session.
 
-The exact browser-invoked Checkout function is `create-instructor-checkout`. It requires a valid user JWT, an owned profile with status `approved`, and the verified fixed monthly Price. It requires a payment method and enables Stripe's promotion-code field. No trial is added automatically.
+The exact browser-invoked Checkout function is `create-instructor-checkout`. It requires a valid user JWT, an owned profile with status `approved`, and the verified fixed monthly Product and Price in the expected Stripe mode. It requires a payment method, enables Stripe's promotion-code field, and requires Stripe terms consent in production. No trial is added automatically.
 
-Enable Stripe Customer Portal for payment-method updates, invoice history, and subscription cancellation. The authenticated `create-billing-portal` function verifies ownership and the exact Hire Line Dancers Price before creating a Portal Session. A dedicated Portal configuration is recommended when Hire Line Dancers shares a Stripe account with another product line.
+Checkout returns to `/account/?checkout=success&session_id={CHECKOUT_SESSION_ID}`. The authenticated `reconcile-instructor-checkout` function retrieves that Session and its Subscription from Stripe, verifies the instructor, Customer, metadata, Product, Price, and mode, then applies the current membership state through the same database function used by the webhook. The account page retries this path and preserves the Session reference until membership is confirmed, so a delayed or missed webhook does not force a paid instructor to start another checkout.
 
-Before switching Supabase from sandbox to live Stripe secrets, inspect and resolve every sandbox billing reference. Active sandbox statuses can correctly block Checkout even though their Customer and Subscription IDs do not exist in live mode. Also expire every open sandbox Checkout Session before deploying the no-default-trial flow. Use:
+Enable Stripe Customer Portal for payment-method updates, invoice history, and subscription cancellation at the end of the billing period. Disable plan and quantity changes. The authenticated `create-billing-portal` function verifies ownership, the exact Hire Line Dancers Product and Price, live mode, and the dedicated Portal configuration before creating a Portal Session. Production requires `STRIPE_BILLING_PORTAL_CONFIGURATION_ID=bpc_1U1CG4PoYzwtbFuToKoH8q3u`. Public Portal login is optional and currently disabled.
+
+The completed production cutover included an audit of every sandbox billing reference. Reuse this audit before any future Stripe account or mode cutover. Active sandbox statuses can correctly block Checkout even though their Customer and Subscription IDs do not exist in live mode. Also expire every open sandbox Checkout Session before deploying a replacement Checkout flow. Use:
 
 ```sql
 select instructor_profile_id, subscription_status, stripe_customer_id, stripe_subscription_id
@@ -254,24 +284,18 @@ Set these in Supabase Edge Function secrets:
 ```text
 APP_URL=https://hirelinedancers.com
 STRIPE_SECRET_KEY=sk_live_...
+STRIPE_EXPECTED_MODE=live
+STRIPE_PRODUCT_ID=prod_...
 STRIPE_PRICE_ID=price_...
+STRIPE_BILLING_PORTAL_CONFIGURATION_ID=bpc_1U1CG4PoYzwtbFuToKoH8q3u
+STRIPE_REQUIRE_TERMS_CONSENT=true
 STRIPE_WEBHOOK_SIGNING_SECRET=whsec_...
 RESEND_API_KEY=re_...
 RESEND_FROM_EMAIL=Hire Line Dancers <inquiries@mail.hirelinedancers.com>
 SUPPORT_EMAIL=hello@hirelinedancers.com
 ```
 
-Optional dedicated Customer Portal configuration:
-
-```text
-STRIPE_BILLING_PORTAL_CONFIGURATION_ID=bpc_...
-```
-
-After setting valid Terms and Privacy URLs in Stripe Public details, enable Stripe's required terms checkbox:
-
-```text
-STRIPE_REQUIRE_TERMS_CONSENT=true
-```
+The dedicated Customer Portal configuration is required in production and optional for local or sandbox use. Valid Terms, Privacy, and support URLs are configured in Stripe Public details, and production uses `STRIPE_REQUIRE_TERMS_CONSENT=true`. Production Checkout fails closed when this setting is missing, invalid, or false. The live Stripe secrets listed above are installed in Supabase.
 
 SMS is currently paused, so no Twilio secrets are required. The following names are reserved for a future reviewed SMS launch:
 
@@ -297,16 +321,20 @@ Keep that environment file outside Git. Hosted Edge Functions receive Supabase U
 
 - `create-instructor-checkout`: `verify_jwt = true`
 - `create-billing-portal`: `verify_jwt = true`
+- `reconcile-instructor-checkout`: `verify_jwt = true`
 - `verify-instructor-refund`: `verify_jwt = true`
+- `send-instructor-invitation`: `verify_jwt = true`
 - `stripe-webhook`: `verify_jwt = false`, because Stripe authenticates with its signature
 - `process-inquiry-notifications`: `verify_jwt = false`, because the function requires the named `automations` Supabase secret key in `apikey`
 
-Deploy:
+After applying migrations and setting all production secrets, deploy the reconciliation endpoint before the Checkout endpoint:
 
 ```bash
-supabase functions deploy create-instructor-checkout
+supabase functions deploy reconcile-instructor-checkout
 supabase functions deploy create-billing-portal
+supabase functions deploy create-instructor-checkout
 supabase functions deploy verify-instructor-refund
+supabase functions deploy send-instructor-invitation
 supabase functions deploy stripe-webhook
 supabase functions deploy process-inquiry-notifications
 ```

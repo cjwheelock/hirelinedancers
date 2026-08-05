@@ -904,6 +904,237 @@ select pg_temp.expect_error(
   'removing an assigned founding position'
 );
 
+-- Lifetime access is independent from Stripe and may be granted only through
+-- the protected admin or invitation workflows.
+reset role;
+select pg_temp.set_request(null, null, 'postgres');
+insert into auth.users (id, email, raw_user_meta_data) values
+  ('00000000-0000-0000-0000-000000000013', 'lifetime-invite@example.test', '{"full_name":"Lena Lifetime"}'),
+  ('00000000-0000-0000-0000-000000000014', 'lifetime-admin@example.test', '{"full_name":"Gina Grant"}');
+
+set local role authenticated;
+select pg_temp.set_request(
+  '00000000-0000-0000-0000-000000000014',
+  'lifetime-admin@example.test',
+  'authenticated'
+);
+select public.complete_account_onboarding(
+  'instructor', 'Gina Grant', 'Grant Dance Co.', null, false
+);
+update public.instructor_profiles
+set city = 'Denver', region = 'CO', status = 'pending_review'
+where account_id = '00000000-0000-0000-0000-000000000014';
+
+select pg_temp.set_request(
+  '00000000-0000-0000-0000-000000000030',
+  'outsider@example.test',
+  'authenticated'
+);
+select pg_temp.expect_error(
+  format(
+    'select public.admin_grant_instructor_lifetime_access(%L::uuid, null)',
+    (select id from public.instructor_profiles where account_id = '00000000-0000-0000-0000-000000000014')
+  ),
+  'Administrator access required',
+  'regular user lifetime grant'
+);
+select pg_temp.expect_error(
+  format(
+    'insert into public.instructor_lifetime_access (instructor_profile_id, source, granted_by) values (%L::uuid, %L, %L::uuid)',
+    (select id from public.instructor_profiles where account_id = '00000000-0000-0000-0000-000000000014'),
+    'admin',
+    '00000000-0000-0000-0000-000000000030'
+  ),
+  'row-level security',
+  'direct lifetime access insert'
+);
+
+select pg_temp.set_request(
+  '00000000-0000-0000-0000-000000000001',
+  'owner@example.test',
+  'authenticated'
+);
+select pg_temp.test_assert(
+  public.admin_grant_instructor_lifetime_access(
+    (select id from public.instructor_profiles where account_id = '00000000-0000-0000-0000-000000000014'),
+    'Lifecycle admin grant'
+  ),
+  'an administrator must be able to grant lifetime access'
+);
+select public.review_instructor_profile(
+  (select id from public.instructor_profiles where account_id = '00000000-0000-0000-0000-000000000014'),
+  'approve', 'gina-grant-denver-co', 'Lifetime profile approval'
+);
+select pg_temp.test_assert(
+  (select status = 'published'
+   from public.instructor_profiles
+   where account_id = '00000000-0000-0000-0000-000000000014'),
+  'approval must publish an admin-granted lifetime profile without Stripe'
+);
+
+reset role;
+select pg_temp.set_request(null, null, 'postgres');
+insert into public.instructor_invitations (
+  email,
+  token_hash,
+  request_key,
+  grants_lifetime_access,
+  status,
+  invited_by,
+  sent_at
+) values (
+  'lifetime-invite@example.test',
+  repeat('a', 64),
+  'lifetime-invite-lifecycle',
+  true,
+  'sent',
+  '00000000-0000-0000-0000-000000000001',
+  now()
+);
+
+set local role authenticated;
+select pg_temp.set_request(
+  '00000000-0000-0000-0000-000000000013',
+  'lifetime-invite@example.test',
+  'authenticated'
+);
+select pg_temp.test_assert(
+  public.accept_instructor_invitation(
+    repeat('a', 64), 'Lena Lifetime', 'Lifetime Line Dance'
+  ),
+  'accepting a lifetime invitation must return active lifetime access'
+);
+select pg_temp.test_assert(
+  (select account.role = 'instructor'
+      and profile.status = 'draft'
+   from public.accounts account
+   join public.instructor_profiles profile on profile.account_id = account.id
+   where account.id = '00000000-0000-0000-0000-000000000013'),
+  'invitation acceptance must onboard the instructor with a draft profile'
+);
+select pg_temp.test_assert(
+  public.current_instructor_lifetime_access(),
+  'the signed-in instructor lifetime status check must return true'
+);
+select pg_temp.test_assert(
+  public.accept_instructor_invitation(
+    repeat('a', 64), 'Lena Lifetime', 'Lifetime Line Dance'
+  ),
+  'accepted invitation claims must be idempotent for the same instructor'
+);
+
+reset role;
+select pg_temp.set_request(null, null, 'postgres');
+select pg_temp.test_assert(
+  (select access.source = 'invitation'
+   from public.instructor_profiles profile
+   join public.instructor_lifetime_access access
+     on access.instructor_profile_id = profile.id
+   where profile.account_id = '00000000-0000-0000-0000-000000000013'),
+  'invitation acceptance must record invitation-sourced lifetime access'
+);
+insert into public.instructor_invitations (
+  email, token_hash, request_key, grants_lifetime_access, status, invited_by, sent_at
+) values (
+  'another-instructor@example.test', repeat('b', 64), 'wrong-email-lifecycle',
+  false, 'sent', '00000000-0000-0000-0000-000000000001', now()
+);
+insert into public.instructor_invitations (
+  email, token_hash, request_key, grants_lifetime_access, status, invited_by,
+  created_at, expires_at, sent_at
+) values (
+  'lifetime-invite@example.test', repeat('c', 64), 'expired-invite-lifecycle',
+  false, 'sent', '00000000-0000-0000-0000-000000000001',
+  now() - interval '2 days', now() - interval '1 day', now() - interval '2 days'
+);
+set local role authenticated;
+select pg_temp.set_request(
+  '00000000-0000-0000-0000-000000000013',
+  'lifetime-invite@example.test',
+  'authenticated'
+);
+select pg_temp.expect_error(
+  'select public.accept_instructor_invitation(repeat(''b'', 64), ''Lena Lifetime'', null)',
+  'Sign in with the email address',
+  'invitation email mismatch'
+);
+select pg_temp.expect_error(
+  'select public.accept_instructor_invitation(repeat(''c'', 64), ''Lena Lifetime'', null)',
+  'invitation has expired',
+  'expired instructor invitation'
+);
+
+select pg_temp.set_request(
+  '00000000-0000-0000-0000-000000000001',
+  'owner@example.test',
+  'authenticated'
+);
+update public.instructor_profiles
+set city = 'Raleigh', region = 'NC', status = 'pending_review'
+where account_id = '00000000-0000-0000-0000-000000000013';
+select public.review_instructor_profile(
+  (select id from public.instructor_profiles where account_id = '00000000-0000-0000-0000-000000000013'),
+  'approve', 'lena-lifetime-raleigh-nc', 'Invited lifetime approval'
+);
+select pg_temp.test_assert(
+  (select status = 'published'
+   from public.instructor_profiles
+   where account_id = '00000000-0000-0000-0000-000000000013'),
+  'approval must publish an invitation-granted lifetime profile without Stripe'
+);
+
+reset role;
+select pg_temp.set_request(null, null, 'postgres');
+set local role service_role;
+select pg_temp.set_request(null, null, 'service_role');
+select (public.create_instructor_invitation(
+  'replacement@example.test', repeat('d', 64), 'replacement-first', false,
+  '00000000-0000-0000-0000-000000000001', now() + interval '30 days'
+)).id as replacement_first_id \gset
+select (public.create_instructor_invitation(
+  'replacement@example.test', repeat('e', 64), 'replacement-second', true,
+  '00000000-0000-0000-0000-000000000001', now() + interval '30 days'
+)).id as replacement_second_id \gset
+select pg_temp.test_assert(
+  (select first.status = 'revoked' and second.status = 'pending'
+   from public.instructor_invitations first
+   join public.instructor_invitations second on second.id = :'replacement_second_id'::uuid
+   where first.id = :'replacement_first_id'::uuid),
+  'a newer invitation must atomically revoke the prior open invitation'
+);
+select pg_temp.test_assert(
+  public.apply_stripe_subscription_event(
+    'evt_lifetime_canceled', 'customer.subscription.deleted', timestamptz '2026-08-25 12:00:00+00',
+    '2025-07-30.basil', false,
+    (select id from public.instructor_profiles where account_id = '00000000-0000-0000-0000-000000000013'),
+    'cus_lifetime_ignored', 'sub_lifetime_ignored', 'price_hld_monthly', 'canceled',
+    timestamptz '2026-08-01 12:00:00+00', timestamptz '2026-08-25 12:00:00+00',
+    false, null, null,
+    timestamptz '2026-08-01 12:00:00+00', timestamptz '2026-08-25 12:01:00+00'
+  ) = 'lifetime_access_ignored',
+  'Stripe cancellation events must be ignored for lifetime profiles'
+);
+select pg_temp.test_assert(
+  not public.register_instructor_checkout_attempt(
+    (select id from public.instructor_profiles where account_id = '00000000-0000-0000-0000-000000000013'),
+    'lifetime-checkout-block', 'cs_lifetime_block', 'cus_lifetime_block',
+    'price_hld_monthly', 'https://checkout.stripe.test/lifetime-block', now() + interval '1 hour'
+  ),
+  'checkout registration must reject lifetime access after the final server check'
+);
+reset role;
+select pg_temp.set_request(null, null, 'postgres');
+select pg_temp.test_assert(
+  (select status = 'published'
+      and not exists (
+        select 1 from public.instructor_memberships membership
+        where membership.instructor_profile_id = profile.id
+      )
+   from public.instructor_profiles profile
+   where profile.account_id = '00000000-0000-0000-0000-000000000013'),
+  'a canceled Stripe event cannot unpublish or create billing for lifetime access'
+);
+
 -- Founding positions stop at 100 and are never reused when benefits end. The
 -- ninety-eighth bulk fixture is marketplace member 101 because three positions
 -- were already assigned above.

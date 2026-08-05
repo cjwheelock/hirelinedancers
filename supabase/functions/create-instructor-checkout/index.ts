@@ -1,22 +1,13 @@
 import { withSupabase } from "npm:@supabase/server@^1";
 import Stripe from "npm:stripe@^22";
+import {
+  checkoutTermsRequired,
+  hldStripeConfig,
+  requiredEnv,
+  verifiedMembershipPrice,
+} from "../_shared/hld-stripe.ts";
 
-const MONTHLY_PRICE_CENTS = 1499;
-const CHECKOUT_TERMS_VERSION = "2026-08-promo-codes";
-
-function requiredEnv(name: string): string {
-  const value = Deno.env.get(name)?.trim();
-  if (!value) throw new Error(`Missing required secret: ${name}`);
-  return value;
-}
-
-function appUrl(): URL {
-  const url = new URL(requiredEnv("APP_URL"));
-  if (url.protocol !== "https:" && url.hostname !== "localhost" && url.hostname !== "127.0.0.1") {
-    throw new Error("APP_URL must use HTTPS outside local development");
-  }
-  return url;
-}
+const CHECKOUT_TERMS_VERSION = "2026-08-production-v1";
 
 function requestKey(req: Request): string {
   const supplied = req.headers.get("Idempotency-Key")?.trim();
@@ -57,9 +48,19 @@ export default {
     const accountId = ctx.userClaims?.id;
     if (!accountId) return json({ error: "Authentication required" }, 401);
 
-    const priceId = requiredEnv("STRIPE_PRICE_ID");
-    const requireTermsConsent = Deno.env.get("STRIPE_REQUIRE_TERMS_CONSENT")?.trim().toLowerCase() === "true";
-    const key = requestKey(req);
+    let stripeConfig: ReturnType<typeof hldStripeConfig>;
+    let requireTermsConsent: boolean;
+    try {
+      stripeConfig = hldStripeConfig();
+      requireTermsConsent = checkoutTermsRequired(stripeConfig);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown Stripe configuration error";
+      console.error("Checkout configuration is invalid", message);
+      return json({ error: "Membership checkout is not configured correctly" }, 500);
+    }
+
+    const priceId = stripeConfig.priceId;
+    let key = requestKey(req);
     const now = new Date().toISOString();
 
     const { data: profile, error: profileError } = await ctx.supabaseAdmin
@@ -72,7 +73,30 @@ export default {
       console.error("Unable to read instructor profile", profileError.code);
       return json({ error: "Unable to load the instructor profile" }, 500);
     }
-    if (!profile || profile.status !== "approved" || !profile.approved_at) {
+    if (!profile) {
+      return json({
+        error: "Checkout becomes available after your instructor profile is approved",
+        code: "profile_not_approved",
+      }, 403);
+    }
+
+    const { data: lifetimeAccess, error: lifetimeAccessError } = await ctx.supabaseAdmin
+      .from("instructor_lifetime_access")
+      .select("instructor_profile_id")
+      .eq("instructor_profile_id", profile.id)
+      .maybeSingle();
+
+    if (lifetimeAccessError) {
+      console.error("Unable to verify instructor access", lifetimeAccessError.code);
+      return json({ error: "Unable to verify instructor access" }, 500);
+    }
+    if (lifetimeAccess) {
+      return json({
+        error: "This instructor has lifetime access and does not need Stripe checkout",
+        code: "lifetime_access",
+      }, 409);
+    }
+    if (profile.status !== "approved" || !profile.approved_at) {
       return json({
         error: "Checkout becomes available after your instructor profile is approved",
         code: "profile_not_approved",
@@ -157,17 +181,27 @@ export default {
       }
     }
 
+    const { data: closedAttemptWithKey, error: closedAttemptWithKeyError } = await ctx.supabaseAdmin
+      .from("stripe_checkout_attempts")
+      .select("id")
+      .eq("instructor_profile_id", profile.id)
+      .eq("request_key", key)
+      .maybeSingle();
+
+    if (closedAttemptWithKeyError) {
+      console.error("Unable to verify the Checkout request key", closedAttemptWithKeyError.code);
+      return json({ error: "Unable to prepare checkout" }, 500);
+    }
+    if (closedAttemptWithKey) {
+      key = crypto.randomUUID();
+    }
+
     try {
-      const price = await stripe.prices.retrieve(priceId);
-      if (
-        !price.active
-        || price.type !== "recurring"
-        || price.currency !== "usd"
-        || price.unit_amount !== MONTHLY_PRICE_CENTS
-        || price.recurring?.interval !== "month"
-        || price.recurring.interval_count !== 1
-      ) {
-        console.error("STRIPE_PRICE_ID does not identify the fixed monthly membership price");
+      try {
+        await verifiedMembershipPrice(stripe, stripeConfig);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unknown Stripe Price error";
+        console.error("Membership Price validation failed", message);
         return json({ error: "Membership checkout is not configured correctly" }, 500);
       }
 
@@ -227,10 +261,14 @@ export default {
         }, 409);
       }
 
-      const baseUrl = appUrl();
-      const successUrl = new URL("/account/", baseUrl);
+      const successUrl = new URL("/account/", stripeConfig.appUrl);
       successUrl.searchParams.set("checkout", "success");
-      const cancelUrl = new URL("/account/", baseUrl);
+      successUrl.searchParams.set("session_id", "{CHECKOUT_SESSION_ID}");
+      const checkoutSuccessUrl = successUrl.toString().replace(
+        "%7BCHECKOUT_SESSION_ID%7D",
+        "{CHECKOUT_SESSION_ID}",
+      );
+      const cancelUrl = new URL("/account/", stripeConfig.appUrl);
       cancelUrl.searchParams.set("checkout", "canceled");
 
       const session = await stripe.checkout.sessions.create({
@@ -243,7 +281,7 @@ export default {
         ...(requireTermsConsent ? {
           consent_collection: { terms_of_service: "required" as const },
         } : {}),
-        success_url: successUrl.toString(),
+        success_url: checkoutSuccessUrl,
         cancel_url: cancelUrl.toString(),
         metadata: {
           instructor_profile_id: profile.id,
@@ -268,18 +306,24 @@ export default {
         return json({ error: "Stripe did not return a checkout URL" }, 502);
       }
 
-      const { error: saveError } = await ctx.supabaseAdmin
-        .from("stripe_checkout_attempts")
-        .insert({
-          instructor_profile_id: profile.id,
-          request_key: key,
-          stripe_checkout_session_id: session.id,
-          stripe_customer_id: customerId,
-          stripe_price_id: priceId,
-          checkout_url: session.url,
-          status: "open",
-          expires_at: new Date(session.expires_at * 1000).toISOString(),
+      const { data: registered, error: saveError } = await ctx.supabaseAdmin
+        .rpc("register_instructor_checkout_attempt", {
+          p_instructor_profile_id: profile.id,
+          p_request_key: key,
+          p_stripe_checkout_session_id: session.id,
+          p_stripe_customer_id: customerId,
+          p_stripe_price_id: priceId,
+          p_checkout_url: session.url,
+          p_expires_at: new Date(session.expires_at * 1000).toISOString(),
         });
+
+      if (!saveError && registered === false) {
+        await stripe.checkout.sessions.expire(session.id).catch(() => undefined);
+        return json({
+          error: "This instructor has lifetime access and does not need Stripe checkout",
+          code: "lifetime_access",
+        }, 409);
+      }
 
       if (saveError) {
         if (saveError.code === "23505") {
@@ -305,7 +349,6 @@ export default {
 
           await stripe.checkout.sessions.expire(session.id).catch(() => undefined);
         }
-
         console.error("Unable to save Checkout attempt", saveError.code);
         return json({ error: "Unable to save checkout" }, 500);
       }

@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import {
   callbackUrl,
   cleanAccountIntent,
+  cleanInstructorInvitationToken,
   cleanReturnPath,
   getMarketplaceClient,
   marketplaceConfigured,
@@ -12,10 +13,11 @@ import {
 } from "@/lib/marketplace";
 import styles from "./Marketplace.module.css";
 
-function accountEntryPath(intent: AccountIntent | null, returnPath: string): string {
+function accountEntryPath(intent: AccountIntent | null, returnPath: string, invitationToken: string | null): string {
   if (!intent) return returnPath;
 
   const params = new URLSearchParams({ intent });
+  if (invitationToken) params.set("invite", invitationToken);
   if (returnPath !== "/account/") params.set("returnTo", returnPath);
   return `/account/?${params.toString()}`;
 }
@@ -27,13 +29,16 @@ export function LoginScreen() {
   const [error, setError] = useState<string | null>(null);
   const [next, setNext] = useState("/account/");
   const [intent, setIntent] = useState<AccountIntent | null>(null);
+  const [invited, setInvited] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const returnPath = cleanReturnPath(params.get("next"));
-    const requestedIntent = cleanAccountIntent(params.get("role"));
-    const entryPath = accountEntryPath(requestedIntent, returnPath);
+    const invitationToken = cleanInstructorInvitationToken(params.get("invite"));
+    const requestedIntent = invitationToken ? "instructor" : cleanAccountIntent(params.get("role"));
+    const entryPath = accountEntryPath(requestedIntent, returnPath, invitationToken);
     setIntent(requestedIntent);
+    setInvited(Boolean(invitationToken));
     setNext(entryPath);
 
     const client = getMarketplaceClient();
@@ -76,7 +81,7 @@ export function LoginScreen() {
         }
       });
       if (authError) throw authError;
-      setMessage("Check your email for a secure sign-in link. You can close this tab after it arrives.");
+      setMessage("Check your email for a secure sign-in link. Open it on this same device and in the same browser you used to request it.");
     } catch (authError) {
       setError(readableError(authError));
     } finally {
@@ -86,12 +91,14 @@ export function LoginScreen() {
 
   const eyebrow = intent === "instructor" ? "For instructors" : intent === "organizer" ? "For organizers" : "Your account";
   const title = intent === "instructor"
-    ? "Sign in to build your instructor profile"
+    ? invited ? "Sign in to accept your instructor invitation" : "Sign in to build your instructor profile"
     : intent === "organizer"
       ? "Sign in to contact instructors"
       : "Sign in to Hire Line Dancers";
   const subtitle = intent === "instructor"
-    ? "Create your instructor workspace, complete your public profile, add photos and videos, and submit it for review."
+    ? invited
+      ? "Use the email address that received your private invitation. After signing in, you can create or update your instructor profile."
+      : "Create your instructor workspace, complete your public profile, add photos and videos, and submit it for review."
     : intent === "organizer"
       ? "Create a planner account to contact instructors and keep your event inquiries organized."
       : "Browse instructors without an account. Sign in when you are ready to send an inquiry, or to manage your instructor profile.";

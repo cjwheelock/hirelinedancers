@@ -1,11 +1,6 @@
 import { withSupabase } from "npm:@supabase/server@^1";
 import Stripe from "npm:stripe@^22";
-
-function requiredEnv(name: string): string {
-  const value = Deno.env.get(name)?.trim();
-  if (!value) throw new Error(`Missing required secret: ${name}`);
-  return value;
-}
+import { hldStripeConfig, requiredEnv } from "../_shared/hld-stripe.ts";
 
 function objectId(value: unknown): string | null {
   if (typeof value === "string") return value;
@@ -125,6 +120,25 @@ export default {
       return new Response("Invalid Stripe signature", { status: 400 });
     }
 
+    let stripeConfig: ReturnType<typeof hldStripeConfig>;
+    try {
+      stripeConfig = hldStripeConfig();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Invalid Stripe mode configuration";
+      console.error("Stripe webhook mode configuration failed", message);
+      return new Response("Stripe webhook is not configured", { status: 500 });
+    }
+
+    if (event.livemode !== stripeConfig.expectedLivemode) {
+      console.warn(
+        "Rejected Stripe webhook with unexpected livemode",
+        event.id,
+        event.livemode,
+        stripeConfig.expectedLivemode,
+      );
+      return new Response("Unexpected Stripe mode", { status: 400 });
+    }
+
     if (!handledEvents.has(event.type)) {
       return Response.json({ received: true, ignored: true });
     }
@@ -136,22 +150,52 @@ export default {
     }
 
     try {
+      const observedAt = new Date().toISOString();
       const subscription = await stripe.subscriptions.retrieve(identifiers.subscriptionId, {
         expand: ["items.data.price"],
       });
-      const observedAt = new Date().toISOString();
-      const expectedPriceId = requiredEnv("STRIPE_PRICE_ID");
+      const expectedPriceId = stripeConfig.priceId;
       const membershipItem = subscription.items.data.find((item) => item.price.id === expectedPriceId);
-
-      if (!membershipItem) {
-        console.info("Ignoring Stripe event for another product line", event.id, subscription.id);
-        return Response.json({ received: true, ignored: true });
-      }
-
-      const instructorProfileId = validUuid(subscription.metadata?.instructor_profile_id)
-        ?? identifiers.instructorProfileId;
       const customerId = objectId(subscription.customer);
       if (!customerId) throw new Error("Subscription is missing a customer identifier");
+
+      let instructorProfileId = validUuid(subscription.metadata?.instructor_profile_id)
+        ?? identifiers.instructorProfileId;
+      let membershipStatus = normalizedStatus(subscription.status);
+      let currentPeriodStart = membershipItem
+        ? new Date(membershipItem.current_period_start * 1000).toISOString()
+        : null;
+      let currentPeriodEnd = membershipItem
+        ? new Date(membershipItem.current_period_end * 1000).toISOString()
+        : null;
+
+      if (!membershipItem) {
+        const { data: canonicalMembership, error: membershipError } = await ctx.supabaseAdmin
+          .from("instructor_memberships")
+          .select("instructor_profile_id, current_period_start, current_period_end")
+          .eq("stripe_subscription_id", subscription.id)
+          .eq("stripe_price_id", expectedPriceId)
+          .maybeSingle();
+
+        if (membershipError) {
+          throw new Error(`Unable to identify the canonical HLD subscription: ${membershipError.code}`);
+        }
+
+        if (!canonicalMembership) {
+          console.info("Ignoring Stripe event for another product line", event.id, subscription.id);
+          return Response.json({ received: true, ignored: true });
+        }
+
+        console.warn(
+          "Configured HLD price was removed from the canonical subscription; revoking membership",
+          event.id,
+          subscription.id,
+        );
+        instructorProfileId = validUuid(canonicalMembership.instructor_profile_id);
+        membershipStatus = "inactive";
+        currentPeriodStart = canonicalMembership.current_period_start;
+        currentPeriodEnd = canonicalMembership.current_period_end;
+      }
 
       const latestInvoiceId = objectId(subscription.latest_invoice);
       const { data, error } = await ctx.supabaseAdmin.rpc("apply_stripe_subscription_event", {
@@ -163,10 +207,10 @@ export default {
         p_instructor_profile_id: instructorProfileId,
         p_customer_id: customerId,
         p_subscription_id: subscription.id,
-        p_price_id: membershipItem.price.id,
-        p_status: normalizedStatus(subscription.status),
-        p_current_period_start: new Date(membershipItem.current_period_start * 1000).toISOString(),
-        p_current_period_end: new Date(membershipItem.current_period_end * 1000).toISOString(),
+        p_price_id: expectedPriceId,
+        p_status: membershipStatus,
+        p_current_period_start: currentPeriodStart,
+        p_current_period_end: currentPeriodEnd,
         p_cancel_at_period_end: subscription.cancel_at_period_end,
         p_checkout_session_id: identifiers.checkoutSessionId,
         p_latest_invoice_id: latestInvoiceId,

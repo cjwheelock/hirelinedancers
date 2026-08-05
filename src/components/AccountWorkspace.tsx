@@ -5,8 +5,10 @@ import { cities, eventTypes } from "@/data/site";
 import { useMarketplaceSession } from "@/hooks/useMarketplaceSession";
 import {
   cleanAccountIntent,
+  cleanInstructorInvitationToken,
   cleanReturnPath,
   getMarketplaceClient,
+  instructorInvitationTokenHash,
   loginUrl,
   readableError,
   type AccountIntent,
@@ -46,16 +48,23 @@ export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean })
   const [workspaceMode, setWorkspaceMode] = useState<"admin" | "account">("admin");
   const [entryIntent, setEntryIntent] = useState<AccountIntent | null | undefined>(undefined);
   const [entryReturnTo, setEntryReturnTo] = useState<string | null>(null);
+  const [entryInvitationToken, setEntryInvitationToken] = useState<string | null | undefined>(undefined);
+  const [invitationClaim, setInvitationClaim] = useState<"idle" | "claiming" | "accepted" | "error">("idle");
+  const [invitationError, setInvitationError] = useState<string | null>(null);
+  const invitationClaimStarted = useRef(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    setEntryIntent(cleanAccountIntent(params.get("intent")));
+    const invitationToken = cleanInstructorInvitationToken(params.get("invite"));
+    setEntryInvitationToken(invitationToken);
+    setEntryIntent(invitationToken ? "instructor" : cleanAccountIntent(params.get("intent")));
     const requestedReturn = params.get("returnTo");
     setEntryReturnTo(requestedReturn ? cleanReturnPath(requestedReturn) : null);
   }, []);
 
   useEffect(() => {
     if (entryIntent === undefined || !account?.role) return;
+    if (entryInvitationToken) return;
     if (account.role === entryIntent && entryReturnTo) {
       window.location.replace(entryReturnTo);
       return;
@@ -66,7 +75,55 @@ export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean })
     url.searchParams.delete("intent");
     url.searchParams.delete("returnTo");
     window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
-  }, [account?.role, entryIntent, entryReturnTo]);
+  }, [account?.role, entryIntent, entryInvitationToken, entryReturnTo]);
+
+  useEffect(() => {
+    if (!entryInvitationToken || !session || !account?.role || invitationClaimStarted.current) return;
+    invitationClaimStarted.current = true;
+    const scrubInvitationUrl = () => {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("invite");
+      window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+    };
+    if (account.role !== "instructor") {
+      setInvitationError("This invitation requires an instructor account. Contact support to change your account type.");
+      setInvitationClaim("error");
+      scrubInvitationUrl();
+      return;
+    }
+    const accountFullName = account.full_name;
+    const accountCompanyName = account.company_name;
+
+    setInvitationClaim("claiming");
+    setInvitationError(null);
+
+    async function claimInvitation() {
+      const client = getMarketplaceClient();
+      if (!client || !entryInvitationToken) return;
+      try {
+        const tokenHash = await instructorInvitationTokenHash(entryInvitationToken);
+        const { error: claimError } = await client.rpc("accept_instructor_invitation", {
+          p_token_hash: tokenHash,
+          p_full_name: accountFullName,
+          p_company_name: accountCompanyName
+        });
+        if (claimError) throw claimError;
+        setInvitationClaim("accepted");
+        setEntryInvitationToken(null);
+        await refresh();
+        const url = new URL(window.location.href);
+        url.searchParams.delete("invite");
+        url.searchParams.delete("intent");
+        window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+      } catch (claimError) {
+        setInvitationError(readableError(claimError));
+        setInvitationClaim("error");
+        scrubInvitationUrl();
+      }
+    }
+
+    void claimInvitation();
+  }, [account?.company_name, account?.full_name, account?.role, entryInvitationToken, session]);
 
   useEffect(() => {
     if (!isAdmin) {
@@ -78,7 +135,9 @@ export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean })
       return;
     }
     const params = new URLSearchParams(window.location.search);
-    setWorkspaceMode(params.has("followup") || params.get("tab") === "inquiries" ? "account" : "admin");
+    const requestedTab = params.get("tab");
+    const accountTabRequested = ["profile", "inquiries", "membership", "media"].includes(requestedTab ?? "");
+    setWorkspaceMode(params.has("followup") || accountTabRequested ? "account" : "admin");
   }, [account?.role, adminOnly, isAdmin]);
 
   async function signOut() {
@@ -89,7 +148,21 @@ export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean })
     window.location.replace("/");
   }
 
-  if (loading || entryIntent === undefined) return <div className={styles.loading}>Loading your account...</div>;
+  async function restartInvitationSignIn() {
+    const client = getMarketplaceClient();
+    if (!client || !entryInvitationToken) return;
+    setSigningOut(true);
+    const { error: signOutError } = await client.auth.signOut();
+    if (signOutError) {
+      setInvitationError(signOutError.message);
+      setSigningOut(false);
+      return;
+    }
+    const query = new URLSearchParams({ role: "instructor", invite: entryInvitationToken });
+    window.location.replace(`/login/?${query.toString()}`);
+  }
+
+  if (loading || entryIntent === undefined || entryInvitationToken === undefined) return <div className={styles.loading}>Loading your account...</div>;
 
   if (!configured) {
     return (
@@ -103,13 +176,16 @@ export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean })
 
   if (!session) {
     const next = adminOnly ? "/admin/" : entryReturnTo ?? "/account/";
+    const signInHref = entryInvitationToken
+      ? `/login/?${new URLSearchParams({ role: "instructor", invite: entryInvitationToken }).toString()}`
+      : loginUrl(next, entryIntent ?? undefined);
     return (
       <section className={`${styles.shell} ${styles.narrow}`}>
         <p className={styles.eyebrow}>Your account</p>
         <h1 className={styles.title}>Sign in to continue</h1>
         <p className={styles.subtitle}>Manage your instructor profile or keep track of the instructors you contacted.</p>
         <div className={styles.buttonRow} style={{ marginTop: 28 }}>
-          <a className={styles.button} href={loginUrl(next, entryIntent ?? undefined)}>Sign in</a>
+          <a className={styles.button} href={signInHref}>Sign in</a>
         </div>
       </section>
     );
@@ -126,13 +202,33 @@ export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean })
     );
   }
 
-  if (!account?.role && !isAdmin) {
+  if (entryInvitationToken && account?.role) {
+    return (
+      <section className={`${styles.shell} ${styles.narrow}`}>
+        <p className={styles.eyebrow}>Instructor invitation</p>
+        <h1 className={styles.title}>{invitationClaim === "error" ? "We could not accept this invitation" : "Accepting your invitation"}</h1>
+        {invitationClaim === "error" ? (
+          <>
+            <p className={styles.error} role="alert">{invitationError}</p>
+            <div className={styles.buttonRow}>
+              <button className={styles.button} type="button" disabled={signingOut} onClick={() => void restartInvitationSignIn()}>
+                {signingOut ? "Signing out..." : "Sign out and try another account"}
+              </button>
+              <a className={styles.secondaryButton} href="/account/">Open my account without this invitation</a>
+            </div>
+          </>
+        ) : <p className={styles.notice} role="status">Please wait while we prepare your instructor workspace.</p>}
+      </section>
+    );
+  }
+
+  if (!account?.role && (!isAdmin || Boolean(entryInvitationToken))) {
     const isInstructorEntry = entryIntent === "instructor";
     const isOrganizerEntry = entryIntent === "organizer";
     return (
       <section className={`${styles.shell} ${styles.narrow}`}>
         <p className={styles.eyebrow}>{isInstructorEntry ? "Instructor account" : isOrganizerEntry ? "Organizer account" : "One quick step"}</p>
-        <h1 className={styles.title}>{isInstructorEntry ? "Set up your instructor workspace" : isOrganizerEntry ? "Set up your organizer workspace" : "How will you use Hire Line Dancers?"}</h1>
+        <h1 className={styles.title}>{entryInvitationToken ? "Accept your instructor invitation" : isInstructorEntry ? "Set up your instructor workspace" : isOrganizerEntry ? "Set up your organizer workspace" : "How will you use Hire Line Dancers?"}</h1>
         <p className={styles.subtitle}>
           {isInstructorEntry
             ? "Add your account details, then complete your public instructor profile."
@@ -145,7 +241,10 @@ export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean })
           email={session.user.email ?? ""}
           initialName={account?.full_name ?? session.user.user_metadata.full_name ?? ""}
           fixedRole={entryIntent ?? undefined}
+          invitationToken={entryInvitationToken ?? undefined}
           onComplete={async () => {
+            setEntryInvitationToken(null);
+            setInvitationClaim("accepted");
             if (entryReturnTo) {
               window.location.replace(entryReturnTo);
               return;
@@ -189,11 +288,13 @@ function OnboardingForm({
   email,
   initialName,
   fixedRole,
+  invitationToken,
   onComplete
 }: {
   email: string;
   initialName: string;
   fixedRole?: AccountIntent;
+  invitationToken?: string;
   onComplete: () => void | Promise<void>;
 }) {
   const [role, setRole] = useState<AccountRole>(fixedRole ?? "organizer");
@@ -209,19 +310,30 @@ function OnboardingForm({
 
     setBusy(true);
     setError(null);
-    const { error: rpcError } = await client.rpc("complete_account_onboarding", {
-      p_role: role,
-      p_full_name: name.trim(),
-      p_company_name: company.trim() || null,
-      p_phone_e164: null,
-      p_sms_opt_in: false
-    });
-    setBusy(false);
-    if (rpcError) {
-      setError(rpcError.message);
-      return;
+    try {
+      const tokenHash = invitationToken
+        ? await instructorInvitationTokenHash(invitationToken)
+        : null;
+      const { error: rpcError } = tokenHash
+        ? await client.rpc("accept_instructor_invitation", {
+            p_token_hash: tokenHash,
+            p_full_name: name.trim(),
+            p_company_name: company.trim() || null
+          })
+        : await client.rpc("complete_account_onboarding", {
+            p_role: role,
+            p_full_name: name.trim(),
+            p_company_name: company.trim() || null,
+            p_phone_e164: null,
+            p_sms_opt_in: false
+          });
+      if (rpcError) throw rpcError;
+      await onComplete();
+    } catch (submitError) {
+      setError(readableError(submitError));
+    } finally {
+      setBusy(false);
     }
-    await onComplete();
   }
 
   return (
@@ -255,7 +367,7 @@ function OnboardingForm({
       </label>
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
       <button className={styles.button} disabled={busy} type="submit">
-        {busy ? "Saving..." : role === "instructor" ? "Open instructor workspace" : "Open organizer workspace"}
+        {busy ? "Saving..." : invitationToken ? "Accept invitation" : role === "instructor" ? "Open instructor workspace" : "Open organizer workspace"}
       </button>
     </form>
   );
@@ -267,9 +379,13 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
   const [focusFollowup, setFocusFollowup] = useState<"booking" | "completion" | null>(null);
   const [profile, setProfile] = useState<InstructorProfile | null>(null);
   const [settings, setSettings] = useState<InstructorPrivateSettings | null>(null);
+  const [hasLifetimeAccess, setHasLifetimeAccess] = useState<boolean | null>(null);
   const [inquiries, setInquiries] = useState<MarketplaceInquiry[]>([]);
   const [loading, setLoading] = useState(true);
   const [checkoutPending, setCheckoutPending] = useState(false);
+  const [checkoutRecoveryError, setCheckoutRecoveryError] = useState<string | null>(null);
+  const [checkoutRetryVersion, setCheckoutRetryVersion] = useState(0);
+  const [membershipNotice, setMembershipNotice] = useState<{ tone: "notice" | "success"; message: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function load(silent = false) {
@@ -285,6 +401,7 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
       .maybeSingle();
     if (profileError) {
       setError(profileError.message);
+      setHasLifetimeAccess(null);
       setLoading(false);
       return;
     }
@@ -292,13 +409,20 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
     const loadedProfile = profileData as InstructorProfile | null;
     setProfile(loadedProfile);
     if (loadedProfile) {
-      const [privateResult, inquiryResult] = await Promise.all([
+      const [privateResult, inquiryResult, lifetimeAccessResult] = await Promise.all([
         client.from("instructor_private_settings").select("*").eq("instructor_profile_id", loadedProfile.id).maybeSingle(),
-        client.from("inquiries").select("*").eq("instructor_profile_id", loadedProfile.id).order("created_at", { ascending: false })
+        client.from("inquiries").select("*").eq("instructor_profile_id", loadedProfile.id).order("created_at", { ascending: false }),
+        client.rpc("current_instructor_lifetime_access")
       ]);
-      if (privateResult.error) setError(privateResult.error.message);
+      const loadError = privateResult.error ?? inquiryResult.error ?? lifetimeAccessResult.error;
+      if (loadError) setError(loadError.message);
       setSettings(privateResult.data as InstructorPrivateSettings | null);
       setInquiries((inquiryResult.data as MarketplaceInquiry[] | null) ?? []);
+      setHasLifetimeAccess(lifetimeAccessResult.error ? null : Boolean(lifetimeAccessResult.data));
+    } else {
+      setSettings(null);
+      setInquiries([]);
+      setHasLifetimeAccess(null);
     }
     setLoading(false);
   }
@@ -310,6 +434,33 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("checkout") === "success") return;
+
+    if (params.get("checkout") === "canceled") {
+      setTab("membership");
+      setCheckoutPending(false);
+      setCheckoutRecoveryError(null);
+      setMembershipNotice({
+        tone: "notice",
+        message: "Checkout was canceled. No new membership was started, and you can try again when you are ready."
+      });
+      const url = new URL(window.location.href);
+      url.searchParams.delete("checkout");
+      url.searchParams.delete("session_id");
+      window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+      return;
+    }
+
+    if (params.get("billing") === "returned") {
+      setTab("membership");
+      setMembershipNotice({
+        tone: "notice",
+        message: "You returned from Stripe membership settings. Your latest billing status is shown below."
+      });
+      const url = new URL(window.location.href);
+      url.searchParams.delete("billing");
+      window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+      return;
+    }
 
     const requestedTab = params.get("tab");
     const requestedInquiry = params.get("inquiry");
@@ -340,30 +491,74 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
   }, [account.id]);
 
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("checkout") !== "success") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("checkout") !== "success") return;
 
     setTab("membership");
     setCheckoutPending(true);
+    setCheckoutRecoveryError(null);
+    setMembershipNotice(null);
     let stopped = false;
     let attempts = 0;
     let timer: number | undefined;
+    const sessionId = params.get("session_id");
 
-    async function pollForMembership() {
-      await load(true);
-      attempts += 1;
-      if (!stopped && attempts < 6) {
-        timer = window.setTimeout(() => void pollForMembership(), 1500);
-      } else if (!stopped) {
-        setCheckoutPending(false);
-      }
+    if (!sessionId || !/^cs_(?:live|test)_[A-Za-z0-9]+$/.test(sessionId)) {
+      setCheckoutPending(false);
+      setCheckoutRecoveryError("Stripe returned without a valid checkout reference. Refresh this page, then contact support if your membership is not active.");
+      return;
     }
 
-    timer = window.setTimeout(() => void pollForMembership(), 500);
+    async function reconcileMembership() {
+      const client = getMarketplaceClient();
+      if (!client || stopped) return;
+      attempts += 1;
+      const { data, error: reconciliationError } = await client.functions.invoke("reconcile-instructor-checkout", {
+        body: { sessionId }
+      });
+      if (stopped) return;
+
+      await load(true);
+      if (stopped) return;
+
+      if (
+        !reconciliationError
+        && data?.reconciled === true
+        && ["active", "trialing"].includes(data.membershipStatus)
+      ) {
+        setCheckoutPending(false);
+        setCheckoutRecoveryError(null);
+        setMembershipNotice({
+          tone: "success",
+          message: "Your membership is confirmed. Your approved instructor profile is now ready for the directory."
+        });
+        const url = new URL(window.location.href);
+        url.searchParams.delete("checkout");
+        url.searchParams.delete("session_id");
+        window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+        return;
+      }
+
+      if (attempts < 4) {
+        const retryDelay = [750, 1500, 3000, 5000][attempts - 1] ?? 5000;
+        timer = window.setTimeout(() => void reconcileMembership(), retryDelay);
+        return;
+      }
+
+      const recoveryMessage = reconciliationError
+        ? await edgeFunctionError(reconciliationError)
+        : "Stripe is still confirming your membership.";
+      if (stopped) return;
+      setCheckoutPending(false);
+      setCheckoutRecoveryError(`${recoveryMessage} Use Check membership again below. If this continues, contact support and do not start another checkout.`);
+    }
+
+    timer = window.setTimeout(() => void reconcileMembership(), 500);
     return () => {
       stopped = true;
       if (timer) window.clearTimeout(timer);
     };
-  }, [account.id]);
+  }, [account.id, checkoutRetryVersion]);
 
   useEffect(() => {
     if (!checkoutPending) return;
@@ -372,8 +567,14 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
     if (!membershipConfirmed) return;
 
     setCheckoutPending(false);
+    setCheckoutRecoveryError(null);
+    setMembershipNotice({
+      tone: "success",
+      message: "Your membership is confirmed. Your approved instructor profile is now ready for the directory."
+    });
     const url = new URL(window.location.href);
     url.searchParams.delete("checkout");
+    url.searchParams.delete("session_id");
     window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
   }, [checkoutPending, profile?.status, settings?.subscription_status]);
 
@@ -430,8 +631,23 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
           onFeedbackSubmitted={clearInquiryFocus}
         />
       ) : null}
-      {!loading && profile && tab === "membership" ? (
-        <MembershipCard profile={profile} settings={settings} checkoutPending={checkoutPending} />
+      {!loading && profile && tab === "membership" && hasLifetimeAccess !== null ? (
+        <MembershipCard
+          profile={profile}
+          settings={settings}
+          checkoutPending={checkoutPending}
+          checkoutRecoveryError={checkoutRecoveryError}
+          membershipNotice={membershipNotice}
+          hasLifetimeAccess={hasLifetimeAccess}
+          onRetryCheckout={() => setCheckoutRetryVersion((current) => current + 1)}
+        />
+      ) : null}
+      {!loading && profile && tab === "membership" && hasLifetimeAccess === null ? (
+        <div className={styles.card}>
+          <p className={styles.eyebrow}>Instructor access</p>
+          <h2>Access check unavailable</h2>
+          <p className={styles.notice}>Membership controls are unavailable until we can verify your instructor access. Refresh the page to try again.</p>
+        </div>
       ) : null}
     </>
   );
@@ -855,10 +1071,18 @@ function MembershipCard({
   profile,
   settings,
   checkoutPending,
+  checkoutRecoveryError,
+  membershipNotice,
+  hasLifetimeAccess,
+  onRetryCheckout,
 }: {
   profile: InstructorProfile;
   settings: InstructorPrivateSettings | null;
   checkoutPending: boolean;
+  checkoutRecoveryError: string | null;
+  membershipNotice: { tone: "notice" | "success"; message: string } | null;
+  hasLifetimeAccess: boolean;
+  onRetryCheckout: () => void;
 }) {
   const [busy, setBusy] = useState<"checkout" | "portal" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -876,7 +1100,7 @@ function MembershipCard({
     });
     setBusy(null);
     if (checkoutError) {
-      setError(checkoutError.message);
+      setError(await edgeFunctionError(checkoutError));
       return;
     }
     if (!data?.url || typeof data.url !== "string") {
@@ -896,7 +1120,7 @@ function MembershipCard({
     });
     setBusy(null);
     if (portalError) {
-      setError(portalError.message);
+      setError(await edgeFunctionError(portalError));
       return;
     }
     if (!data?.url || typeof data.url !== "string") {
@@ -907,26 +1131,48 @@ function MembershipCard({
   }
 
   const hasPriorSubscription = Boolean(settings?.stripe_subscription_id);
-  const canManage = profile.status === "published"
-    || ["trialing", "active", "past_due", "unpaid", "paused"].includes(settings?.subscription_status ?? "");
+  const canManage = ["trialing", "active", "past_due", "unpaid", "paused"].includes(settings?.subscription_status ?? "");
+
+  if (hasLifetimeAccess) {
+    return (
+      <div className={styles.card}>
+        <p className={styles.eyebrow}>Instructor access</p>
+        <h2>Lifetime access</h2>
+        <p>Your instructor account has complimentary lifetime access. You will not be asked to enter payment details or activate a Stripe membership for this profile.</p>
+        <p><span className={styles.status}>Lifetime</span></p>
+        {profile.status === "draft" ? <p className={styles.notice}>Complete your profile and submit it for review. Lifetime access will activate it automatically after approval.</p> : null}
+        {profile.status === "pending_review" ? <p className={styles.notice}>Your profile is under review. It will go live automatically when approved.</p> : null}
+        {profile.status === "approved" ? <p className={styles.notice}>Your profile is approved and is being prepared for the directory.</p> : null}
+        {profile.status === "published" ? <p className={styles.success}>Your profile is live in the directory.</p> : null}
+        {profile.status === "suspended" ? <p className={styles.notice}>Your profile is currently suspended. Contact support if you have questions.</p> : null}
+      </div>
+    );
+  }
 
   return (
     <div className={styles.card}>
       <p className={styles.eyebrow}>Instructor membership</p>
-      <h2>$14.99 per month</h2>
+      <h2>$14.99 USD per month</h2>
       <p>Activate your instructor membership after your profile is approved. Stripe securely processes payment, and your membership renews monthly until canceled. Eligible founding memberships include the first-year booking guarantee described in the refund policy.</p>
       <p><span className={styles.status}>{settings?.subscription_status ?? "inactive"}</span></p>
+      {membershipNotice ? <p className={styles[membershipNotice.tone]} role="status">{membershipNotice.message}</p> : null}
+      {checkoutRecoveryError ? (
+        <div className={styles.stack}>
+          <p className={styles.error} role="alert">{checkoutRecoveryError}</p>
+          <button className={styles.button} type="button" disabled={busy !== null} onClick={onRetryCheckout}>Check membership again</button>
+        </div>
+      ) : null}
       {profile.status === "approved" ? (
         <>
           {checkoutPending ? (
             <p className={styles.notice}>Stripe received your checkout. We are confirming your membership now. This usually takes a few seconds.</p>
-          ) : (
+          ) : checkoutRecoveryError ? null : (
             <>
               <p>Your profile has been approved. {hasPriorSubscription ? "Restart your membership" : "Activate your membership"} to publish it in the directory.</p>
               <button className={styles.button} type="button" disabled={busy !== null} onClick={() => void activateMembership()}>
                 {busy === "checkout" ? "Opening secure checkout..." : hasPriorSubscription ? "Restart membership" : "Activate membership"}
               </button>
-              <p className={styles.muted}>By selecting this button, you agree to the <a href="/legal/terms/">Terms of Use</a>, acknowledge the <a href="/legal/refund-policy/">Refund Policy</a>, and authorize a recurring $14.99 monthly charge until you cancel.</p>
+              <p className={styles.muted}>By selecting this button, you agree to the <a href="/legal/terms/">Terms of Use</a>, acknowledge the <a href="/legal/privacy/">Privacy Policy</a> and <a href="/legal/refund-policy/">Refund Policy</a>, and authorize a recurring $14.99 USD monthly charge until you cancel.</p>
             </>
           )}
         </>
@@ -961,6 +1207,31 @@ type AdminAccess = {
   full_name: string | null;
   is_owner: boolean;
   granted_at: string;
+};
+
+type AdminInstructorLifetimeAccess = {
+  instructor_profile_id: string;
+  account_id: string;
+  display_name: string;
+  account_email: string | null;
+  profile_status: string;
+  has_lifetime_access: boolean;
+  access_source: "admin" | "invitation" | null;
+  granted_at: string | null;
+  granted_by_email: string | null;
+};
+
+type AdminInstructorInvitation = {
+  invitation_id: string;
+  email: string;
+  grants_lifetime_access: boolean;
+  invitation_status: "pending" | "sending" | "sent" | "delivery_failed" | "accepted" | "revoked" | "expired";
+  expires_at: string;
+  sent_at: string | null;
+  accepted_at: string | null;
+  accepted_profile_id: string | null;
+  invited_by_email: string;
+  created_at: string;
 };
 
 type AdminInstructorMembership = {
@@ -1538,12 +1809,14 @@ function MembershipGuaranteeAdmin({ isOwner }: { isOwner: boolean }) {
 }
 
 function AdminDashboard({ isOwner }: { isOwner: boolean }) {
-  const [tab, setTab] = useState<"overview" | "profiles" | "memberships" | "delivery" | "access">("overview");
+  const [tab, setTab] = useState<"overview" | "profiles" | "memberships" | "invitations" | "delivery" | "access">("overview");
   const [profiles, setProfiles] = useState<InstructorProfile[]>([]);
   const [inquiries, setInquiries] = useState<MarketplaceInquiry[]>([]);
   const [jobs, setJobs] = useState<AdminNotificationJob[]>([]);
   const [media, setMedia] = useState<ProfileMedia[]>([]);
   const [admins, setAdmins] = useState<AdminAccess[]>([]);
+  const [lifetimeAccess, setLifetimeAccess] = useState<AdminInstructorLifetimeAccess[]>([]);
+  const [invitations, setInvitations] = useState<AdminInstructorInvitation[]>([]);
   const [followupResponses, setFollowupResponses] = useState<AdminFollowupResponse[]>([]);
   const [analytics, setAnalytics] = useState<AdminAnalytics>(emptyAdminAnalytics);
   const [slugs, setSlugs] = useState<Record<string, string>>({});
@@ -1556,6 +1829,10 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
   });
   const [customEnd, setCustomEnd] = useState(() => dateInputValue(new Date()));
   const [grantEmail, setGrantEmail] = useState("");
+  const [invitationEmail, setInvitationEmail] = useState("");
+  const [invitationGrantsLifetime, setInvitationGrantsLifetime] = useState(false);
+  const invitationRequestKey = useRef<string | null>(null);
+  const invitationDeliveryToken = useRef<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -1576,15 +1853,17 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
     if (!client) return;
     setLoading(true);
     setError(null);
-    const [profileResult, inquiryResult, jobResult, mediaResult, adminResult, feedbackResult] = await Promise.all([
+    const [profileResult, inquiryResult, jobResult, mediaResult, adminResult, feedbackResult, lifetimeResult, invitationResult] = await Promise.all([
       client.from("instructor_profiles").select("*").order("updated_at", { ascending: false }),
       client.from("inquiries").select("*").order("created_at", { ascending: false }).limit(100),
       client.from("inquiry_notification_jobs").select("id,channel,notification_type,status,attempts,last_error,created_at").order("created_at", { ascending: false }).limit(100),
       client.from("profile_media").select("*").order("sort_order"),
       client.rpc("list_marketplace_admins"),
-      client.from("inquiry_followup_responses").select("id,inquiry_id,stage,response,confirmed_event_date,private_comment,submitted_at").order("submitted_at", { ascending: false }).limit(100)
+      client.from("inquiry_followup_responses").select("id,inquiry_id,stage,response,confirmed_event_date,private_comment,submitted_at").order("submitted_at", { ascending: false }).limit(100),
+      client.rpc("admin_list_instructor_lifetime_access"),
+      client.rpc("admin_list_instructor_invitations")
     ]);
-    const loadError = profileResult.error ?? inquiryResult.error ?? jobResult.error ?? mediaResult.error ?? adminResult.error ?? feedbackResult.error;
+    const loadError = profileResult.error ?? inquiryResult.error ?? jobResult.error ?? mediaResult.error ?? adminResult.error ?? feedbackResult.error ?? lifetimeResult.error ?? invitationResult.error;
     if (loadError) setError(loadError.message);
     const loadedProfiles = (profileResult.data as InstructorProfile[] | null) ?? [];
     setProfiles(loadedProfiles);
@@ -1593,6 +1872,8 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
     setMedia((mediaResult.data as ProfileMedia[] | null) ?? []);
     setAdmins((adminResult.data as AdminAccess[] | null) ?? []);
     setFollowupResponses((feedbackResult.data as AdminFollowupResponse[] | null) ?? []);
+    setLifetimeAccess((lifetimeResult.data as AdminInstructorLifetimeAccess[] | null) ?? []);
+    setInvitations((invitationResult.data as AdminInstructorInvitation[] | null) ?? []);
     setSlugs((current) => Object.fromEntries(loadedProfiles.map((profile) => [profile.id, current[profile.id] ?? profile.slug ?? suggestedSlug(profile)])));
     setLoading(false);
   }
@@ -1637,7 +1918,7 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
     setBusyId(null);
     if (reviewError) setError(reviewError.message);
     else {
-      setMessage(decision === "approve" ? "Instructor approved or reactivated. Active memberships publish automatically." : "Instructor profile updated.");
+      setMessage(decision === "approve" ? "Instructor approved or reactivated. Active memberships and lifetime access publish automatically." : "Instructor profile updated.");
       await loadOperations();
     }
   }
@@ -1674,6 +1955,68 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
     }
   }
 
+  async function sendInstructorInvitation(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const client = getMarketplaceClient();
+    if (!client) return;
+    setBusyId("send-instructor-invitation");
+    setError(null);
+    setMessage(null);
+    invitationRequestKey.current ??= crypto.randomUUID();
+    invitationDeliveryToken.current ??= Array.from(
+      crypto.getRandomValues(new Uint8Array(32)),
+      (byte) => byte.toString(16).padStart(2, "0")
+    ).join("");
+    const { data, error: invitationError } = await client.functions.invoke("send-instructor-invitation", {
+      body: {
+        email: invitationEmail.trim(),
+        grantsLifetimeAccess: invitationGrantsLifetime,
+        requestKey: invitationRequestKey.current,
+        invitationToken: invitationDeliveryToken.current
+      },
+      headers: { "Idempotency-Key": invitationRequestKey.current }
+    });
+    setBusyId(null);
+    if (invitationError) {
+      setError(await edgeFunctionError(invitationError));
+      return;
+    }
+    if (!data?.invitationId) {
+      setError("The invitation service did not confirm delivery.");
+      return;
+    }
+    if (data.deliveryPending) {
+      setMessage(`The invitation to ${data.email} is already being sent.`);
+      await loadOperations();
+      return;
+    }
+    setInvitationEmail("");
+    setInvitationGrantsLifetime(false);
+    invitationRequestKey.current = null;
+    invitationDeliveryToken.current = null;
+    setMessage(`Instructor invitation sent to ${data.email}.`);
+    await loadOperations();
+  }
+
+  async function grantLifetimeAccess(profileId: string) {
+    const client = getMarketplaceClient();
+    if (!client) return;
+    setBusyId(`lifetime:${profileId}`);
+    setError(null);
+    setMessage(null);
+    const { error: grantError } = await client.rpc("admin_grant_instructor_lifetime_access", {
+      p_instructor_profile_id: profileId,
+      p_note: "Granted from the admin dashboard"
+    });
+    setBusyId(null);
+    if (grantError) {
+      setError(grantError.message);
+      return;
+    }
+    setMessage("Lifetime instructor access granted.");
+    await loadOperations();
+  }
+
   function mediaUrl(item: ProfileMedia) {
     if (item.external_url) return item.external_url;
     const client = getMarketplaceClient();
@@ -1690,8 +2033,8 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
     <>
       <div className={styles.tabs} role="tablist" aria-label="Admin dashboard sections">
         {(isOwner
-          ? (["overview", "profiles", "memberships", "delivery", "access"] as const)
-          : (["overview", "profiles", "memberships", "delivery"] as const)
+          ? (["overview", "profiles", "memberships", "invitations", "delivery", "access"] as const)
+          : (["overview", "profiles", "memberships", "invitations", "delivery"] as const)
         ).map((name) => (
           <button key={name} className={`${styles.tab} ${tab === name ? styles.activeTab : ""}`} type="button" onClick={() => setTab(name)}>
             {name[0].toUpperCase() + name.slice(1)}
@@ -1839,7 +2182,7 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
         <>
           <div className={styles.card}>
             <h2>Profiles awaiting review</h2>
-            <p className={styles.muted}>Review the profile copy and all uploaded media before approval. Approval unlocks membership checkout.</p>
+            <p className={styles.muted}>Review the profile copy and all uploaded media before approval. Approval publishes profiles with lifetime access and unlocks membership activation for everyone else.</p>
             {!pending.length ? <p className={styles.notice}>No profiles are waiting for review.</p> : null}
             <div className={styles.list}>
               {pending.map((profile) => {
@@ -1869,7 +2212,7 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
                       <label className={styles.field}><span>Review note</span><input value={notes[profile.id] ?? ""} onChange={(event) => setNotes((current) => ({ ...current, [profile.id]: event.target.value }))} /></label>
                     </div>
                     <div className={styles.buttonRow}>
-                      <button className={styles.button} disabled={busyId === profile.id} type="button" onClick={() => void review(profile.id, "approve")}>Approve for payment</button>
+                      <button className={styles.button} disabled={busyId === profile.id} type="button" onClick={() => void review(profile.id, "approve")}>Approve profile</button>
                       <button className={styles.dangerButton} disabled={busyId === profile.id} type="button" onClick={() => void review(profile.id, "return_to_draft")}>Request changes</button>
                     </div>
                   </article>
@@ -1899,6 +2242,86 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
       ) : null}
 
       {!loading && tab === "memberships" ? <MembershipGuaranteeAdmin isOwner={isOwner} /> : null}
+
+      {!loading && tab === "invitations" ? (
+        <>
+          <div className={styles.card}>
+            <p className={styles.eyebrow}>Invite an instructor</p>
+            <h2>Send a private signup invitation</h2>
+            <p className={styles.muted}>The instructor receives a secure link to sign in and create an instructor profile. The invitation can also include lifetime access.</p>
+            <form className={styles.stack} onSubmit={sendInstructorInvitation}>
+              <label className={styles.field}>
+                <span>Instructor email</span>
+                <input type="email" required autoComplete="off" value={invitationEmail} onChange={(event) => {
+                  setInvitationEmail(event.target.value);
+                  invitationRequestKey.current = null;
+                  invitationDeliveryToken.current = null;
+                }} placeholder="instructor@example.com" />
+              </label>
+              <label className={styles.check}>
+                <input type="checkbox" checked={invitationGrantsLifetime} onChange={(event) => {
+                  setInvitationGrantsLifetime(event.target.checked);
+                  invitationRequestKey.current = null;
+                  invitationDeliveryToken.current = null;
+                }} />
+                <span>Include complimentary lifetime access. This instructor will never need Stripe payment details for their profile.</span>
+              </label>
+              <div className={styles.buttonRow}>
+                <button className={styles.button} disabled={busyId === "send-instructor-invitation"} type="submit">
+                  {busyId === "send-instructor-invitation" ? "Sending invitation..." : "Send instructor invitation"}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <div className={styles.card}>
+            <h2>Lifetime instructor access</h2>
+            <p className={styles.muted}>Lifetime access is stored separately from Stripe billing. An approved profile with lifetime access stays active without a subscription.</p>
+            <div className={styles.tableWrap}>
+              <table className={styles.dataTable}>
+                <thead><tr><th>Instructor</th><th>Profile</th><th>Access</th><th>Action</th></tr></thead>
+                <tbody>{lifetimeAccess.map((row) => (
+                  <tr key={row.instructor_profile_id}>
+                    <td>{row.display_name}{row.account_email ? <small>{row.account_email}</small> : null}</td>
+                    <td><span className={styles.status}>{row.profile_status.replaceAll("_", " ")}</span></td>
+                    <td>
+                      {row.has_lifetime_access ? (
+                        <><span className={styles.status}>Lifetime</span>{row.granted_at ? <small>{row.access_source} · {new Date(row.granted_at).toLocaleDateString()}</small> : null}</>
+                      ) : <span className={styles.muted}>Standard membership</span>}
+                    </td>
+                    <td>{row.has_lifetime_access ? (
+                      <span className={styles.status}>Granted</span>
+                    ) : (
+                      <button className={styles.button} disabled={busyId === `lifetime:${row.instructor_profile_id}`} type="button" onClick={() => void grantLifetimeAccess(row.instructor_profile_id)}>
+                        {busyId === `lifetime:${row.instructor_profile_id}` ? "Granting..." : "Grant lifetime access"}
+                      </button>
+                    )}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className={styles.card}>
+            <h2>Recent invitations</h2>
+            {!invitations.length ? <p className={styles.notice}>No instructor invitations have been sent yet.</p> : (
+              <div className={styles.tableWrap}>
+                <table className={styles.dataTable}>
+                  <thead><tr><th>Email</th><th>Sent</th><th>Access</th><th>Status</th></tr></thead>
+                  <tbody>{invitations.map((invitation) => (
+                    <tr key={invitation.invitation_id}>
+                      <td>{invitation.email}</td>
+                      <td>{invitation.sent_at ? new Date(invitation.sent_at).toLocaleDateString() : "Not sent"}</td>
+                      <td>{invitation.grants_lifetime_access ? <span className={styles.status}>Lifetime</span> : "Standard"}</td>
+                      <td><span className={styles.status}>{invitation.invitation_status.replaceAll("_", " ")}</span></td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </>
+      ) : null}
 
       {!loading && tab === "delivery" ? (
         <div className={styles.card}>

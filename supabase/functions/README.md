@@ -1,6 +1,6 @@
 # Hire Line Dancers server functions
 
-These functions implement the approved-instructor payment flow, manual refund verification, and inquiry notifications. They keep Stripe, Resend, and Supabase secret keys on the server. SMS is currently paused. The dormant Twilio implementation remains in the worker for possible future use.
+These functions implement the approved-instructor payment flow, instructor invitations, manual refund verification, and inquiry notifications. They keep Stripe, Resend, and Supabase secret keys on the server. SMS is currently paused. The dormant Twilio implementation remains in the worker for possible future use.
 
 ## Functions
 
@@ -12,12 +12,13 @@ The function:
 
 1. Requires a valid Supabase user JWT.
 2. Requires the caller to own an instructor profile whose status is exactly `approved`.
-3. Reads the fixed Stripe Price ID from a server secret.
-4. Verifies that the Price is active, recurring monthly, USD, and exactly $14.99.
+3. Reads the fixed Stripe Product and Price IDs from server secrets.
+4. Verifies that the Product and Price are active, belong together, use the expected Stripe mode, and represent a recurring $14.99 USD monthly membership.
 5. Requires a payment method and enables Stripe's promotion-code field without adding a default trial.
 6. Checks Stripe for an existing non-canceled membership on the configured Price before creating a Session.
 7. Reuses an unexpired Checkout Session when possible.
 8. Creates Stripe Checkout in subscription mode with the instructor UUID in Checkout and Subscription metadata.
+9. Includes Stripe's `{CHECKOUT_SESSION_ID}` placeholder in the authenticated account return URL.
 
 The browser should send a stable random value in the `Idempotency-Key` header when retrying the same action. The value must contain 8 to 64 ASCII letters, numbers, underscores, or hyphens.
 
@@ -51,6 +52,26 @@ if (!error && data?.url) window.location.assign(data.url);
 ```
 
 This keeps cancellation, payment-method changes, and invoice history in Stripe instead of rebuilding billing screens in the application.
+
+In production, `STRIPE_BILLING_PORTAL_CONFIGURATION_ID` is required. The live value is `bpc_1U1CG4PoYzwtbFuToKoH8q3u`. The function retrieves that configuration before creating a Session and verifies that it is active, is in live mode, enables payment-method updates and invoice history, cancels at the end of the billing period, and does not allow plan changes. The public Customer Portal login page is optional and currently disabled because the app creates authenticated Portal Sessions for signed-in instructors.
+
+Both Stripe endpoints reject instructors who have lifetime access. Lifetime access is stored separately from subscription status, and the database performs a final locked access check before a newly created Checkout Session can be returned.
+
+### `reconcile-instructor-checkout`
+
+Authenticated recovery endpoint for the Checkout success page. The browser sends the returned `session_id`, and the function retrieves the Checkout Session and Subscription directly from Stripe. It verifies all of the following before applying the current subscription state through the same database function used by the webhook:
+
+- The caller owns the approved instructor profile.
+- Checkout and Subscription metadata identify that profile, account, and the Hire Line Dancers product line.
+- The Stripe Customer matches the one stored for the instructor.
+- The Session is complete and paid, including a `no_payment_required` first invoice produced by a valid promotion code.
+- The Subscription contains the exact configured Price, Product, and Stripe mode.
+
+The account page retries reconciliation, keeps the Session reference in the URL until membership is confirmed, and offers a manual retry instead of sending a paid instructor through a second Checkout. This endpoint complements the signed webhook. It does not replace ongoing webhook synchronization.
+
+### `send-instructor-invitation`
+
+Authenticated administrator endpoint for sending a private instructor signup link through Resend. It validates administrator access, normalizes the invited email, stores only a SHA-256 hash of the invitation token, and uses an idempotent delivery claim. The recipient must sign in with the invited email before the database accepts the invitation. An invitation can grant permanent lifetime access during instructor onboarding.
 
 ### `stripe-webhook`
 
@@ -124,12 +145,18 @@ Set these with `supabase secrets set`:
 ```text
 APP_URL=https://hirelinedancers.com
 STRIPE_SECRET_KEY=sk_live_...
+STRIPE_EXPECTED_MODE=live
+STRIPE_PRODUCT_ID=prod_...
 STRIPE_PRICE_ID=price_...
+STRIPE_BILLING_PORTAL_CONFIGURATION_ID=bpc_1U1CG4PoYzwtbFuToKoH8q3u
+STRIPE_REQUIRE_TERMS_CONSENT=true
 STRIPE_WEBHOOK_SIGNING_SECRET=whsec_...
 RESEND_API_KEY=re_...
 RESEND_FROM_EMAIL=Hire Line Dancers <inquiries@mail.hirelinedancers.com>
 SUPPORT_EMAIL=hello@hirelinedancers.com
 ```
+
+`send-instructor-invitation` uses `APP_URL`, `RESEND_API_KEY`, and `RESEND_FROM_EMAIL`. Optionally set `RESEND_INVITATION_FROM_EMAIL` to a verified sender dedicated to instructor invitations. If it is omitted, invitations use `RESEND_FROM_EMAIL`.
 
 `SUPPORT_EMAIL` receives replies to booking and completion follow-ups. If it is omitted, the worker uses `hello@hirelinedancers.com`. Resend handles outbound sending only, so configure an inbound mailbox or forwarding rule separately for that address.
 
@@ -143,19 +170,7 @@ TWILIO_MESSAGING_SERVICE_SID=MG...
 
 Use `TWILIO_FROM_NUMBER=+1...` instead of `TWILIO_MESSAGING_SERVICE_SID` only if SMS is restored and a specific Twilio number is used.
 
-Optional dedicated Stripe Customer Portal configuration:
-
-```text
-STRIPE_BILLING_PORTAL_CONFIGURATION_ID=bpc_...
-```
-
-When this value is omitted, Stripe uses the account's default Customer Portal configuration.
-
-After setting valid Terms and Privacy URLs in the live Stripe account's Public details, require Stripe's terms checkbox with:
-
-```text
-STRIPE_REQUIRE_TERMS_CONSENT=true
-```
+Local and sandbox environments may omit `STRIPE_BILLING_PORTAL_CONFIGURATION_ID` and use the account default. Production requires the dedicated configuration. The live Stripe account has Terms of Use, Privacy Policy, and support links configured in Public details and uses `STRIPE_REQUIRE_TERMS_CONSENT=true`. The Checkout function treats this as required configuration and refuses to create production Checkout Sessions when it is missing, invalid, or false.
 
 Supabase provides `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEYS`, `SUPABASE_SECRET_KEYS`, and `SUPABASE_JWKS` to hosted Edge Functions. For local development with `@supabase/server`, singular `SUPABASE_PUBLISHABLE_KEY` and `SUPABASE_SECRET_KEY` values are also supported.
 
@@ -165,7 +180,9 @@ Do not put any secret listed here into `NEXT_PUBLIC_*` variables or browser code
 
 - `create-instructor-checkout`: keep JWT verification enabled. The function also uses `auth: "user"`.
 - `create-billing-portal`: keep JWT verification enabled. The function also uses `auth: "user"`.
+- `reconcile-instructor-checkout`: keep JWT verification enabled. The function uses `auth: "user"` and verifies Session ownership against Stripe and Supabase.
 - `verify-instructor-refund`: keep JWT verification enabled. The function also uses `auth: "user"` and enforces marketplace-owner access.
+- `send-instructor-invitation`: keep JWT verification enabled. The function uses `auth: "user"` and enforces marketplace administrator access.
 - `stripe-webhook`: deploy with JWT verification disabled. The function uses `auth: "none"` and verifies Stripe itself.
 - `process-inquiry-notifications`: deploy with JWT verification disabled. The function uses `auth: "secret:automations"` and requires the named `automations` Supabase secret key in `apikey`.
 
@@ -175,14 +192,16 @@ These settings are pinned in `supabase/config.toml`. `process-inquiry-notificati
 
 ```bash
 supabase db push
-supabase functions deploy create-instructor-checkout
+supabase functions deploy reconcile-instructor-checkout
 supabase functions deploy create-billing-portal
+supabase functions deploy create-instructor-checkout
 supabase functions deploy verify-instructor-refund
+supabase functions deploy send-instructor-invitation
 supabase functions deploy stripe-webhook
 supabase functions deploy process-inquiry-notifications
 ```
 
-Set secrets before testing production traffic:
+Set secrets before deploying the Stripe functions or testing production traffic:
 
 ```bash
 supabase secrets set --env-file supabase/functions/.env.production
@@ -192,7 +211,24 @@ Keep that environment file outside Git.
 
 No Stripe Product, Price, webhook endpoint, Resend domain, inbound support mailbox, or Supabase Cron job is created by these files. Those account changes require an authorized operator.
 
-The current sandbox uses a dedicated Hire a Line Dancer Stripe account. The code still isolates the product line by filtering every membership and refund against the exact `STRIPE_PRICE_ID` and by attaching `product_line=hire_line_dancers` metadata.
+Legacy sandbox resources on the restricted Atlas-created Stripe account remain documented for local and test reference only. Production Supabase uses the separate live `Hire Line Dancers` account inside the `OMG Goals Inc.` Stripe Organization. The code isolates the product line by filtering every membership and refund against the exact `STRIPE_PRICE_ID` and by attaching `product_line=hire_line_dancers` metadata.
+
+Current live Stripe resources:
+
+- Account: `acct_1U17IgPoYzwtbFuT`
+- Product: `prod_V1EDFGlsi5zmnJ`
+- Monthly Price: `price_1U1Bl5PoYzwtbFuTQ7Jw7WeN`
+- Customer Portal configuration: `bpc_1U1CG4PoYzwtbFuToKoH8q3u`
+- First-time-customer promotion code: `FREEMONTH`
+- Webhook destination: `we_1U1CVOPoYzwtbFuTNyyP9Cy0`
+
+Account `acct_1U17IgPoYzwtbFuT` has charges and payouts enabled, with no currently due, past-due, or pending-verification requirements. Migration `202608050002_instructor_lifetime_access_and_invitations.sql` is applied, and the live Stripe secrets are installed in Supabase. The production webhook is active. Its unsigned rejection smoke test and signed synthetic event smoke test passed.
+
+Stripe Public details include the Hire Line Dancers Terms of Use, Privacy Policy, and support links. The generic Stripe Checkout refund display is disabled because the applicable offer is the conditional 12-month founding-instructor guarantee linked from the app, Terms of Use, and Refund Policy.
+
+The public Customer Portal login page is disabled and optional. The app creates short-lived authenticated Portal Sessions through `create-billing-portal`.
+
+`FREEMONTH` is limited to first-time customers, but its underlying coupon is currently account-scoped. It is safe only while Hire Line Dancers is the sole active Product in this account. Replace or restrict that coupon and promotion code before adding another active Product.
 
 ## Cron invocation
 
@@ -245,10 +281,10 @@ limit 50;
 
 ## Operational caveats
 
-- Stripe must contain an active recurring Price for exactly $14.99 USD per month, and `STRIPE_PRICE_ID` must reference it. The Checkout function requires a payment method and accepts valid Stripe promotion codes.
-- In live mode, create a Product-scoped, 100 percent once-only coupon and the first-time-customer promotion code `FREEMONTH`. Audit other active promotion codes when using a shared Stripe account.
-- Enable Stripe's **Limit customers to one subscription** setting, keep the Portal login link enabled, and retain the server-side existing-subscription check.
-- Configure live Public details with the Terms and Privacy URLs before enabling Stripe's required terms checkbox.
+- Stripe must contain an active Product and recurring Price for exactly $14.99 USD per month. `STRIPE_PRODUCT_ID` and `STRIPE_PRICE_ID` must reference that exact pair, and `STRIPE_EXPECTED_MODE` must match their live or test mode. The Checkout function requires a payment method and accepts valid Stripe promotion codes.
+- In live mode, create a 100 percent once-only coupon and the first-time-customer promotion code `FREEMONTH`. Restrict the coupon to the Hire Line Dancers Product whenever the account contains another active Product. The current account-scoped coupon must be replaced or restricted before that happens. Audit other active promotion codes when using a shared Stripe account.
+- Enable Stripe's **Limit customers to one subscription** setting and retain the server-side existing-subscription check. The public Portal login page is optional because the app creates authenticated Portal Sessions.
+- Configure live Public details with the Terms, Privacy, and support URLs before enabling Stripe's required terms checkbox.
 - Configure Stripe Customer Portal for payment-method updates, invoice history, and subscription cancellation before showing the production Manage membership button.
 - Configure Stripe to send the listed events to `/functions/v1/stripe-webhook` and copy that endpoint's signing secret into Supabase.
 - Verify the Resend sending domain before using the production From address.

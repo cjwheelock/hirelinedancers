@@ -1,19 +1,11 @@
 import { withSupabase } from "npm:@supabase/server@^1";
 import Stripe from "npm:stripe@^22";
-
-function requiredEnv(name: string): string {
-  const value = Deno.env.get(name)?.trim();
-  if (!value) throw new Error(`Missing required secret: ${name}`);
-  return value;
-}
-
-function appUrl(): URL {
-  const url = new URL(requiredEnv("APP_URL"));
-  if (url.protocol !== "https:" && url.hostname !== "localhost" && url.hostname !== "127.0.0.1") {
-    throw new Error("APP_URL must use HTTPS outside local development");
-  }
-  return url;
-}
+import {
+  hldStripeConfig,
+  requiredEnv,
+  verifiedMembershipPrice,
+  verifiedPortalConfigurationId,
+} from "../_shared/hld-stripe.ts";
 
 function json(body: unknown, status = 200): Response {
   return Response.json(body, {
@@ -33,6 +25,15 @@ export default {
     const accountId = ctx.userClaims?.id;
     if (!accountId) return json({ error: "Authentication required" }, 401);
 
+    let stripeConfig: ReturnType<typeof hldStripeConfig>;
+    try {
+      stripeConfig = hldStripeConfig();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown Stripe configuration error";
+      console.error("Billing Portal configuration is invalid", message);
+      return json({ error: "Membership billing is not configured correctly" }, 500);
+    }
+
     const { data: profile, error: profileError } = await ctx.supabaseAdmin
       .from("instructor_profiles")
       .select("id")
@@ -47,9 +48,26 @@ export default {
       return json({ error: "An instructor profile is required", code: "profile_required" }, 403);
     }
 
+    const { data: lifetimeAccess, error: lifetimeAccessError } = await ctx.supabaseAdmin
+      .from("instructor_lifetime_access")
+      .select("instructor_profile_id")
+      .eq("instructor_profile_id", profile.id)
+      .maybeSingle();
+
+    if (lifetimeAccessError) {
+      console.error("Unable to verify instructor access", lifetimeAccessError.code);
+      return json({ error: "Unable to verify instructor access" }, 500);
+    }
+    if (lifetimeAccess) {
+      return json({
+        error: "This instructor has lifetime access and does not need Stripe billing",
+        code: "lifetime_access",
+      }, 409);
+    }
+
     const { data: membership, error: membershipError } = await ctx.supabaseAdmin
       .from("instructor_memberships")
-      .select("stripe_customer_id, stripe_price_id")
+      .select("stripe_customer_id, stripe_price_id, status")
       .eq("instructor_profile_id", profile.id)
       .maybeSingle();
 
@@ -57,7 +75,11 @@ export default {
       console.error("Unable to read instructor membership", membershipError.code);
       return json({ error: "Unable to load membership billing" }, 500);
     }
-    if (!membership || membership.stripe_price_id !== requiredEnv("STRIPE_PRICE_ID")) {
+    if (
+      !membership
+      || membership.stripe_price_id !== stripeConfig.priceId
+      || !["trialing", "active", "past_due", "unpaid", "paused"].includes(membership.status)
+    ) {
       return json({
         error: "No Hire Line Dancers membership is available to manage",
         code: "membership_required",
@@ -65,14 +87,33 @@ export default {
     }
 
     try {
-      const returnUrl = new URL("/account/", appUrl());
+      await verifiedMembershipPrice(stripe, stripeConfig);
+      const configuration = await verifiedPortalConfigurationId(stripe, stripeConfig);
+
+      const returnUrl = new URL("/account/", stripeConfig.appUrl);
       returnUrl.searchParams.set("billing", "returned");
-      const configuration = Deno.env.get("STRIPE_BILLING_PORTAL_CONFIGURATION_ID")?.trim();
       const session = await stripe.billingPortal.sessions.create({
         customer: membership.stripe_customer_id,
         return_url: returnUrl.toString(),
         ...(configuration ? { configuration } : {}),
       });
+
+      const { data: finalLifetimeAccess, error: finalLifetimeAccessError } = await ctx.supabaseAdmin
+        .from("instructor_lifetime_access")
+        .select("instructor_profile_id")
+        .eq("instructor_profile_id", profile.id)
+        .maybeSingle();
+
+      if (finalLifetimeAccessError) {
+        console.error("Unable to complete the final instructor access check", finalLifetimeAccessError.code);
+        return json({ error: "Unable to verify instructor access" }, 500);
+      }
+      if (finalLifetimeAccess) {
+        return json({
+          error: "This instructor has lifetime access and does not need Stripe billing",
+          code: "lifetime_access",
+        }, 409);
+      }
 
       return json({ url: session.url });
     } catch (error) {

@@ -135,6 +135,19 @@ export function cleanAccountIntent(value: string | null | undefined): AccountInt
   return value === "instructor" || value === "organizer" ? value : null;
 }
 
+export function cleanInstructorInvitationToken(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const token = value.trim().toLowerCase();
+  return /^[a-f0-9]{64}$/.test(token) ? token : null;
+}
+
+export async function instructorInvitationTokenHash(token: string): Promise<string> {
+  const cleanToken = cleanInstructorInvitationToken(token);
+  if (!cleanToken) throw new Error("The instructor invitation link is invalid.");
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(cleanToken));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
 export function loginUrl(next = "/account/", intent?: AccountIntent): string {
   const query = new URLSearchParams({ next: cleanReturnPath(next) });
   if (intent) query.set("role", intent);

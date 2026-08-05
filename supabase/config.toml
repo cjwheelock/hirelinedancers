@@ -4,6 +4,9 @@ verify_jwt = true
 [functions.create-billing-portal]
 verify_jwt = true
 
+[functions.reconcile-instructor-checkout]
+verify_jwt = true
+
 [functions.stripe-webhook]
 verify_jwt = false
 
@@ -11,4 +14,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.verify-instructor-refund]
+verify_jwt = true
+
+[functions.send-instructor-invitation]
 verify_jwt = true
