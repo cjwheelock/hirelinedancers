@@ -29,9 +29,15 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     "@context": "https://schema.org",
     "@type": "Organization",
     "@id": `${site.url}/#organization`,
-    name: site.name,
+    name: site.legalName,
+    legalName: site.legalName,
+    alternateName: site.name,
     url: site.url,
     email: site.email,
+    brand: {
+      "@type": "Brand",
+      name: site.name
+    },
     founder: {
       "@type": "Person",
       name: "CJ Wheelock",

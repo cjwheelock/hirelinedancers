@@ -1,5 +1,6 @@
 export const site = {
   name: "Hire Line Dancers",
+  legalName: "OMG Goals Inc.",
   url: "https://hirelinedancers.com",
   email: "hello@hirelinedancers.com",
   description:

@@ -101,10 +101,9 @@ export default function AboutPage() {
                 friends, and help the community grow (and hopefully get into West Coast Swing too).
               </p>
               <p>
-                I would love for there to be thriving line dancing communities all across the US. I
-                say that as a regular who is not a huge line dancer myself. I simply see the value,
-                see how much people love it, and think there should be more of it. That is what
-                I&rsquo;m working to build here.
+                I would love for there to be thriving line dancing communities all across the US
+                because I see the joy it brings people and the lasting friendships it builds. That
+                is what I&rsquo;m working to build here.
               </p>
               <p>
                 If you have feedback or want to chat, please email me at{" "}

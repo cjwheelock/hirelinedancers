@@ -83,6 +83,11 @@
   margin-top: 24px;
 }
 
+.topContactButton {
+  width: fit-content;
+  margin-top: 24px;
+}
+
 .heroTags span {
   display: inline-flex;
   align-items: center;
@@ -234,7 +239,10 @@
 }
 
 .contactCard h2 {
-  font-size: clamp(2rem, 3.5vw, 3.4rem);
+  max-width: 12ch;
+  font-size: clamp(1.75rem, 2.4vw, 2.25rem);
+  line-height: 1.05;
+  text-wrap: balance;
 }
 
 .contactCard > p:not(.kicker, .finePrint, .response) {
@@ -267,6 +275,15 @@
   line-height: 1.55;
 }
 
+.bookingList {
+  display: grid;
+  gap: 10px;
+  padding-left: 20px;
+  color: #3f4b66;
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
 .response {
   display: inline-flex;
   align-items: center;
@@ -276,6 +293,36 @@
   color: #1c2a44;
   font-size: 0.82rem;
   font-weight: 700;
+}
+
+.bottomCta {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: clamp(24px, 4vw, 48px);
+  margin-top: clamp(42px, 6vw, 72px);
+  padding: clamp(28px, 4vw, 44px);
+  border: 2px solid #1c2a44;
+  border-left: 8px solid #e7a33c;
+  background: #fff;
+}
+
+.bottomCta > div {
+  max-width: 680px;
+}
+
+.bottomCta h2 {
+  font-size: clamp(2rem, 4vw, 3.15rem);
+}
+
+.bottomCta p:not(.kicker) {
+  margin-top: 12px;
+  color: #3f4b66;
+  line-height: 1.65;
+}
+
+.bottomCta .primaryButton {
+  flex: 0 0 auto;
 }
 
 @media (max-width: 840px) {
@@ -290,6 +337,15 @@
 
   .contactCard {
     position: static;
+  }
+
+  .bottomCta {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .bottomCta .primaryButton {
+    width: 100%;
   }
 }
 
@@ -306,5 +362,13 @@
   .section,
   .contactCard {
     padding: 22px 18px;
+  }
+
+  .topContactButton {
+    width: 100%;
+  }
+
+  .bottomCta {
+    padding: 24px 22px;
   }
 }

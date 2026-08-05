@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Clock, MapPin, Users } from "lucide-react";
 import { InstructorContactLink } from "@/components/InstructorContactLink";
@@ -38,6 +37,7 @@ export default async function InstructorPage({ params }: { params: Promise<{ slu
   if (!instructor) notFound();
   const jsonLd = profileJsonLd(instructor.slug);
   const profileEvents = eventTypes.filter((event) => instructor.events.includes(event.slug));
+  const firstName = instructor.name.trim().split(/\s+/)[0] || instructor.name;
 
   return (
     <section className="page-shell profile-page">
@@ -64,6 +64,13 @@ export default async function InstructorPage({ params }: { params: Promise<{ slu
       </div>
       <div className="profile-grid">
         <div>
+          <InstructorContactLink
+            instructorIdentifier={instructor.slug}
+            className="button primary profile-top-contact"
+          >
+            Contact {firstName}
+          </InstructorContactLink>
+
           <div className="stat-grid">
             <span><MapPin size={18} /> {instructor.city}, {instructor.state}{instructor.demoEverywhere ? " · National travel available" : ""}</span>
             <span><Users size={18} /> Up to {instructor.groupSize} guests</span>
@@ -71,7 +78,7 @@ export default async function InstructorPage({ params }: { params: Promise<{ slu
           </div>
 
           <div className="policy-box">
-            <h2>About {instructor.name.split(" ")[0]}</h2>
+            <h2>About {firstName}</h2>
             <p>{instructor.bio}</p>
           </div>
 
@@ -152,9 +159,9 @@ export default async function InstructorPage({ params }: { params: Promise<{ slu
             />
           )}
         </div>
-        <aside className="sticky-panel">
+        <aside className="sticky-panel profile-booking-panel" aria-labelledby="profile-booking-title">
           <p className="eyebrow">Booking details</p>
-          <h2>Plan your line dance experience</h2>
+          <h2 id="profile-booking-title">Plan your line dance experience</h2>
           <p>{instructor.profileDetails?.responseTime || "Event details and availability are confirmed directly with the instructor."}</p>
           <ul className="check-list profile-booking-list">
             <li>Rates quoted after reviewing the date, location, group size, and format</li>
@@ -162,12 +169,19 @@ export default async function InstructorPage({ params }: { params: Promise<{ slu
             <li>Song requests and accessibility needs discussed before the event</li>
             <li>Travel, venue access, sound, and insurance confirmed in advance</li>
           </ul>
-          <InstructorContactLink instructorIdentifier={instructor.slug} className="button primary">
-            Contact {instructor.name.split(" ")[0]}
-          </InstructorContactLink>
-          <Link className="button secondary" href="/instructors/">Browse other instructors</Link>
         </aside>
       </div>
+
+      <section className="profile-bottom-cta" aria-labelledby="profile-bottom-cta-title">
+        <div>
+          <p className="eyebrow">Start planning</p>
+          <h2 id="profile-bottom-cta-title">Bring {firstName} to your event.</h2>
+          <p>Share your date, location, group size, and event details to check availability.</p>
+        </div>
+        <InstructorContactLink instructorIdentifier={instructor.slug} className="button primary">
+          Contact {firstName}
+        </InstructorContactLink>
+      </section>
     </section>
   );
 }

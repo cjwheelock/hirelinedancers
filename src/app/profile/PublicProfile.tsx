@@ -279,6 +279,7 @@ export function PublicProfile() {
   }
 
   const identifier = profile.slug || profile.id;
+  const firstName = profile.display_name.trim().split(/\s+/)[0] || profile.display_name;
   const headshot = media.find((item) => item.media_type === "headshot");
   const headshotUrl = headshot ? mediaUrl(headshot) : null;
   const location = [profile.city, profile.region].filter(Boolean).join(", ") || "Service area available on request";
@@ -298,6 +299,12 @@ export function PublicProfile() {
           <h1>{profile.display_name}</h1>
           {profile.business_name ? <p className={styles.business}>{profile.business_name}</p> : null}
           <p className={styles.headline}>{profile.headline || "Beginner-friendly line dance instruction for events and programs."}</p>
+          <InstructorContactLink
+            instructorIdentifier={identifier}
+            className={`${styles.primaryButton} ${styles.topContactButton}`}
+          >
+            Contact {firstName}
+          </InstructorContactLink>
           <div className={styles.heroTags}>
             <span><MapPin size={16} aria-hidden="true" /> {location}</span>
             {profile.max_group_size ? <span><Users size={16} aria-hidden="true" /> Groups up to {profile.max_group_size}</span> : null}
@@ -374,15 +381,29 @@ export function PublicProfile() {
 
         <aside className={styles.contactCard}>
           <CalendarCheck size={30} aria-hidden="true" />
-          <p className={styles.kicker}>Check availability</p>
-          <h2>Tell {profile.display_name} about your event.</h2>
-          <p>Send the date, location, group size, and event details. The instructor will reply directly with availability, rates, and next steps.</p>
-          <InstructorContactLink instructorIdentifier={identifier} className={styles.primaryButton}>Contact this instructor</InstructorContactLink>
+          <p className={styles.kicker}>Booking details</p>
+          <h2>Plan your line dance experience</h2>
+          <p>Share the date, location, group size, and event format when you contact the instructor.</p>
+          <ul className={styles.bookingList}>
+            <li>The instructor confirms availability, rates, and next steps.</li>
+            <li>Discuss music, accessibility, travel, sound, and venue requirements before the event.</li>
+          </ul>
           <p className={styles.finePrint}>You can browse without an account. Sign in is required when you send an inquiry so you can track its status.</p>
           <p className={styles.finePrint}>Hire Line Dancers does not handle instructor contracts or event payments. Confirm all terms directly before booking.</p>
           <p className={styles.response}><Clock size={15} aria-hidden="true" /> Preferred response window: about {profile.preferred_response_hours} hours</p>
         </aside>
       </div>
+
+      <section className={styles.bottomCta} aria-labelledby="published-profile-bottom-cta">
+        <div>
+          <p className={styles.kicker}>Start planning</p>
+          <h2 id="published-profile-bottom-cta">Bring {firstName} to your event.</h2>
+          <p>Share your date, location, group size, and event details to check availability.</p>
+        </div>
+        <InstructorContactLink instructorIdentifier={identifier} className={styles.primaryButton}>
+          Contact {firstName}
+        </InstructorContactLink>
+      </section>
     </main>
   );
 }

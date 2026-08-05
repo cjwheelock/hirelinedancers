@@ -153,7 +153,7 @@ export default function Home() {
       </section>
 
       {/* EVENT TYPES */}
-      <section className="section steps">
+      <section className="section steps" id="events">
         <div className="section-heading">
           <p className="eyebrow">Perfect for every kind of celebration</p>
           <h2>One instructor. A whole room moving together.</h2>

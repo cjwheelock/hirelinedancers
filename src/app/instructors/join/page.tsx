@@ -56,7 +56,7 @@ export default function JoinPage() {
           <article className="step">
             <div className="step-num"><CreditCard size={20} /></div>
             <h3>3. Activate &amp; go live</h3>
-            <p>Once approved, add a payment method and activate your $14.99 monthly membership through Stripe. We publish your approved profile after Stripe confirms your membership and send planner inquiries to you.</p>
+            <p>Once approved, add a payment method and activate your $14.99 USD monthly membership through Stripe. We publish your approved profile after Stripe confirms your membership and send planner inquiries to you.</p>
           </article>
         </div>
       </div>
@@ -69,7 +69,7 @@ export default function JoinPage() {
           <article className="price-card featured">
             <BadgeCheck size={28} />
             <h2>Founding Instructor</h2>
-            <p className="price">$14.99 <span>per month</span></p>
+            <p className="price">$14.99 USD <span>per month</span></p>
             <p>Add a payment method after approval to activate your profile. Your membership renews monthly until canceled, and billing is managed securely through Stripe.</p>
             <p>For our first 100 approved instructors. Founding members receive a <strong>Founding Instructor badge</strong>, a complete public profile, and early placement while we build each local directory. Your first year is protected by our money-back guarantee.</p>
             <Link className="button primary" href={loginUrl("/account/", "instructor")}>Claim a founding spot</Link>

@@ -40,6 +40,7 @@ export function Footer() {
             <li><Link href="/guides/">Guides</Link></li>
             <li><Link href="/guides/start-a-line-dance-club-on-campus/">Start a campus club</Link></li>
             <li><Link href="/blog/">Blog</Link></li>
+            <li><Link href="/support/">Support</Link></li>
             <li><Link href="/legal/terms/">Terms</Link></li>
             <li><Link href="/legal/privacy/">Privacy</Link></li>
             <li><Link href="/legal/refund-policy/">Refund policy</Link></li>
@@ -47,8 +48,8 @@ export function Footer() {
         </div>
       </div>
       <div className="footer-bottom">
-        <span>© {new Date().getFullYear()} {site.name}. Instructors are independent providers.</span>
-        <span>{site.url.replace("https://", "")}</span>
+        <span>© {new Date().getFullYear()} {site.legalName}. Operating as {site.name}. Instructors are independent providers.</span>
+        <span><a href={`mailto:${site.email}`}>{site.email}</a> · {site.url.replace("https://", "")}</span>
       </div>
     </footer>
   );
