@@ -403,6 +403,60 @@ select pg_temp.expect_error(
   'delegated admin finance mutation'
 );
 
+-- Admin access is an overlay. An instructor admin keeps the instructor role
+-- and can also submit an organizer inquiry under the same account identity.
+select pg_temp.set_request(
+  '00000000-0000-0000-0000-000000000001',
+  'owner@example.test',
+  'authenticated'
+);
+select public.grant_marketplace_admin('alice@example.test');
+
+select pg_temp.set_request(
+  '00000000-0000-0000-0000-000000000010',
+  'alice@example.test',
+  'authenticated'
+);
+select public.submit_inquiry(
+  null,
+  'private-parties',
+  current_date + 75,
+  p_event_city => 'Austin',
+  p_event_region => 'TX',
+  p_message => 'Admin organizer capability test.',
+  p_instructor_slug => 'tessa-mctester'
+) as admin_organizer_inquiry_id \gset
+
+reset role;
+select pg_temp.set_request(null, null, 'postgres');
+select pg_temp.test_assert(
+  (select role = 'instructor'
+   from public.accounts
+   where id = '00000000-0000-0000-0000-000000000010'),
+  'admin organizer access must preserve the primary instructor role'
+);
+select pg_temp.test_assert(
+  (select organizer_account_id = '00000000-0000-0000-0000-000000000010'
+   from public.inquiries
+   where id = :'admin_organizer_inquiry_id'::uuid),
+  'an instructor admin inquiry must retain the submitting account as organizer'
+);
+select pg_temp.test_assert(
+  (select delivered_to_email = 'hello@hirelinedancers.com'
+   from public.inquiry_recipients
+   where inquiry_id = :'admin_organizer_inquiry_id'::uuid),
+  'an instructor admin must use the normal inquiry delivery path'
+);
+delete from public.inquiries where id = :'admin_organizer_inquiry_id'::uuid;
+
+set local role authenticated;
+select pg_temp.set_request(
+  '00000000-0000-0000-0000-000000000001',
+  'owner@example.test',
+  'authenticated'
+);
+select public.revoke_marketplace_admin('00000000-0000-0000-0000-000000000010');
+
 -- A regular instructor cannot see admin finance tables or use admin search.
 select pg_temp.set_request(
   '00000000-0000-0000-0000-000000000010',
@@ -417,6 +471,18 @@ select pg_temp.expect_error(
   'select * from public.admin_search_instructors(null, 100, 0)',
   'Administrator access required',
   'regular user admin search'
+);
+select pg_temp.expect_error(
+  $$select public.submit_inquiry(
+    null,
+    'private-parties',
+    current_date + 76,
+    p_event_city => 'Austin',
+    p_event_region => 'TX',
+    p_instructor_slug => 'tessa-mctester'
+  )$$,
+  'Complete organizer onboarding before contacting an instructor',
+  'regular instructor organizer submission'
 );
 
 -- Organizer inquiry submission creates exactly one email job. SMS recipient

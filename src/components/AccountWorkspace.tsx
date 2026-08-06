@@ -45,7 +45,7 @@ type InstructorTab = "profile" | "inquiries" | "membership";
 export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean }) {
   const { session, account, isAdmin, isOwner, loading, error, configured, refresh } = useMarketplaceSession();
   const [signingOut, setSigningOut] = useState(false);
-  const [workspaceMode, setWorkspaceMode] = useState<"admin" | "account">("admin");
+  const [workspaceMode, setWorkspaceMode] = useState<"admin" | "account" | "organizer">("admin");
   const [entryIntent, setEntryIntent] = useState<AccountIntent | null | undefined>(undefined);
   const [entryReturnTo, setEntryReturnTo] = useState<string | null>(null);
   const [entryInvitationToken, setEntryInvitationToken] = useState<string | null | undefined>(undefined);
@@ -63,9 +63,9 @@ export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean })
   }, []);
 
   useEffect(() => {
-    if (entryIntent === undefined || !account?.role) return;
+    if (entryIntent === undefined || !account) return;
     if (entryInvitationToken) return;
-    if (account.role === entryIntent && entryReturnTo) {
+    if ((account.role === entryIntent || (isAdmin && entryIntent === "organizer")) && entryReturnTo) {
       window.location.replace(entryReturnTo);
       return;
     }
@@ -75,7 +75,7 @@ export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean })
     url.searchParams.delete("intent");
     url.searchParams.delete("returnTo");
     window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
-  }, [account?.role, entryIntent, entryInvitationToken, entryReturnTo]);
+  }, [account, entryIntent, entryInvitationToken, entryReturnTo, isAdmin]);
 
   useEffect(() => {
     if (!entryInvitationToken || !session || !account?.role || invitationClaimStarted.current) return;
@@ -261,7 +261,7 @@ export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean })
     <section className={styles.shell}>
       <div className={styles.topbar}>
         <div>
-          <p className={styles.eyebrow}>{workspaceMode === "admin" && isAdmin ? "Admin workspace" : account?.role === "instructor" ? "Instructor workspace" : "Planner workspace"}</p>
+          <p className={styles.eyebrow}>{workspaceMode === "admin" && isAdmin ? "Admin workspace" : workspaceMode === "organizer" || account?.role === "organizer" ? "Planner workspace" : "Instructor workspace"}</p>
           <h1>Welcome, {account?.full_name?.split(" ")[0] || "there"}</h1>
           <p className={styles.muted}>{account?.email}</p>
         </div>
@@ -270,16 +270,19 @@ export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean })
         </button>
       </div>
 
-      {!adminOnly && isAdmin && account?.role && account.role !== "admin" ? (
+      {!adminOnly && isAdmin ? (
         <div className={styles.tabs} role="tablist" aria-label="Workspace selection">
           <button className={`${styles.tab} ${workspaceMode === "admin" ? styles.activeTab : ""}`} type="button" onClick={() => setWorkspaceMode("admin")}>Admin</button>
-          <button className={`${styles.tab} ${workspaceMode === "account" ? styles.activeTab : ""}`} type="button" onClick={() => setWorkspaceMode("account")}>My account</button>
+          {account?.role === "instructor" ? <button className={`${styles.tab} ${workspaceMode === "account" ? styles.activeTab : ""}`} type="button" onClick={() => setWorkspaceMode("account")}>Instructor</button> : null}
+          {account?.role === "organizer" ? <button className={`${styles.tab} ${workspaceMode === "account" ? styles.activeTab : ""}`} type="button" onClick={() => setWorkspaceMode("account")}>Organizer</button> : null}
+          {account?.role !== "organizer" ? <button className={`${styles.tab} ${workspaceMode === "organizer" ? styles.activeTab : ""}`} type="button" onClick={() => setWorkspaceMode("organizer")}>Organizer</button> : null}
         </div>
       ) : null}
 
       {isAdmin && workspaceMode === "admin" ? <AdminDashboard isOwner={isOwner} /> : null}
       {workspaceMode === "account" && account?.role === "instructor" ? <InstructorDashboard account={account} /> : null}
-      {workspaceMode === "account" && account?.role === "organizer" ? <OrganizerDashboard /> : null}
+      {workspaceMode === "account" && account?.role === "organizer" ? <OrganizerDashboard accountId={account.id} /> : null}
+      {workspaceMode === "organizer" && isAdmin && account ? <OrganizerDashboard accountId={account.id} /> : null}
     </section>
   );
 }
@@ -2361,7 +2364,7 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
   );
 }
 
-function OrganizerDashboard() {
+function OrganizerDashboard({ accountId }: { accountId: string }) {
   const [inquiries, setInquiries] = useState<MarketplaceInquiry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -2369,7 +2372,11 @@ function OrganizerDashboard() {
   async function load() {
     const client = getMarketplaceClient();
     if (!client) return;
-    const { data, error: loadError } = await client.from("inquiries").select("*").order("created_at", { ascending: false });
+    const { data, error: loadError } = await client
+      .from("inquiries")
+      .select("*")
+      .eq("organizer_account_id", accountId)
+      .order("created_at", { ascending: false });
     setInquiries((data as MarketplaceInquiry[] | null) ?? []);
     setError(loadError?.message ?? null);
     setLoading(false);
@@ -2377,7 +2384,7 @@ function OrganizerDashboard() {
 
   useEffect(() => {
     void load();
-  }, []);
+  }, [accountId]);
 
   return (
     <>

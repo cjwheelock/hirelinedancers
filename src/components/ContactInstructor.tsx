@@ -11,7 +11,7 @@ type ContactProfile = Pick<InstructorProfile, "id" | "slug" | "display_name" | "
 };
 
 export function ContactInstructor() {
-  const { session, account, loading: authLoading } = useMarketplaceSession();
+  const { session, account, isAdmin, loading: authLoading } = useMarketplaceSession();
   const [profile, setProfile] = useState<ContactProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -141,7 +141,7 @@ export function ContactInstructor() {
     );
   }
 
-  if (account.role !== "organizer") {
+  if (account.role !== "organizer" && !isAdmin) {
     return (
       <section className={`${styles.shell} ${styles.narrow}`}>
         <h1 className={styles.title}>Planner account required</h1>
