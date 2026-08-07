@@ -1,0 +1,50 @@
+.heroHeading.heroHeading {
+  max-width: none;
+  font-size: clamp(38px, 5vw, 64px);
+  line-height: 1;
+  letter-spacing: -0.025em;
+}
+
+.heroSubheading {
+  display: grid;
+  gap: 0.08em;
+  margin: clamp(20px, 3vw, 30px) auto 0;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: clamp(27px, 3.4vw, 44px);
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+
+.heroSubheading span {
+  display: block;
+}
+
+.sectionHeading.sectionHeading {
+  max-width: 16ch;
+  font-size: clamp(32px, 4vw, 50px);
+  line-height: 1;
+}
+
+.marketplaceHeading.marketplaceHeading {
+  font-size: clamp(32px, 4.2vw, 52px);
+  line-height: 1;
+}
+
+@media (min-width: 541px) {
+  .heroSubheading span {
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 540px) {
+  .heroHeading.heroHeading {
+    font-size: clamp(38px, 11vw, 52px);
+  }
+
+  .heroSubheading {
+    font-size: clamp(25px, 8vw, 36px);
+  }
+}

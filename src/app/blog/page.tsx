@@ -11,7 +11,6 @@ export default function BlogIndexPage() {
   const posts = publishedPosts();
   return (
     <section className="page-shell">
-      <p className="eyebrow">The Hire Line Dancers blog</p>
       <h1>Ideas for a packed dance floor.</h1>
       <p className="lede">City guides, entertainment comparisons, and practical planning advice for weddings, corporate events, and parties.</p>
       <div className="blog-grid">

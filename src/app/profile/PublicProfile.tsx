@@ -295,9 +295,7 @@ export function PublicProfile() {
           ) : initials(profile.display_name)}
         </div>
         <div className={styles.heroCopy}>
-          <p className={styles.kicker}>Published instructor profile</p>
           <h1>{profile.display_name}</h1>
-          {profile.business_name ? <p className={styles.business}>{profile.business_name}</p> : null}
           <p className={styles.headline}>{profile.headline || "Beginner-friendly line dance instruction for events and programs."}</p>
           <InstructorContactLink
             instructorIdentifier={identifier}

@@ -54,6 +54,7 @@ type PublicInstructorResultsProps = {
   compact?: boolean;
   darkBackground?: boolean;
   showExamplesWhenUnconfigured?: boolean;
+  suppressEmptyMessage?: boolean;
   emptyTitle?: string;
   emptyBody?: string;
   onCountChange?: (count: number | null) => void;
@@ -234,6 +235,7 @@ export function PublicInstructorResults({
   compact = false,
   darkBackground = false,
   showExamplesWhenUnconfigured = false,
+  suppressEmptyMessage = false,
   emptyTitle = "No published instructor matches yet.",
   emptyBody = "Try another filter, or check back as new instructors are approved.",
   onCountChange
@@ -392,6 +394,15 @@ export function PublicInstructorResults({
   }
 
   if (!marketplaceConfigured) {
+    if (suppressEmptyMessage) {
+      return (
+        <>
+          {demoResults.map((instructor) => (
+            <ExampleProfileCard key={instructor.slug} instructor={instructor} compact={compact} />
+          ))}
+        </>
+      );
+    }
     return (
       <>
         <div className={stateClass}>
@@ -406,6 +417,7 @@ export function PublicInstructorResults({
   }
 
   if (!results.length && !demoResults.length) {
+    if (suppressEmptyMessage) return null;
     return (
       <div className={stateClass}>
         <h3>{emptyTitle}</h3>
@@ -419,14 +431,16 @@ export function PublicInstructorResults({
       {results.map((profile) => <PublicProfileCard key={profile.id} profile={profile} compact={compact} />)}
       {demoResults.length ? (
         <>
-          <div className={stateClass}>
-            <h3>{results.length ? "Featured instructor profile" : emptyTitle}</h3>
-            <p>
-              {results.length
-                ? "Explore Tessa McTester’s teaching approach, event specialties, equipment, travel preferences, and sample session."
-                : `${emptyBody} You can still explore Tessa McTester’s profile while more instructors join.`}
-            </p>
-          </div>
+          {results.length || !suppressEmptyMessage ? (
+            <div className={stateClass}>
+              <h3>{results.length ? "Featured instructor profile" : emptyTitle}</h3>
+              <p>
+                {results.length
+                  ? "Explore Tessa McTester’s teaching approach, event specialties, equipment, travel preferences, and sample session."
+                  : `${emptyBody} You can still explore Tessa McTester’s profile while more instructors join.`}
+              </p>
+            </div>
+          ) : null}
           {demoResults.map((instructor) => (
             <ExampleProfileCard key={instructor.slug} instructor={instructor} compact={compact} />
           ))}
@@ -473,6 +487,7 @@ export function InstructorDirectoryBrowser() {
           citySlug={city || undefined}
           eventSlug={event || undefined}
           groupSize={Number(groupSize || 0)}
+          suppressEmptyMessage={!city && !event && !groupSize}
           onCountChange={setResultCount}
         />
       </div>
@@ -490,8 +505,7 @@ export function SearchPanel() {
   return (
     <section className="search-section" id="find">
       <div className="section-heading">
-        <p className="eyebrow">Find your match</p>
-        <h2>Tell us about your event. We&rsquo;ll show you who&rsquo;s nearby.</h2>
+        <h2>Find your match</h2>
         <p>Pick your city, the kind of event or program, and roughly how many guests. We&rsquo;ll show you published instructors whose experience fits the request.</p>
       </div>
       <div className="search-grid">

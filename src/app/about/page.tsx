@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { CalendarHeart, UsersRound } from "lucide-react";
 import { site } from "@/data/site";
+import styles from "./about.module.css";
 
 export const metadata: Metadata = {
   title: "About",
@@ -41,11 +42,11 @@ export default function AboutPage() {
       <article className="about-page">
         <header className="about-hero">
           <div className="about-hero-inner">
-            <p className="eyebrow">Why we exist</p>
-            <h1>
+            <h1 className={styles.heroHeading}>Why we exist</h1>
+            <p className={styles.heroSubheading}>
               <span>Get more people dancing.</span>
               <span>That&rsquo;s the whole idea.</span>
-            </h1>
+            </p>
             <div className="about-purpose">
               <p>
                 I want to help line dancing grow however I possibly can. That starts with making it
@@ -69,8 +70,7 @@ export default function AboutPage() {
         <section className="about-intro section" aria-labelledby="shared-experience-title">
           <div className="about-intro-grid">
             <div className="about-founder">
-              <p className="eyebrow">A shared experience</p>
-              <h2 id="shared-experience-title">Hi, I&rsquo;m CJ.</h2>
+              <h2 className={styles.sectionHeading} id="shared-experience-title">A shared experience</h2>
               <iframe
                 className="about-instagram-reel"
                 src="https://www.instagram.com/reel/DbmgUcPAlKC/embed/"
@@ -82,11 +82,11 @@ export default function AboutPage() {
             </div>
             <div className="about-prose">
               <p>
-                I&rsquo;ve been dancing West Coast Swing for more than 16 years, and I&rsquo;ve
-                become a regular at San Francisco line dance venues (shout out to Jaxson and
-                Westwood). Over the years, I&rsquo;ve gotten to know the instructors, met too many
-                people to count, brought some of them into the West Coast Swing community, and found
-                line dancing really growing on me.
+                Hi, I&rsquo;m CJ. I&rsquo;ve been dancing West Coast Swing for more than 16 years,
+                and I&rsquo;ve become a regular at San Francisco line dance venues (shout out to
+                Jaxson and Westwood). Over the years, I&rsquo;ve gotten to know the instructors, met
+                too many people to count, brought some of them into the West Coast Swing community,
+                and found line dancing really growing on me.
               </p>
               <p>
                 West Coast Swing will always have my heart but line dancing is unbelievably
@@ -116,8 +116,9 @@ export default function AboutPage() {
         <section className="about-marketplace section" aria-labelledby="marketplace-title">
           <div className="section-inner">
             <div className="section-heading about-marketplace-heading">
-              <p className="eyebrow">What we&rsquo;re building</p>
-              <h2 id="marketplace-title">A two-sided marketplace for better events.</h2>
+              <h2 className={styles.marketplaceHeading} id="marketplace-title">
+                The vision: A two-sided marketplace for better events.
+              </h2>
             </div>
 
             <div className="marketplace-map">

@@ -69,8 +69,7 @@ export default function Home() {
           />
         </div>
         <div className="hero-content">
-          <p className="eyebrow">Live entertainment that gets the whole room moving</p>
-          <h1><span>Get more guests.</span><strong>On their feet.</strong></h1>
+          <h1>Live entertainment that gets the whole room moving.</h1>
           <p className="lede">Hire a line dance instructor for your wedding, party, or company event. Give guests a beginner-friendly way to learn, move, and have fun together.</p>
           <div className="hero-actions">
             <Link className="button primary" href="#find">Find an instructor near you <ArrowRight size={18} /></Link>
@@ -97,8 +96,7 @@ export default function Home() {
       {/* BENEFITS */}
       <section className="section">
         <div className="section-heading">
-          <p className="eyebrow">Why planners book a line dance instructor</p>
-          <h2>The surest way to a packed, happy dance floor.</h2>
+          <h2>Why planners book a line dance instructor</h2>
         </div>
         <div className="benefit-grid">
           {benefits.map((b) => (
@@ -114,8 +112,7 @@ export default function Home() {
       {/* HOW IT WORKS */}
       <section className="section steps" id="how-it-works">
         <div className="section-heading">
-          <p className="eyebrow">How it works</p>
-          <h2>Start with three simple steps.</h2>
+          <h2>How it works</h2>
         </div>
         <div className="step-grid">
           <article className="step">
@@ -142,8 +139,7 @@ export default function Home() {
       {/* FEATURED INSTRUCTORS */}
       <section className="section">
         <div className="section-heading">
-          <p className="eyebrow">Profile previews</p>
-          <h2>See what instructor listings can include.</h2>
+          <h2>Profile previews</h2>
         </div>
         <div className="card-grid">
           {featured.map((instructor) => (
@@ -155,8 +151,7 @@ export default function Home() {
       {/* EVENT TYPES */}
       <section className="section steps" id="events">
         <div className="section-heading">
-          <p className="eyebrow">Perfect for every kind of celebration</p>
-          <h2>One instructor. A whole room moving together.</h2>
+          <h2>Perfect for every kind of celebration</h2>
         </div>
         <div className="link-grid">
           {eventTypes.map((event) => (
@@ -181,7 +176,6 @@ export default function Home() {
       {/* LAUNCH CITIES */}
       <section className="section steps" id="cities">
         <div className="section-heading">
-          <p className="eyebrow">Our first 11 city markets</p>
           <h2>Find line dance instructors and local planning guides.</h2>
         </div>
         <div className="link-grid">

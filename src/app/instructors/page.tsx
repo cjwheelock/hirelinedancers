@@ -10,7 +10,6 @@ export const metadata: Metadata = {
 export default function InstructorsPage() {
   return (
     <section className="page-shell">
-      <p className="eyebrow">Public instructor directory</p>
       <h1>Find a line dance instructor.</h1>
       <p className="lede">Browse without an account. Filter published profiles by service market, event or program, and approximate group size. Sign in only when you are ready to contact an instructor.</p>
       <div className="faq-block">

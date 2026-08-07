@@ -53,9 +53,7 @@ export default async function InstructorPage({ params }: { params: Promise<{ slu
           )}
         </div>
         <div className="profile-hero-copy">
-          <p className="eyebrow">Line dance instructor</p>
           <h1>{instructor.name}</h1>
-          <p className="card-sub">{instructor.business}</p>
           <p className="lede">{instructor.headline || instructor.bio}</p>
           <div className="tag-row">
             {instructor.tags.map((tag) => <span key={tag}>{tag}</span>)}
