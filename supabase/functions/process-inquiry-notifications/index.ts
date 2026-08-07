@@ -70,6 +70,32 @@ function display(value: string | number | null | undefined): string {
   return String(value);
 }
 
+const EVENT_TYPE_LABELS: Record<string, string> = {
+  weddings: "Wedding",
+  "corporate-events": "Corporate event",
+  "bachelorette-parties": "Bachelorette party",
+  "bar-bat-mitzvahs": "Bar or bat mitzvah",
+  "private-parties": "Private party",
+  fundraisers: "Fundraiser",
+  "summer-camps": "Summer camp",
+  "after-school-programs": "After-school program",
+  "fitness-classes": "Fitness class or studio program",
+  venues: "Venue or bar event",
+  "schools-community": "School or community event",
+};
+
+function eventTypeLabel(value: string | null): string {
+  if (!value) return "Line dance event";
+  const knownLabel = EVENT_TYPE_LABELS[value];
+  if (knownLabel) return knownLabel;
+  const readable = value.replaceAll("-", " ").trim();
+  return readable ? `${readable.charAt(0).toUpperCase()}${readable.slice(1)}` : "Line dance event";
+}
+
+function eventTypeInSentence(value: string | null): string {
+  return eventTypeLabel(value).toLocaleLowerCase("en-US");
+}
+
 function yesNo(value: boolean | null): string {
   if (value === null) return "Not provided";
   return value ? "Yes" : "No";
@@ -102,7 +128,7 @@ function emailText(job: NotificationJob): string {
     return [
       `Hi ${job.instructor_name},`,
       "",
-      `${job.organizer_name}${job.company_name ? ` from ${job.company_name}` : ""} contacted you through Hire Line Dancers one week ago about a ${job.event_type || "line dance"} event.`,
+      `${job.organizer_name}${job.company_name ? ` from ${job.company_name}` : ""} contacted you through Hire Line Dancers one week ago about a ${eventTypeInSentence(job.event_type)}.`,
       "",
       "Did this inquiry turn into a booking? Choose Yes, No, or In progress. Your private comments help us improve Hire Line Dancers.",
       "",
@@ -116,7 +142,7 @@ function emailText(job: NotificationJob): string {
     return [
       `Hi ${job.instructor_name},`,
       "",
-      `We hope your ${job.event_type || "line dance"} event on ${display(job.event_date)} went well.`,
+      `We hope your ${eventTypeInSentence(job.event_type)} on ${display(job.event_date)} went well.`,
       "",
       "Did the event happen? Choose Yes or No. Your private comments help us improve Hire Line Dancers.",
       "",
@@ -129,7 +155,7 @@ function emailText(job: NotificationJob): string {
     "",
     `${job.organizer_name} sent you a new inquiry through Hire Line Dancers. Reply to this email to respond directly to the organizer.`,
     "",
-    `Event type: ${display(job.event_type)}`,
+    `Event type: ${eventTypeLabel(job.event_type)}`,
     `Event date: ${display(job.event_date)}`,
     `Start time: ${display(job.event_start_time)}${job.time_zone ? ` ${job.time_zone}` : ""}`,
     `Company: ${display(job.company_name)}`,
@@ -156,8 +182,8 @@ function emailHtml(job: NotificationJob): string {
     const isBooking = notificationType === "booking_followup";
     const heading = isBooking ? "Did this inquiry turn into a booking?" : "Did the event happen?";
     const description = isBooking
-      ? `${job.organizer_name}${job.company_name ? ` from ${job.company_name}` : ""} contacted you one week ago about a ${job.event_type || "line dance"} event.`
-      : `We hope your ${job.event_type || "line dance"} event on ${display(job.event_date)} went well.`;
+      ? `${job.organizer_name}${job.company_name ? ` from ${job.company_name}` : ""} contacted you one week ago about a ${eventTypeInSentence(job.event_type)}.`
+      : `We hope your ${eventTypeInSentence(job.event_type)} on ${display(job.event_date)} went well.`;
     const prompt = isBooking
       ? "Choose Yes, No, or In progress."
       : "Choose Yes or No.";
@@ -179,7 +205,7 @@ function emailHtml(job: NotificationJob): string {
   }
 
   const rows: Array<[string, string]> = [
-    ["Event type", display(job.event_type)],
+    ["Event type", eventTypeLabel(job.event_type)],
     ["Event date", display(job.event_date)],
     ["Start time", `${display(job.event_start_time)}${job.time_zone ? ` ${job.time_zone}` : ""}`],
     ["Company", display(job.company_name)],
@@ -243,7 +269,7 @@ async function sendEmail(job: NotificationJob): Promise<string> {
           ? "Did this inquiry turn into a booking?"
           : normalizedNotificationType(job) === "completion_followup"
           ? "How did your line dance event go?"
-          : `New ${job.event_type || "event"} inquiry from ${job.organizer_name}`,
+          : `New ${eventTypeInSentence(job.event_type)} inquiry from ${job.organizer_name}`,
         text: emailText(job),
         html: emailHtml(job),
       }),
