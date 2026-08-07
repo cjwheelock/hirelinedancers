@@ -349,6 +349,47 @@
   text-transform: uppercase;
 }
 
+.adminShell {
+  padding-top: 28px;
+}
+
+.adminTopbar {
+  align-items: center;
+  padding-bottom: 12px;
+  border-bottom-width: 1px;
+}
+
+.adminTopbar h1 {
+  margin: 0;
+  font-family: Lato, sans-serif;
+  font-size: 1.2rem;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.adminTopbar .muted {
+  margin: 2px 0 0;
+  font-size: 0.78rem;
+}
+
+.adminTopbar .secondaryButton {
+  min-height: 34px;
+  padding: 7px 10px;
+  font-size: 0.74rem;
+}
+
+.adminShell > .tabs {
+  gap: 4px;
+  margin-top: 12px;
+}
+
+.adminShell > .tabs .tab {
+  padding: 7px 9px;
+  font-size: 0.72rem;
+}
+
 .tabs {
   display: flex;
   flex-wrap: wrap;
@@ -431,10 +472,10 @@
 
 .membershipAdminLayout {
   display: grid;
-  grid-template-columns: minmax(280px, 0.78fr) minmax(0, 1.55fr);
-  gap: 20px;
+  gap: 14px;
+  min-width: 0;
   align-items: start;
-  margin-top: 32px;
+  margin-top: 16px;
 }
 
 .membershipAdminLayout > .card,
@@ -442,63 +483,212 @@
   margin-top: 0;
 }
 
-.membershipSearch {
+.compactAdminStack {
   display: grid;
-  gap: 10px;
-  margin-top: 22px;
+  gap: 12px;
+  margin-top: 14px;
 }
 
-.membershipSearch .button {
-  width: 100%;
-}
-
-.membershipResults {
-  display: grid;
-  gap: 8px;
-  max-height: 620px;
-  margin-top: 20px;
-  overflow-y: auto;
-}
-
-.membershipResult {
-  display: grid;
-  gap: 10px;
-  width: 100%;
-  padding: 14px;
-  border: 1.5px solid #a9adba;
-  border-radius: 2px;
+.compactAdminCard {
+  min-width: 0;
+  margin-top: 0;
+  padding: 16px 18px;
+  border-width: 1px;
+  border-radius: 0;
   background: #fff;
-  color: #1c2a44;
-  cursor: pointer;
-  font: inherit;
-  text-align: left;
 }
 
-.membershipResult:hover,
-.selectedMembershipResult {
-  border-color: #b5472b;
-  background: #fff8ed;
-}
-
-.selectedMembershipResult {
-  box-shadow: inset 4px 0 0 #e7a33c;
-}
-
-.membershipResult > span {
-  display: grid;
-  gap: 3px;
-}
-
-.membershipResult small {
-  color: #6d7488;
-  font-size: 0.78rem;
+.compactAdminCard h2,
+.compactAdminCard h3 {
+  margin: 0;
+  font-family: Lato, sans-serif;
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: 0;
+  text-transform: none;
   overflow-wrap: anywhere;
 }
 
-.resultStatuses {
-  display: flex !important;
+.compactAdminCard .muted {
+  margin: 3px 0 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.compactAdminCard .notice,
+.compactAdminCard .error,
+.compactAdminCard .success {
+  margin-top: 10px;
+  padding: 9px 11px;
+  font-size: 0.82rem;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.compactSectionHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.recordCount {
+  flex: 0 0 auto;
+  color: #57607a;
+  font: 700 0.72rem/1.2 "IBM Plex Mono", monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.membershipToolbar {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.5fr) minmax(180px, 0.8fr) auto;
+  gap: 10px;
+  align-items: end;
+  margin-top: 12px;
+}
+
+.membershipToolbar .field,
+.invitationForm .field {
+  gap: 4px;
+}
+
+.membershipToolbar .field > span,
+.invitationForm .field > span {
+  font-size: 0.68rem;
+}
+
+.membershipToolbar input,
+.membershipToolbar select,
+.invitationForm input {
+  min-height: 36px;
+  padding: 7px 9px;
+  font-size: 0.86rem;
+}
+
+.compactButton {
+  min-height: 36px;
+  padding: 7px 11px;
+  font-size: 0.76rem;
+  white-space: nowrap;
+}
+
+.membershipTableWrap {
+  max-height: 520px;
+  margin-top: 12px;
+  border: 1px solid #c6c8d0;
+  overflow: auto;
+}
+
+.membershipTableWrap:focus-visible,
+.compactTableWrap:focus-visible {
+  outline: 3px solid rgb(181 71 43 / 22%);
+  outline-offset: 2px;
+}
+
+.emptyFilterState {
+  display: flex;
   flex-wrap: wrap;
-  gap: 7px !important;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid #b3b7c2;
+  background: #e8ebf2;
+  color: #1c2a44;
+  font-size: 0.84rem;
+}
+
+.membershipTable {
+  min-width: 1040px;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.membershipTable th,
+.membershipTable td {
+  padding: 7px 9px;
+  line-height: 1.3;
+}
+
+.membershipTable thead th {
+  position: sticky;
+  z-index: 2;
+  top: 0;
+}
+
+.membershipTable td:not(:first-child) {
+  white-space: nowrap;
+}
+
+.membershipTable td:first-child {
+  min-width: 210px;
+}
+
+.membershipTable .status,
+.membershipTable .verifiedBadge {
+  padding: 3px 5px;
+  font-size: 0.62rem;
+}
+
+.cityGroupRow th {
+  padding: 6px 9px;
+  border-top: 1px solid #9ba0af;
+  border-bottom: 1px solid #b3b7c2;
+  background: #e8ebf2;
+  color: #1c2a44;
+  font: 800 0.7rem/1.2 "IBM Plex Mono", monospace;
+  letter-spacing: 0.03em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.cityGroupRow th span {
+  margin-left: 8px;
+  color: #6d7488;
+  font-weight: 600;
+}
+
+.tableSelectButton {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #1c2a44;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+  text-align: left;
+}
+
+.tableSelectButton:hover {
+  color: #9b3822;
+  text-decoration: underline;
+}
+
+.tableSelectButton:focus-visible {
+  border-radius: 2px;
+  outline: 3px solid rgb(181 71 43 / 22%);
+  outline-offset: 2px;
+}
+
+.selectedTableRow td {
+  background: #fff8ed;
+}
+
+.selectedTableRow td:first-child {
+  box-shadow: inset 3px 0 0 #e7a33c;
 }
 
 .verifiedBadge {
@@ -515,8 +705,35 @@
 
 .membershipDetail {
   display: grid;
-  gap: 20px;
+  gap: 12px;
   min-width: 0;
+}
+
+.membershipDetail .stack {
+  gap: 10px;
+}
+
+.membershipDetail .grid {
+  gap: 12px;
+}
+
+.membershipDetail .button,
+.membershipDetail .secondaryButton,
+.membershipDetail .dangerButton {
+  min-height: 36px;
+  padding: 7px 11px;
+  font-size: 0.76rem;
+}
+
+.membershipDetail .field input,
+.membershipDetail .field select {
+  min-height: 38px;
+  padding: 8px 10px;
+}
+
+.membershipDetail .field textarea {
+  min-height: 82px;
+  padding: 8px 10px;
 }
 
 .membershipHeader {
@@ -532,21 +749,25 @@
   margin-bottom: 5px;
 }
 
+.membershipHeader > * {
+  min-width: 0;
+}
+
 .membershipSummary {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 1px;
-  margin-top: 24px;
+  margin-top: 12px;
   border: 1px solid #c6c8d0;
   background: #c6c8d0;
 }
 
 .membershipSummary > div {
   display: grid;
-  gap: 7px;
-  min-height: 92px;
+  gap: 4px;
+  min-height: 64px;
   align-content: space-between;
-  padding: 14px;
+  padding: 9px;
   background: #fff;
 }
 
@@ -559,16 +780,17 @@
 }
 
 .membershipSummary strong {
-  font-size: 0.94rem;
-  line-height: 1.35;
+  font-size: 0.78rem;
+  line-height: 1.3;
   text-transform: capitalize;
+  overflow-wrap: anywhere;
 }
 
 .membershipFacts {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px 24px;
-  margin: 24px 0 0;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px 18px;
+  margin: 12px 0 0;
 }
 
 .membershipFacts > div {
@@ -578,7 +800,41 @@
 .membershipFacts dd {
   margin: 4px 0 0;
   color: #1c2a44;
+  font-size: 0.8rem;
   overflow-wrap: anywhere;
+}
+
+.invitationForm {
+  display: grid;
+  grid-template-columns: minmax(230px, 1fr) minmax(230px, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+  margin-top: 12px;
+}
+
+.invitationForm .check {
+  min-height: 36px;
+  align-items: center;
+  font-size: 0.82rem;
+}
+
+.compactTableWrap {
+  margin-top: 10px;
+}
+
+.compactDataTable th,
+.compactDataTable td {
+  padding: 8px 10px;
+  font-size: 0.78rem;
+  line-height: 1.3;
+}
+
+.compactDataTable .button,
+.compactDataTable .secondaryButton,
+.compactDataTable .dangerButton {
+  min-height: 32px;
+  padding: 6px 9px;
+  font-size: 0.7rem;
 }
 
 .verifiedRefund {
@@ -711,6 +967,25 @@
   color: #57607a;
 }
 
+@media (max-width: 960px) {
+  .membershipSummary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .membershipFacts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .invitationForm {
+    grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr);
+  }
+
+  .invitationForm .compactButton {
+    grid-column: 1 / -1;
+    width: fit-content;
+  }
+}
+
 @media (max-width: 720px) {
   .shell {
     padding-top: 42px;
@@ -733,5 +1008,28 @@
 
   .topbar .secondaryButton {
     width: 100%;
+  }
+
+  .membershipToolbar,
+  .invitationForm {
+    grid-template-columns: 1fr;
+  }
+
+  .membershipToolbar .compactButton,
+  .invitationForm .compactButton {
+    grid-column: auto;
+    width: 100%;
+  }
+
+  .membershipSummary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .membershipFacts {
+    grid-template-columns: 1fr;
+  }
+
+  .compactSectionHeader {
+    gap: 10px;
   }
 }

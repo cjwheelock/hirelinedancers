@@ -95,7 +95,7 @@ const stripe = new Stripe(requiredEnv("STRIPE_SECRET_KEY"));
 const cryptoProvider = Stripe.createSubtleCryptoProvider();
 
 export default {
-  fetch: withSupabase({ auth: "none", cors: false }, async (req, ctx) => {
+  fetch: withSupabase<any>({ auth: "none", cors: false }, async (req, ctx) => {
     if (req.method !== "POST") {
       return new Response("Method not allowed", { status: 405 });
     }

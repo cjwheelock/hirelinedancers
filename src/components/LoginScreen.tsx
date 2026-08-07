@@ -89,7 +89,7 @@ export function LoginScreen() {
     }
   }
 
-  const eyebrow = intent === "instructor" ? "For instructors" : intent === "organizer" ? "For organizers" : "Your account";
+  const eyebrow = intent === "instructor" ? "For instructors" : intent === "organizer" ? "For organizers" : null;
   const title = intent === "instructor"
     ? invited ? "Sign in to accept your instructor invitation" : "Sign in to build your instructor profile"
     : intent === "organizer"
@@ -105,7 +105,7 @@ export function LoginScreen() {
 
   return (
     <section className={`${styles.shell} ${styles.narrow}`}>
-      <p className={styles.eyebrow}>{eyebrow}</p>
+      {eyebrow ? <p className={styles.eyebrow}>{eyebrow}</p> : null}
       <h1 className={styles.title}>{title}</h1>
       <p className={styles.subtitle}>{subtitle}</p>
 

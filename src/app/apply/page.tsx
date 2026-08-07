@@ -6,5 +6,5 @@ export const metadata = {
 };
 
 export default function ApplyPage() {
-  redirect("/login/?next=%2Faccount%2F&role=instructor");
+  redirect("/sign-in/?next=%2Faccount%2F&role=instructor");
 }

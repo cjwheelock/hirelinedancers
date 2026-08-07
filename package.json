@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "eslint .",
+    "audit:static": "node scripts/audit-static-site.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.2",

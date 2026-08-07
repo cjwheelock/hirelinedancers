@@ -1,9 +1,10 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import Link from "next/link";
 import { eventTypes, instructors } from "@/data/site";
 import { useMarketplaceSession } from "@/hooks/useMarketplaceSession";
-import { getMarketplaceClient, loginUrl, readableError, type InstructorProfile } from "@/lib/marketplace";
+import { getMarketplaceClient, signInUrl, readableError, type InstructorProfile } from "@/lib/marketplace";
 import styles from "./Marketplace.module.css";
 
 type ContactProfile = Pick<InstructorProfile, "id" | "slug" | "display_name" | "business_name" | "city" | "region"> & {
@@ -125,7 +126,7 @@ export function ContactInstructor() {
         <h1 className={styles.title}>Sign in to send your inquiry</h1>
         <p className={styles.subtitle}>Profiles are open to everyone. An account is required only when you are ready to contact an instructor.</p>
         <div className={styles.buttonRow} style={{ marginTop: 28 }}>
-          <a className={styles.button} href={loginUrl(next, "organizer")}>Sign in and continue</a>
+          <a className={styles.button} href={signInUrl(next, "organizer")}>Sign in and continue</a>
         </div>
       </section>
     );
@@ -155,7 +156,7 @@ export function ContactInstructor() {
       <section className={`${styles.shell} ${styles.narrow}`}>
         <h1 className={styles.title}>We could not start this inquiry</h1>
         <p className={styles.error}>{error}</p>
-        <a className={styles.button} href="/#find">Find an instructor</a>
+        <Link className={styles.button} href="/#find">Find an instructor</Link>
       </section>
     );
   }
@@ -173,7 +174,7 @@ export function ContactInstructor() {
         <p className={styles.subtitle}>Ask the instructor about availability, final pricing, contracts, insurance, payment terms, and any venue requirements.</p>
         <div className={styles.buttonRow} style={{ marginTop: 26 }}>
           <a className={styles.button} href="/account/">View my inquiries</a>
-          <a className={styles.secondaryButton} href="/#find">Browse more instructors</a>
+          <Link className={styles.secondaryButton} href="/#find">Browse more instructors</Link>
         </div>
       </section>
     );

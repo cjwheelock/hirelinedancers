@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, BadgeCheck, ClipboardCheck, CreditCard, ShieldCheck, Sparkles, Users } from "lucide-react";
-import { loginUrl } from "@/lib/marketplace";
+import { signInUrl } from "@/lib/marketplace";
 
 export const metadata = {
   title: "List Your Services as a Line Dance Instructor",
@@ -15,7 +15,7 @@ export default function JoinPage() {
       <p className="lede">Hire Line Dancers helps event planners, couples, and companies find instructors who can get their guests dancing. Build a profile, appear in relevant local searches, and receive event inquiries by email.</p>
 
       <div className="hero-actions" style={{ marginTop: 28 }}>
-        <Link className="button primary" href={loginUrl("/account/", "instructor")}>Apply to get listed <ArrowRight size={18} /></Link>
+        <Link className="button primary" href={signInUrl("/account/", "instructor")}>Apply to get listed <ArrowRight size={18} /></Link>
       </div>
 
       <div className="faq-block">
@@ -72,7 +72,7 @@ export default function JoinPage() {
             <p className="price">$14.99 USD <span>per month</span></p>
             <p>Add a payment method after approval to activate your profile. Your membership renews monthly until canceled, and billing is managed securely through Stripe.</p>
             <p>For our first 100 approved instructors. Founding members receive a <strong>Founding Instructor badge</strong>, a complete public profile, and early placement while we build each local directory. Your first year is protected by our money-back guarantee.</p>
-            <Link className="button primary" href={loginUrl("/account/", "instructor")}>Claim a founding spot</Link>
+            <Link className="button primary" href={signInUrl("/account/", "instructor")}>Claim a founding spot</Link>
           </article>
         </div>
         <p style={{ marginTop: 16 }}>You set your rates and payment terms directly with each client. Hire Line Dancers does not take a commission or handle payment for your events.</p>

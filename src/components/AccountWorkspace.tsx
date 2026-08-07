@@ -1,6 +1,7 @@
 "use client";
 
 import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { cities, eventTypes } from "@/data/site";
 import { useMarketplaceSession } from "@/hooks/useMarketplaceSession";
 import {
@@ -9,7 +10,7 @@ import {
   cleanReturnPath,
   getMarketplaceClient,
   instructorInvitationTokenHash,
-  loginUrl,
+  signInUrl,
   readableError,
   type AccountIntent,
   type AccountRole,
@@ -61,6 +62,15 @@ export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean })
     const requestedReturn = params.get("returnTo");
     setEntryReturnTo(requestedReturn ? cleanReturnPath(requestedReturn) : null);
   }, []);
+
+  useEffect(() => {
+    if (loading || !configured || session || entryIntent === undefined || entryInvitationToken === undefined) return;
+    const next = adminOnly ? "/admin/" : entryReturnTo ?? "/account/";
+    const signInHref = entryInvitationToken
+      ? `${signInUrl(next, "instructor")}&invite=${encodeURIComponent(entryInvitationToken)}`
+      : signInUrl(next, entryIntent ?? undefined);
+    window.location.replace(signInHref);
+  }, [adminOnly, configured, entryIntent, entryInvitationToken, entryReturnTo, loading, session]);
 
   useEffect(() => {
     if (entryIntent === undefined || !account) return;
@@ -158,8 +168,7 @@ export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean })
       setSigningOut(false);
       return;
     }
-    const query = new URLSearchParams({ role: "instructor", invite: entryInvitationToken });
-    window.location.replace(`/login/?${query.toString()}`);
+    window.location.replace(`${signInUrl("/account/", "instructor")}&invite=${encodeURIComponent(entryInvitationToken)}`);
   }
 
   if (loading || entryIntent === undefined || entryInvitationToken === undefined) return <div className={styles.loading}>Loading your account...</div>;
@@ -175,20 +184,7 @@ export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean })
   }
 
   if (!session) {
-    const next = adminOnly ? "/admin/" : entryReturnTo ?? "/account/";
-    const signInHref = entryInvitationToken
-      ? `/login/?${new URLSearchParams({ role: "instructor", invite: entryInvitationToken }).toString()}`
-      : loginUrl(next, entryIntent ?? undefined);
-    return (
-      <section className={`${styles.shell} ${styles.narrow}`}>
-        <p className={styles.eyebrow}>Your account</p>
-        <h1 className={styles.title}>Sign in to continue</h1>
-        <p className={styles.subtitle}>Manage your instructor profile or keep track of the instructors you contacted.</p>
-        <div className={styles.buttonRow} style={{ marginTop: 28 }}>
-          <a className={styles.button} href={signInHref}>Sign in</a>
-        </div>
-      </section>
-    );
+    return <div className={styles.loading}>Opening sign in...</div>;
   }
 
   if (adminOnly && !isAdmin) {
@@ -257,12 +253,14 @@ export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean })
     );
   }
 
+  const adminWorkspaceActive = isAdmin && workspaceMode === "admin";
+
   return (
-    <section className={styles.shell}>
-      <div className={styles.topbar}>
+    <section className={`${styles.shell} ${adminWorkspaceActive ? styles.adminShell : ""}`}>
+      <div className={`${styles.topbar} ${adminWorkspaceActive ? styles.adminTopbar : ""}`}>
         <div>
-          <p className={styles.eyebrow}>{workspaceMode === "admin" && isAdmin ? "Admin workspace" : workspaceMode === "organizer" || account?.role === "organizer" ? "Planner workspace" : "Instructor workspace"}</p>
-          <h1>Welcome, {account?.full_name?.split(" ")[0] || "there"}</h1>
+          {!adminWorkspaceActive ? <p className={styles.eyebrow}>{workspaceMode === "organizer" || account?.role === "organizer" ? "Planner workspace" : "Instructor workspace"}</p> : null}
+          <h1>{adminWorkspaceActive ? "Admin" : `Welcome, ${account?.full_name?.split(" ")[0] || "there"}`}</h1>
           <p className={styles.muted}>{account?.email}</p>
         </div>
         <button className={styles.secondaryButton} type="button" disabled={signingOut} onClick={() => void signOut()}>
@@ -765,7 +763,7 @@ function InstructorProfileForm({
     onSaved();
   }
 
-  const canEdit = profile.status === "draft" || profile.status === "published";
+  const canEdit = ["draft", "approved", "published"].includes(profile.status);
   const canSubmitForReview = profile.status === "draft";
   const selectedMarket = cities.find((market) => market.city === form.city && market.state === form.region);
   const allEventTypesSelected = eventTypes.every((item) => form.event_types.includes(item.slug));
@@ -789,7 +787,7 @@ function InstructorProfileForm({
         <span className={styles.status}>{profile.status.replace("_", " ")}</span>
         {profile.status === "pending_review" ? <span className={styles.muted}>We will email you after the review.</span> : null}
       </div>
-      {!canEdit ? <p className={styles.notice}>Editing is paused while your profile is in review or awaiting membership activation.</p> : null}
+      {!canEdit ? <p className={styles.notice}>Editing is paused while your profile is in review or suspended.</p> : null}
 
       <div className={`${styles.grid} ${styles.alignedGrid}`}>
         <label className={styles.field}>
@@ -918,7 +916,7 @@ function InstructorProfileForm({
       {canEdit ? (
         <div className={styles.buttonRow}>
           <button className={styles.secondaryButton} type="button" disabled={busy} onClick={() => void save(false)}>
-            {profile.status === "published" ? "Save changes" : "Save draft"}
+            {profile.status === "draft" ? "Save draft" : "Save changes"}
           </button>
           {canSubmitForReview ? (
             <button className={styles.button} type="button" disabled={busy} onClick={() => void save(true)}>Submit for review</button>
@@ -1005,10 +1003,15 @@ function ProfileMediaManager({ profile }: { profile: InstructorProfile }) {
     if (!client) return;
     setBusy(true);
     setError(null);
-    const { error: metadataError } = await client.from("profile_media").delete().eq("id", item.id);
-    if (!metadataError && item.storage_path) {
-      await client.storage.from("instructor-media").remove([item.storage_path]);
+    if (item.storage_path) {
+      const { error: storageError } = await client.storage.from("instructor-media").remove([item.storage_path]);
+      if (storageError) {
+        setError(storageError.message);
+        setBusy(false);
+        return;
+      }
     }
+    const { error: metadataError } = await client.from("profile_media").delete().eq("id", item.id);
     if (metadataError) setError(metadataError.message);
     setBusy(false);
     await load();
@@ -1041,7 +1044,7 @@ function ProfileMediaManager({ profile }: { profile: InstructorProfile }) {
           <span>{busy ? "Uploading..." : "Choose a file"}</span>
           <input
             type="file"
-            disabled={busy || !["draft", "published"].includes(profile.status)}
+            disabled={busy || !["draft", "approved", "published"].includes(profile.status)}
             accept={uploadType === "video" || uploadType === "welcome_video" ? "video/mp4,video/webm" : "image/jpeg,image/png,image/webp"}
             onChange={(event) => void upload(event)}
           />
@@ -1060,7 +1063,7 @@ function ProfileMediaManager({ profile }: { profile: InstructorProfile }) {
               <img className={styles.mediaPreview} src={mediaUrl(item)} alt={item.caption || item.media_type} />
             )}
             <span className={styles.status}>{item.media_type.replace("_", " ")}</span>
-            {["draft", "published"].includes(profile.status) ? (
+            {["draft", "approved", "published"].includes(profile.status) ? (
               <button className={styles.dangerButton} type="button" disabled={busy} onClick={() => void remove(item)}>Remove</button>
             ) : null}
           </article>
@@ -1442,7 +1445,9 @@ async function edgeFunctionError(error: unknown) {
 
 function MembershipGuaranteeAdmin({ isOwner }: { isOwner: boolean }) {
   const [search, setSearch] = useState("");
+  const [cityFilter, setCityFilter] = useState("all");
   const [rows, setRows] = useState<AdminInstructorMembership[]>([]);
+  const loadRequestId = useRef(0);
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
@@ -1467,39 +1472,97 @@ function MembershipGuaranteeAdmin({ isOwner }: { isOwner: boolean }) {
   const [refundId, setRefundId] = useState("");
   const [refundIssuedConfirmed, setRefundIssuedConfirmed] = useState(false);
 
+  const cityOptions = useMemo(() => Array.from(new Set(rows.map((row) => (
+    [row.city, row.region].filter(Boolean).join(", ") || "Location not set"
+  )))).sort((a, b) => {
+    if (a === "Location not set") return 1;
+    if (b === "Location not set") return -1;
+    return a.localeCompare(b);
+  }), [rows]);
+
+  const visibleRows = useMemo(() => {
+    const normalizedSearch = search.trim().toLocaleLowerCase();
+    return rows
+      .filter((row) => {
+        const location = [row.city, row.region].filter(Boolean).join(", ") || "Location not set";
+        const matchesCity = cityFilter === "all" || location === cityFilter;
+        const searchText = [row.display_name, row.business_name, row.account_email, row.inquiry_email]
+          .filter(Boolean)
+          .join(" ")
+          .toLocaleLowerCase();
+        return matchesCity && (!normalizedSearch || searchText.includes(normalizedSearch));
+      })
+      .sort((a, b) => {
+        const aLocation = [a.city, a.region].filter(Boolean).join(", ") || "Location not set";
+        const bLocation = [b.city, b.region].filter(Boolean).join(", ") || "Location not set";
+        if (aLocation === "Location not set" && bLocation !== "Location not set") return 1;
+        if (bLocation === "Location not set" && aLocation !== "Location not set") return -1;
+        return aLocation.localeCompare(bLocation) || a.display_name.localeCompare(b.display_name);
+      });
+  }, [cityFilter, rows, search]);
+
+  const membershipGroups = useMemo(() => visibleRows.reduce<Array<{ city: string; instructors: AdminInstructorMembership[] }>>((groups, row) => {
+    const city = [row.city, row.region].filter(Boolean).join(", ") || "Location not set";
+    const currentGroup = groups.at(-1);
+    if (currentGroup?.city === city) currentGroup.instructors.push(row);
+    else groups.push({ city, instructors: [row] });
+    return groups;
+  }, []), [visibleRows]);
+
   const selected = useMemo(
     () => rows.find((row) => row.instructor_profile_id === selectedProfileId) ?? null,
     [rows, selectedProfileId]
   );
 
-  async function loadMemberships(query = search) {
+  async function loadMemberships() {
     const client = getMarketplaceClient();
     if (!client) return;
+    const requestId = loadRequestId.current + 1;
+    loadRequestId.current = requestId;
     setLoading(true);
     setError(null);
-    const { data, error: searchError } = await client.rpc("admin_search_instructors", {
-      p_search: query.trim() || null,
-      p_limit: 100,
-      p_offset: 0
-    });
-    if (searchError) {
-      setError(searchError.message);
-      setRows([]);
-    } else {
-      const nextRows = (data as AdminInstructorMembership[] | null) ?? [];
-      setRows(nextRows);
-      setSelectedProfileId((current) => (
-        current && nextRows.some((row) => row.instructor_profile_id === current)
-          ? current
-          : nextRows[0]?.instructor_profile_id ?? null
-      ));
+    const pageSize = 200;
+    const nextRows: AdminInstructorMembership[] = [];
+    let offset = 0;
+
+    while (true) {
+      const { data, error: searchError } = await client.rpc("admin_search_instructors", {
+        p_search: null,
+        p_limit: pageSize,
+        p_offset: offset
+      });
+      if (requestId !== loadRequestId.current) return;
+      if (searchError) {
+        setError(searchError.message);
+        setLoading(false);
+        return;
+      }
+      const page = (data as AdminInstructorMembership[] | null) ?? [];
+      nextRows.push(...page);
+      if (page.length < pageSize) break;
+      offset += pageSize;
     }
+
+    setRows(nextRows);
+    setSelectedProfileId((current) => (
+      current && nextRows.some((row) => row.instructor_profile_id === current)
+        ? current
+        : nextRows[0]?.instructor_profile_id ?? null
+    ));
     setLoading(false);
   }
 
   useEffect(() => {
-    void loadMemberships("");
+    void loadMemberships();
   }, []);
+
+  useEffect(() => {
+    setSelectedProfileId((current) => (
+      current && visibleRows.some((row) => row.instructor_profile_id === current)
+        ? current
+        : visibleRows[0]?.instructor_profile_id ?? null
+    ));
+  }, [visibleRows]);
 
   useEffect(() => {
     if (!selected) return;
@@ -1526,12 +1589,6 @@ function MembershipGuaranteeAdmin({ isOwner }: { isOwner: boolean }) {
     setRefundIssuedConfirmed(false);
   }, [selected]);
 
-  async function searchMemberships(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setMessage(null);
-    await loadMemberships(search);
-  }
-
   async function saveGuarantee(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const client = getMarketplaceClient();
@@ -1551,7 +1608,7 @@ function MembershipGuaranteeAdmin({ isOwner }: { isOwner: boolean }) {
       return;
     }
     setMessage("Founding and guarantee status saved.");
-    await loadMemberships(search);
+    await loadMemberships();
   }
 
   async function logClaim(event: FormEvent<HTMLFormElement>) {
@@ -1580,7 +1637,7 @@ function MembershipGuaranteeAdmin({ isOwner }: { isOwner: boolean }) {
       return;
     }
     setMessage("Refund claim logged for review.");
-    await loadMemberships(search);
+    await loadMemberships();
   }
 
   async function reviewClaim(event: FormEvent<HTMLFormElement>) {
@@ -1611,7 +1668,7 @@ function MembershipGuaranteeAdmin({ isOwner }: { isOwner: boolean }) {
       return;
     }
     setMessage("Claim review saved. No money was moved.");
-    await loadMemberships(search);
+    await loadMemberships();
   }
 
   async function verifyRefund(event: FormEvent<HTMLFormElement>) {
@@ -1644,56 +1701,92 @@ function MembershipGuaranteeAdmin({ isOwner }: { isOwner: boolean }) {
     setMessage(`Stripe verified ${money(Number(data?.amountCents ?? 0))}. Claim status: ${statusLabel(String(data?.claimStatus ?? "updated"))}.`);
     setRefundId("");
     setRefundIssuedConfirmed(false);
-    await loadMemberships(search);
+    await loadMemberships();
   }
 
   return (
     <div className={styles.membershipAdminLayout}>
-      <div className={styles.card}>
-        <p className={styles.eyebrow}>Instructor operations</p>
-        <h2>Memberships and guarantees</h2>
-        <p className={styles.muted}>Search by instructor name, business, email, city, or state. Refunds are issued manually in Stripe and verified here afterward.</p>
-        <form className={styles.membershipSearch} onSubmit={searchMemberships}>
+      <section className={`${styles.card} ${styles.compactAdminCard}`}>
+        <div className={styles.compactSectionHeader}>
+          <div>
+            <h2>Memberships and guarantees</h2>
+            <p className={styles.muted}>Select an instructor to review membership, guarantee, claim, and refund details.</p>
+          </div>
+          <span className={styles.recordCount} aria-live="polite">{loading && !rows.length ? "Loading" : `${visibleRows.length} of ${rows.length}`}</span>
+        </div>
+        <div className={styles.membershipToolbar}>
           <label className={styles.field}>
-            <span>Search instructors</span>
-            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Name, email, or city" />
+            <span>Search by name</span>
+            <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Name, business, or email" />
           </label>
-          <button className={styles.button} disabled={loading} type="submit">{loading ? "Searching..." : "Search"}</button>
-        </form>
+          <label className={styles.field}>
+            <span>City</span>
+            <select value={cityFilter} onChange={(event) => setCityFilter(event.target.value)}>
+              <option value="all">All cities</option>
+              {cityOptions.map((city) => <option value={city} key={city}>{city}</option>)}
+            </select>
+          </label>
+          <button className={`${styles.secondaryButton} ${styles.compactButton}`} disabled={loading} type="button" onClick={() => void loadMemberships()}>
+            {loading ? "Refreshing..." : "Refresh"}
+          </button>
+        </div>
         {error ? <p className={styles.error} role="alert">{error}</p> : null}
         {message ? <p className={styles.success}>{message}</p> : null}
-        {!loading && !rows.length ? <p className={styles.notice}>No instructors match this search.</p> : null}
-        <div className={styles.membershipResults}>
-          {rows.map((row) => (
-            <button
-              className={`${styles.membershipResult} ${selectedProfileId === row.instructor_profile_id ? styles.selectedMembershipResult : ""}`}
-              key={row.instructor_profile_id}
-              type="button"
-              onClick={() => setSelectedProfileId(row.instructor_profile_id)}
-            >
-              <span><strong>{row.display_name}</strong>{row.business_name ? <small>{row.business_name}</small> : null}</span>
-              <span><small>{[row.city, row.region].filter(Boolean).join(", ") || "Location not set"}</small><small>{row.account_email}</small></span>
-              <span className={styles.resultStatuses}>
-                <span className={styles.status}>{statusLabel(row.subscription_status)}</span>
-                {row.refunded ? <span className={styles.verifiedBadge}>Refund verified</span> : null}
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
+        {loading && !rows.length ? <p className={styles.notice} role="status">Loading instructors...</p> : null}
+        {!loading && !visibleRows.length ? (
+          <div className={styles.emptyFilterState}>
+            <span role="status">{rows.length ? "No instructors match these filters." : "No instructor memberships yet."}</span>
+            {rows.length ? <button className={`${styles.secondaryButton} ${styles.compactButton}`} type="button" onClick={() => { setSearch(""); setCityFilter("all"); }}>Clear filters</button> : null}
+          </div>
+        ) : null}
+        {visibleRows.length ? <div className={`${styles.tableWrap} ${styles.membershipTableWrap}`} role="region" aria-label="Instructor memberships and guarantees" tabIndex={0}>
+          <table className={`${styles.dataTable} ${styles.membershipTable}`}>
+            <caption className={styles.srOnly}>Instructor memberships and guarantees grouped by city</caption>
+            <thead>
+              <tr><th scope="col">Instructor</th><th scope="col">Profile</th><th scope="col">Membership</th><th scope="col">Founding</th><th scope="col">Guarantee</th><th scope="col">Bookings</th><th scope="col">Claim</th><th scope="col">Refunds</th></tr>
+            </thead>
+            {membershipGroups.map((group) => (
+              <tbody key={group.city}>
+                <tr className={styles.cityGroupRow}><th colSpan={8} scope="rowgroup">{group.city}<span>{group.instructors.length} {group.instructors.length === 1 ? "instructor" : "instructors"}</span></th></tr>
+                {group.instructors.map((row) => (
+                  <tr className={selectedProfileId === row.instructor_profile_id ? styles.selectedTableRow : ""} key={row.instructor_profile_id}>
+                    <td>
+                      <button
+                        className={styles.tableSelectButton}
+                        type="button"
+                        aria-current={selectedProfileId === row.instructor_profile_id ? "true" : undefined}
+                        aria-label={`View membership details for ${row.display_name}`}
+                        onClick={() => setSelectedProfileId(row.instructor_profile_id)}
+                      >{row.display_name}</button>
+                      {row.business_name ? <small>{row.business_name}</small> : null}
+                      <small>{row.account_email || row.inquiry_email || "No email"}</small>
+                    </td>
+                    <td><span className={styles.status}>{statusLabel(row.profile_status)}</span></td>
+                    <td><span className={styles.status}>{statusLabel(row.subscription_status)}</span></td>
+                    <td>{row.founding_member_number ? `#${row.founding_member_number} ` : ""}{statusLabel(row.founding_status)}</td>
+                    <td>{statusLabel(row.guarantee_status)}</td>
+                    <td>{row.qualifying_booking_count}</td>
+                    <td>{row.claim_status ? statusLabel(row.claim_status) : "None"}</td>
+                    <td>{row.refunded ? <span className={styles.verifiedBadge}>Verified</span> : money(row.verified_refund_cents)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            ))}
+          </table>
+        </div> : null}
+      </section>
 
       {selected ? (
         <div className={styles.membershipDetail}>
-          <div className={styles.card}>
+          <div className={`${styles.card} ${styles.compactAdminCard}`}>
             <div className={styles.membershipHeader}>
               <div>
-                <p className={styles.eyebrow}>Selected instructor</p>
                 <h2>{selected.display_name}</h2>
                 <p className={styles.muted}>{[selected.business_name, selected.city, selected.region].filter(Boolean).join(" · ")}</p>
               </div>
               {isOwner && selected.stripe_customer_id ? (
-                <a className={styles.secondaryButton} href={stripeCustomerUrl(selected.stripe_customer_id, selected.stripe_livemode)} target="_blank" rel="noreferrer">Open Stripe customer</a>
-              ) : isOwner ? <span className={styles.notice}>No Stripe customer yet.</span> : null}
+                <a className={`${styles.secondaryButton} ${styles.compactButton}`} href={stripeCustomerUrl(selected.stripe_customer_id, selected.stripe_livemode)} target="_blank" rel="noreferrer">Open Stripe customer</a>
+              ) : isOwner ? <span className={styles.muted}>No Stripe customer</span> : null}
             </div>
             <div className={styles.membershipSummary}>
               <div><span>Profile</span><strong>{statusLabel(selected.profile_status)}</strong></div>
@@ -1722,7 +1815,7 @@ function MembershipGuaranteeAdmin({ isOwner }: { isOwner: boolean }) {
 
           {isOwner ? (
             <>
-              <form className={`${styles.card} ${styles.stack}`} onSubmit={saveGuarantee}>
+              <form className={`${styles.card} ${styles.stack} ${styles.compactAdminCard}`} onSubmit={saveGuarantee}>
                 <div><h3>Founding and guarantee status</h3><p className={styles.muted}>Founding numbers stay attached to the original instructor record.</p></div>
                 <div className={styles.grid}>
                   <label className={styles.field}>
@@ -1750,7 +1843,7 @@ function MembershipGuaranteeAdmin({ isOwner }: { isOwner: boolean }) {
                 <button className={styles.secondaryButton} disabled={busy !== null || selected.refunded || selected.verified_refund_cents > 0} type="submit">{busy === "guarantee" ? "Saving..." : "Save guarantee status"}</button>
               </form>
 
-              <form className={`${styles.card} ${styles.stack}`} onSubmit={logClaim}>
+              <form className={`${styles.card} ${styles.stack} ${styles.compactAdminCard}`} onSubmit={logClaim}>
                 <div><h3>Log a refund claim</h3><p className={styles.muted}>Use this after an instructor contacts you. This creates the review record and does not issue a refund.</p></div>
                 <div className={styles.grid}>
                   <label className={styles.field}>
@@ -1768,7 +1861,7 @@ function MembershipGuaranteeAdmin({ isOwner }: { isOwner: boolean }) {
               </form>
 
               {selected.claim_id ? (
-                <form className={`${styles.card} ${styles.stack}`} onSubmit={reviewClaim}>
+                <form className={`${styles.card} ${styles.stack} ${styles.compactAdminCard}`} onSubmit={reviewClaim}>
                   <div className={styles.membershipHeader}>
                     <div><h3>Review guarantee claim</h3><p className={styles.muted}>Claim received {adminDate(selected.claim_received_at)}. Current status: {statusLabel(selected.claim_status)}.</p></div>
                     <span className={styles.status}>{statusLabel(selected.claim_status)}</span>
@@ -1794,7 +1887,7 @@ function MembershipGuaranteeAdmin({ isOwner }: { isOwner: boolean }) {
               ) : null}
 
               {selected.claim_id && ["approved", "refund_pending", "partially_refunded", "refunded"].includes(selected.claim_status ?? "") ? (
-                <form className={`${styles.card} ${styles.stack} ${styles.refundVerificationCard}`} onSubmit={verifyRefund}>
+                <form className={`${styles.card} ${styles.stack} ${styles.compactAdminCard} ${styles.refundVerificationCard}`} onSubmit={verifyRefund}>
                   <div><p className={styles.eyebrow}>Final verification</p><h3>Record a refund issued in Stripe</h3></div>
                   <p>This action never sends money or cancels a subscription. First issue the refund from the Stripe Dashboard, cancel the subscription there if the instructor wants to stop future charges, then paste the Stripe refund ID here. The server checks the customer, membership invoice, price, amount, and refund status before recording it.</p>
                   {selected.stripe_customer_id ? <a className={styles.secondaryButton} href={stripeCustomerUrl(selected.stripe_customer_id, selected.stripe_livemode)} target="_blank" rel="noreferrer">Open customer in Stripe</a> : null}
@@ -2247,12 +2340,12 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
       {!loading && tab === "memberships" ? <MembershipGuaranteeAdmin isOwner={isOwner} /> : null}
 
       {!loading && tab === "invitations" ? (
-        <>
-          <div className={styles.card}>
-            <p className={styles.eyebrow}>Invite an instructor</p>
-            <h2>Send a private signup invitation</h2>
-            <p className={styles.muted}>The instructor receives a secure link to sign in and create an instructor profile. The invitation can also include lifetime access.</p>
-            <form className={styles.stack} onSubmit={sendInstructorInvitation}>
+        <div className={styles.compactAdminStack}>
+          <section className={`${styles.card} ${styles.compactAdminCard}`}>
+            <div className={styles.compactSectionHeader}>
+              <div><h2>Invite instructor</h2><p className={styles.muted}>Send a secure profile signup link, with optional lifetime access.</p></div>
+            </div>
+            <form className={styles.invitationForm} onSubmit={sendInstructorInvitation}>
               <label className={styles.field}>
                 <span>Instructor email</span>
                 <input type="email" required autoComplete="off" value={invitationEmail} onChange={(event) => {
@@ -2267,22 +2360,20 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
                   invitationRequestKey.current = null;
                   invitationDeliveryToken.current = null;
                 }} />
-                <span>Include complimentary lifetime access. This instructor will never need Stripe payment details for their profile.</span>
+                <span>Complimentary lifetime access</span>
               </label>
-              <div className={styles.buttonRow}>
-                <button className={styles.button} disabled={busyId === "send-instructor-invitation"} type="submit">
-                  {busyId === "send-instructor-invitation" ? "Sending invitation..." : "Send instructor invitation"}
-                </button>
-              </div>
+              <button className={`${styles.button} ${styles.compactButton}`} disabled={busyId === "send-instructor-invitation"} type="submit">
+                {busyId === "send-instructor-invitation" ? "Sending..." : "Send invitation"}
+              </button>
             </form>
-          </div>
+          </section>
 
-          <div className={styles.card}>
+          <section className={`${styles.card} ${styles.compactAdminCard}`}>
             <h2>Lifetime instructor access</h2>
-            <p className={styles.muted}>Lifetime access is stored separately from Stripe billing. An approved profile with lifetime access stays active without a subscription.</p>
-            <div className={styles.tableWrap}>
-              <table className={styles.dataTable}>
-                <thead><tr><th>Instructor</th><th>Profile</th><th>Access</th><th>Action</th></tr></thead>
+            {!lifetimeAccess.length ? <p className={styles.notice}>No instructor profiles yet.</p> : <div className={`${styles.tableWrap} ${styles.compactTableWrap}`} role="region" aria-label="Lifetime instructor access" tabIndex={0}>
+              <table className={`${styles.dataTable} ${styles.compactDataTable}`}>
+                <caption className={styles.srOnly}>Lifetime access status for instructors</caption>
+                <thead><tr><th scope="col">Instructor</th><th scope="col">Profile</th><th scope="col">Access</th><th scope="col">Action</th></tr></thead>
                 <tbody>{lifetimeAccess.map((row) => (
                   <tr key={row.instructor_profile_id}>
                     <td>{row.display_name}{row.account_email ? <small>{row.account_email}</small> : null}</td>
@@ -2295,22 +2386,23 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
                     <td>{row.has_lifetime_access ? (
                       <span className={styles.status}>Granted</span>
                     ) : (
-                      <button className={styles.button} disabled={busyId === `lifetime:${row.instructor_profile_id}`} type="button" onClick={() => void grantLifetimeAccess(row.instructor_profile_id)}>
+                      <button className={`${styles.button} ${styles.compactButton}`} disabled={busyId === `lifetime:${row.instructor_profile_id}`} type="button" onClick={() => void grantLifetimeAccess(row.instructor_profile_id)}>
                         {busyId === `lifetime:${row.instructor_profile_id}` ? "Granting..." : "Grant lifetime access"}
                       </button>
                     )}</td>
                   </tr>
                 ))}</tbody>
               </table>
-            </div>
-          </div>
+            </div>}
+          </section>
 
-          <div className={styles.card}>
+          <section className={`${styles.card} ${styles.compactAdminCard}`}>
             <h2>Recent invitations</h2>
             {!invitations.length ? <p className={styles.notice}>No instructor invitations have been sent yet.</p> : (
-              <div className={styles.tableWrap}>
-                <table className={styles.dataTable}>
-                  <thead><tr><th>Email</th><th>Sent</th><th>Access</th><th>Status</th></tr></thead>
+              <div className={`${styles.tableWrap} ${styles.compactTableWrap}`} role="region" aria-label="Recent instructor invitations" tabIndex={0}>
+                <table className={`${styles.dataTable} ${styles.compactDataTable}`}>
+                  <caption className={styles.srOnly}>Recently sent instructor invitations</caption>
+                  <thead><tr><th scope="col">Email</th><th scope="col">Sent</th><th scope="col">Access</th><th scope="col">Status</th></tr></thead>
                   <tbody>{invitations.map((invitation) => (
                     <tr key={invitation.invitation_id}>
                       <td>{invitation.email}</td>
@@ -2322,8 +2414,8 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
                 </table>
               </div>
             )}
-          </div>
-        </>
+          </section>
+        </div>
       ) : null}
 
       {!loading && tab === "delivery" ? (
@@ -2391,7 +2483,7 @@ function OrganizerDashboard({ accountId }: { accountId: string }) {
       <div className={styles.card}>
         <h2>Your instructor inquiries</h2>
         <p>Instructors reply to your account email so contracts, availability, rates, and payments can stay in your usual inbox.</p>
-        <a className={styles.button} href="/#find">Find an instructor</a>
+        <Link className={styles.button} href="/#find">Find an instructor</Link>
       </div>
       {loading ? <div className={styles.loading}>Loading inquiries...</div> : null}
       {error ? <p className={styles.error}>{error}</p> : null}

@@ -148,10 +148,10 @@ export async function instructorInvitationTokenHash(token: string): Promise<stri
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-export function loginUrl(next = "/account/", intent?: AccountIntent): string {
+export function signInUrl(next = "/account/", intent?: AccountIntent): string {
   const query = new URLSearchParams({ next: cleanReturnPath(next) });
   if (intent) query.set("role", intent);
-  return `/login/?${query.toString()}`;
+  return `/sign-in/?${query.toString()}`;
 }
 
 export function authIdentity(session: Session | null): { user: User | null; email: string | null } {

@@ -71,6 +71,72 @@ grant select, insert, update, delete on all tables in schema public to authentic
 grant all on all tables in schema public to service_role;
 grant usage, select on all sequences in schema public to authenticated, service_role;
 
+-- Internal trigger helpers are not callable through the API. Browser and
+-- service RPCs retain only the grants needed by their respective workflows.
+select pg_temp.test_assert(
+  not has_function_privilege('anon', 'public.create_inquiry_delivery()', 'execute')
+    and not has_function_privilege('authenticated', 'public.create_inquiry_delivery()', 'execute')
+    and not has_function_privilege('service_role', 'public.create_inquiry_delivery()', 'execute'),
+  'inquiry delivery trigger helper must not be directly executable'
+);
+select pg_temp.test_assert(
+  not has_function_privilege('anon', 'public.assign_founding_guarantee_from_membership()', 'execute')
+    and not has_function_privilege('authenticated', 'public.assign_founding_guarantee_from_membership()', 'execute'),
+  'founding guarantee trigger helper must not be exposed to API roles'
+);
+select pg_temp.test_assert(
+  has_function_privilege('authenticated', 'public.complete_account_onboarding(text,text,text,text,boolean)', 'execute')
+    and not has_function_privilege('anon', 'public.complete_account_onboarding(text,text,text,text,boolean)', 'execute'),
+  'account onboarding must remain authenticated only'
+);
+select pg_temp.test_assert(
+  has_function_privilege(
+    'service_role',
+    'public.apply_stripe_subscription_event(text,text,timestamp with time zone,text,boolean,uuid,text,text,text,text,timestamp with time zone,timestamp with time zone,boolean,text,text,timestamp with time zone,timestamp with time zone)',
+    'execute'
+  )
+    and not has_function_privilege(
+      'authenticated',
+      'public.apply_stripe_subscription_event(text,text,timestamp with time zone,text,boolean,uuid,text,text,text,text,timestamp with time zone,timestamp with time zone,boolean,text,text,timestamp with time zone,timestamp with time zone)',
+      'execute'
+    ),
+  'Stripe membership mutation must remain service only'
+);
+select pg_temp.test_assert(
+  has_function_privilege('anon', 'private.published_instructor_directory_profiles()', 'execute')
+    and not has_function_privilege('public', 'private.published_instructor_directory_profiles()', 'execute'),
+  'the narrow directory source must be explicitly granted, not public by default'
+);
+select pg_temp.test_assert(
+  current_setting('server_version_num')::integer < 150000
+    or exists (
+      select 1
+      from pg_class relation
+      join pg_namespace namespace on namespace.oid = relation.relnamespace
+      where namespace.nspname = 'public'
+        and relation.relname = 'instructor_directory_profiles'
+        and 'security_invoker=true' = any(coalesce(relation.reloptions, '{}'::text[]))
+    ),
+  'the public instructor directory view must use invoker security on supported PostgreSQL versions'
+);
+select pg_temp.test_assert(
+  not exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'instructor_directory_profiles'
+      and column_name in (
+        'account_id',
+        'postal_code',
+        'inquiry_email',
+        'minimum_rate_cents',
+        'stripe_customer_id',
+        'stripe_subscription_id'
+      )
+  ),
+  'the public directory view must exclude identity, location, rate, and billing fields'
+);
+
 -- Auth fixtures. In Supabase, inserting auth.users also creates public.accounts.
 insert into auth.users (id, email, raw_user_meta_data) values
   ('00000000-0000-0000-0000-000000000001', 'owner@example.test', '{"full_name":"Marketplace Owner"}'),
@@ -237,6 +303,79 @@ select pg_temp.test_assert(
   'approved profiles must wait for an active membership before publication'
 );
 
+-- Initial approval is the only content review. The instructor can keep editing
+-- profile fields and media while waiting for membership activation, and those
+-- edits preserve the administrator-owned approval state.
+set local role authenticated;
+select pg_temp.set_request(
+  '00000000-0000-0000-0000-000000000010',
+  'alice@example.test',
+  'authenticated'
+);
+update public.instructor_profiles
+set bio = 'Approved profile copy updated by the instructor.'
+where account_id = '00000000-0000-0000-0000-000000000010';
+select pg_temp.test_assert(
+  (select status = 'approved'
+      and approved_at is not null
+      and bio = 'Approved profile copy updated by the instructor.'
+   from public.instructor_profiles
+   where account_id = '00000000-0000-0000-0000-000000000010'),
+  'approved instructors must edit profile copy without another review'
+);
+select pg_temp.expect_error(
+  $statement$
+    update public.instructor_profiles
+    set slug = 'self-assigned-profile-slug'
+    where account_id = '00000000-0000-0000-0000-000000000010'
+  $statement$,
+  'Profile identity fields require an administrator',
+  'approved instructor profile identity mutation'
+);
+insert into public.profile_media (
+  id,
+  instructor_profile_id,
+  media_type,
+  external_url,
+  caption,
+  status
+)
+select
+  '00000000-0000-0000-0000-000000000101',
+  profile.id,
+  'headshot',
+  'https://example.test/alice-headshot.jpg',
+  'Original approved headshot',
+  'ready'
+from public.instructor_profiles profile
+where profile.account_id = '00000000-0000-0000-0000-000000000010';
+update public.profile_media
+set caption = 'Updated approved headshot'
+where id = '00000000-0000-0000-0000-000000000101';
+select pg_temp.test_assert(
+  (select caption = 'Updated approved headshot'
+   from public.profile_media
+   where id = '00000000-0000-0000-0000-000000000101'),
+  'approved instructors must add and update profile media'
+);
+delete from public.profile_media
+where id = '00000000-0000-0000-0000-000000000101';
+select pg_temp.test_assert(
+  not exists (
+    select 1 from public.profile_media
+    where id = '00000000-0000-0000-0000-000000000101'
+  ),
+  'approved instructors must remove profile media'
+);
+reset role;
+select pg_temp.set_request(null, null, 'postgres');
+set local role authenticated;
+select pg_temp.set_request(
+  '00000000-0000-0000-0000-000000000001',
+  'owner@example.test',
+  'authenticated'
+);
+
 -- Create an unassigned guarantee before Casey subscribes. The subscription
 -- trigger must still allocate a founding position to the existing row.
 select public.admin_update_instructor_guarantee(
@@ -299,6 +438,40 @@ select pg_temp.test_assert(
    ) and status = 'published'),
   'active memberships must publish all approved profiles'
 );
+set local role authenticated;
+select pg_temp.set_request(
+  '00000000-0000-0000-0000-000000000010',
+  'alice@example.test',
+  'authenticated'
+);
+update public.instructor_profiles
+set headline = 'Published profile updated directly by the instructor.'
+where account_id = '00000000-0000-0000-0000-000000000010';
+select pg_temp.test_assert(
+  (select status = 'published'
+      and headline = 'Published profile updated directly by the instructor.'
+   from public.instructor_profiles
+   where account_id = '00000000-0000-0000-0000-000000000010'),
+  'published instructor edits must stay live without another review'
+);
+reset role;
+select pg_temp.set_request(null, null, 'postgres');
+set local role anon;
+select pg_temp.set_request(null, null, 'anon');
+select pg_temp.test_assert(
+  (select count(*) = 3 from public.instructor_directory_profiles),
+  'anonymous visitors must read published profiles through the narrow directory view'
+);
+select pg_temp.test_assert(
+  (select count(*) >= 1 from public.directory_instructor_targets where active),
+  'anonymous visitors must read active static instructor targets without the admin helper'
+);
+select pg_temp.test_assert(
+  (select count(*) = 0 from public.instructor_profiles),
+  'anonymous base instructor profile access must return no rows'
+);
+reset role;
+select pg_temp.set_request(null, null, 'postgres');
 select pg_temp.test_assert(
   (select founding_member_number = 1
       and founding_status = 'active'

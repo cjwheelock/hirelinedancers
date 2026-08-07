@@ -24,6 +24,8 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      - name: Lint
+        run: npm run lint
       - name: Build static export
         run: npm run build
         env:
@@ -31,6 +33,8 @@ jobs:
           # remains the authorization boundary for all marketplace data.
           NEXT_PUBLIC_SUPABASE_URL: https://wzmyroeowbsxxibkeejf.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_36gNqu74ysQhY2_VvJlS4A_XTYUFyxe
+      - name: Audit generated site
+        run: npm run audit:static
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

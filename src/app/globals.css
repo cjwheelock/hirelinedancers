@@ -1433,6 +1433,10 @@ button:disabled { opacity: 0.7; cursor: progress; }
   .resource-template .copy-template { margin: 12px; padding: 18px; }
 }
 
+@media (max-width: 340px) {
+  .site-header .brand-name { display: none; }
+}
+
 @media (max-width: 540px) and (orientation: portrait) {
   .hero-image { object-position: 70% center; }
 }

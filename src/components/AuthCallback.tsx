@@ -56,7 +56,7 @@ export function AuthCallback() {
         {error ? (
           <>
             <p className={styles.error} role="alert">{error}</p>
-            <a className={styles.button} href="/login/">Try again</a>
+            <a className={styles.button} href="/sign-in/">Try again</a>
           </>
         ) : (
           <p className={styles.notice} role="status">Please wait while we open your account.</p>

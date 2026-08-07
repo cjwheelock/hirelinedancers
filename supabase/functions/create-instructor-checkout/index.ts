@@ -33,7 +33,7 @@ function stripeErrorCode(error: unknown): string | null {
 const stripe = new Stripe(requiredEnv("STRIPE_SECRET_KEY"));
 
 export default {
-  fetch: withSupabase({
+  fetch: withSupabase<any>({
     auth: "user",
     cors: {
       "Access-Control-Allow-Origin": "*",

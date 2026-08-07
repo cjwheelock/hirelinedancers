@@ -409,7 +409,7 @@ async function processJob(admin: AdminClient, job: NotificationJob): Promise<str
 }
 
 export default {
-  fetch: withSupabase({ auth: "secret:automations", cors: false }, async (req, ctx) => {
+  fetch: withSupabase<any>({ auth: "secret:automations", cors: false }, async (req, ctx) => {
     if (req.method !== "POST") {
       return Response.json({ error: "Method not allowed" }, { status: 405 });
     }

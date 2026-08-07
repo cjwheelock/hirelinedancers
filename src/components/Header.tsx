@@ -25,11 +25,11 @@ export function Header() {
             <>
               <span className="nav-divider" aria-hidden="true" />
               <Link className="navlink nav-ghost nav-role" href="/instructors/join/">For instructors</Link>
-              <Link className="navlink nav-ghost nav-role" href="/login/?next=%2Faccount%2F&role=organizer">For organizers</Link>
+              <Link className="navlink nav-ghost nav-role" href="/sign-in/?next=%2Faccount%2F&role=organizer">For organizers</Link>
             </>
           ) : null}
           {!loading ? (
-            <Link className="navlink is-account" href={session ? "/account/?tab=profile" : "/account/"}>
+            <Link className="navlink is-account" href={session ? "/account/?tab=profile" : "/sign-in/"}>
               {session ? "Profile" : "Sign in"}
             </Link>
           ) : null}

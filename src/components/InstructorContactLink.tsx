@@ -1,7 +1,7 @@
 "use client";
 
 import { MouseEvent, ReactNode, useState } from "react";
-import { getMarketplaceClient, loginUrl } from "@/lib/marketplace";
+import { getMarketplaceClient, signInUrl } from "@/lib/marketplace";
 
 export function InstructorContactLink({
   instructorIdentifier,
@@ -26,7 +26,7 @@ export function InstructorContactLink({
     const { data, error } = await client.auth.getSession();
     const destination = !error && data.session
       ? contactHref
-      : loginUrl(contactHref, "organizer");
+      : signInUrl(contactHref, "organizer");
     window.location.assign(destination);
   }
 

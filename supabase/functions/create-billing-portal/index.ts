@@ -17,7 +17,7 @@ function json(body: unknown, status = 200): Response {
 const stripe = new Stripe(requiredEnv("STRIPE_SECRET_KEY"));
 
 export default {
-  fetch: withSupabase({ auth: "user" }, async (req, ctx) => {
+  fetch: withSupabase<any>({ auth: "user" }, async (req, ctx) => {
     if (req.method !== "POST") {
       return json({ error: "Method not allowed" }, 405);
     }

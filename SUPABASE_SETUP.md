@@ -43,10 +43,20 @@ The relevant migrations are:
 - `202608040001_admin_analytics_and_inquiry_followups.sql`
 - `202608040002_email_only_and_guarantee_refunds.sql`
 - `202608050002_instructor_lifetime_access_and_invitations.sql`
+- `202608060001_admin_multi_workspace_access.sql`
+- `202608060002_allow_approved_instructor_self_service_edits.sql`
+- `202608060003_harden_database_security.sql`
+- `202608060004_harden_rls_event_trigger.sql`
 
-Do not recreate the old `instructor_applications` or minimal `inquiries` tables by hand. Migration `202608020010` establishes the marketplace schema and upgrades an older inquiry table if one exists. Migration `202608020011` adds approve-then-pay membership state, webhook idempotency, and notification worker functions. Migration `202608040002` pauses SMS delivery, adds founding and guarantee records, adds claim and refund audit records, and provides owner-only claim operations plus service-only Stripe refund recording. Migration `202608050002` adds instructor invitations and permanent lifetime access that is stored separately from Stripe billing state.
+Do not recreate the old `instructor_applications` or minimal `inquiries` tables by hand. Migration `202608020010` establishes the marketplace schema and upgrades an older inquiry table if one exists. Migration `202608020011` adds approve-then-pay membership state, webhook idempotency, and notification worker functions. Migration `202608040002` pauses SMS delivery, adds founding and guarantee records, adds claim and refund audit records, and provides owner-only claim operations plus service-only Stripe refund recording. Migration `202608050002` adds instructor invitations and permanent lifetime access that is stored separately from Stripe billing state. Migration `202608060002` lets an approved or published instructor edit profile content and media without another review while keeping review state changes restricted to administrators. Migration `202608060003` hardens the public directory boundary, fixes function search paths, closes internal trigger helpers, and grants each browser or worker RPC only to the roles that need it. Migration `202608060004` removes API execution from Supabase's automatic RLS event-trigger helper when that platform helper is present.
 
-The production project has applied migration `202608050002_instructor_lifetime_access_and_invitations.sql` and all earlier migrations in this list.
+Confirm the production migration history before each release. Do not deploy a frontend that depends on a migration until that migration is present in the linked project.
+
+### Public directory security
+
+The public directory is a security-invoker view over a fixed-search-path function in the non-exposed `private` schema. That function returns only approved public profile fields and never exposes account IDs, postal codes, inquiry email addresses, rates, Stripe identifiers, or other private account data.
+
+Internal trigger helpers cannot be called directly by browser or service API roles. Authenticated browser RPCs and service-only worker or billing RPCs have explicit grants. New database functions start without public execution and require an intentional grant in the migration that adds them.
 
 ## 2. Configure browser environment variables
 
@@ -148,8 +158,8 @@ draft -> pending_review -> approved -> published
 
 - `draft`: the instructor can edit the profile and media.
 - `pending_review`: the profile is waiting for administrator review.
-- `approved`: the profile passed review and can start Stripe Checkout.
-- `published`: Stripe reports an active or trialing membership, so the directory can show the profile.
+- `approved`: the profile passed its one content review and can start Stripe Checkout. The instructor can continue editing profile fields and media without another review.
+- `published`: Stripe reports an active or trialing membership, so the directory can show the profile. Later instructor edits remain published immediately.
 - `suspended`: an administrator has disabled the profile. Stripe events do not republish it automatically.
 
 When a membership becomes inactive, unpaid, paused, or canceled, a published profile returns to `approved`. The profile row and uploaded media are not deleted. A `past_due` event leaves visibility unchanged until a billing grace policy is chosen. Reapproving a profile publishes it immediately when its canonical membership remains active or trialing. Profiles with lifetime access publish after approval without a Stripe membership. Later Stripe events are recorded and ignored for those profiles, so cancellation or refund events cannot remove lifetime access or unpublish the profile.

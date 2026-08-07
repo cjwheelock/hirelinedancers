@@ -35,7 +35,7 @@ export function Footer() {
           <ul>
             <li><Link href="/about/">About</Link></li>
             <li><Link href="/instructors/">Browse instructors</Link></li>
-            {marketplaceConfigured ? <li><Link href="/account/">Account / Sign in</Link></li> : null}
+            {marketplaceConfigured ? <li><Link href="/sign-in/">Sign in</Link></li> : null}
             <li><Link href="/instructors/join/">For instructors</Link></li>
             <li><Link href="/guides/">Guides</Link></li>
             <li><Link href="/guides/start-a-line-dance-club-on-campus/">Start a campus club</Link></li>
@@ -48,7 +48,7 @@ export function Footer() {
         </div>
       </div>
       <div className="footer-bottom">
-        <span>© {new Date().getFullYear()} {site.legalName}. Operating as {site.name}. Instructors are independent providers.</span>
+        <span>© {new Date().getFullYear()} {site.legalName} Operating as {site.name}. Instructors are independent providers.</span>
         <span><a href={`mailto:${site.email}`}>{site.email}</a> · {site.url.replace("https://", "")}</span>
       </div>
     </footer>

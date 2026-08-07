@@ -61,7 +61,7 @@ function providerError(body: unknown, status: number): string {
 }
 
 export default {
-  fetch: withSupabase({
+  fetch: withSupabase<any>({
     auth: "user",
     cors: {
       "Access-Control-Allow-Origin": "*",
@@ -236,7 +236,7 @@ export default {
           p_expires_at: expiresAt,
         })
         .single();
-      invitation = insertResult.data;
+      invitation = insertResult.data as typeof invitation;
       invitationLookupError = insertResult.error;
     }
 
@@ -302,7 +302,7 @@ export default {
       }, 202);
     }
 
-    const invitationUrl = new URL("/login/", baseUrl);
+    const invitationUrl = new URL("/sign-in/", baseUrl);
     invitationUrl.searchParams.set("role", "instructor");
     invitationUrl.searchParams.set("invite", token);
 

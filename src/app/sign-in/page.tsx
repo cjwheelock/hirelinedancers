@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { LegacyLoginRedirect } from "@/components/LegacyLoginRedirect";
+import { LoginScreen } from "@/components/LoginScreen";
 
 export const metadata: Metadata = {
   title: "Sign in",
@@ -7,6 +7,6 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false }
 };
 
-export default function LoginPage() {
-  return <LegacyLoginRedirect />;
+export default function SignInPage() {
+  return <LoginScreen />;
 }
