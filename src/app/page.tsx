@@ -70,7 +70,7 @@ export default function Home() {
         </div>
         <div className="hero-content">
           <h1>Live entertainment that gets the whole room moving.</h1>
-          <p className="lede">Hire a line dance instructor for your wedding, party, or company event. Give guests a beginner-friendly way to learn, move, and have fun together.</p>
+          <p className="lede">Hire Line Dancers is an online directory that helps event planners find and contact line dance instructors for weddings, parties, and company events. Instructors can create profiles, manage their listings, and receive event inquiries.</p>
           <div className="hero-actions">
             <Link className="button primary" href="#find">Find an instructor near you <ArrowRight size={18} /></Link>
             <Link className="button ghost-light" href="#how-it-works">See how it works</Link>
