@@ -81,7 +81,7 @@ export function LoginScreen() {
         }
       });
       if (authError) throw authError;
-      setMessage("Check your email for a secure sign-in link. Open it on this same device and in the same browser you used to request it.");
+      setMessage("Check your email for a secure sign-in link. You can open it on any device and in any browser.");
     } catch (authError) {
       setError(readableError(authError));
     } finally {

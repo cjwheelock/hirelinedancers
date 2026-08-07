@@ -18,3 +18,7 @@ verify_jwt = true
 
 [functions.send-instructor-invitation]
 verify_jwt = true
+
+[auth.email.template.magic_link]
+subject = "Sign in to Hire Line Dancers"
+content_path = "./supabase/templates/magic_link.html"

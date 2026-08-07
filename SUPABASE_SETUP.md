@@ -111,9 +111,13 @@ Do not put the Google Client Secret in this repository or in the browser environ
 
 ### Email magic links
 
-Keep Supabase email authentication enabled. The application calls `signInWithOtp` with account creation enabled, which sends a magic link by default.
+Keep Supabase email authentication enabled. The application calls `signInWithOtp` with account creation enabled, which sends a magic link by default. The tracked magic-link template at `supabase/templates/magic_link.html` sends users directly to the application callback with a one-time token hash. The callback verifies that token with `verifyOtp`, so the link can be opened on a different device or browser from the one that requested it. Do not replace the custom link with `{{ .ConfirmationURL }}` while the browser client uses PKCE, because that restores the same-browser code-verifier requirement.
 
-Configure production SMTP before inviting public users. Supabase's default SMTP service is intended only for testing and restricts recipients. Add the production callback URL to the redirect allow list and test a link in a private browser window.
+Configure production SMTP before inviting public users. Supabase's default SMTP service is intended only for testing and restricts recipients. Add the production callback URL to the redirect allow list, publish the tracked magic-link template to the hosted Auth configuration, and test a link in a private browser window. Deploy the callback code before publishing this template so live links always reach a compatible callback.
+
+### Session persistence
+
+The browser client uses persistent local storage, automatic access-token refresh, and multiple concurrent sessions. In the hosted Auth session settings, keep the time-box and inactivity timeout disabled, and keep single-session-per-user disabled. With those settings, a session continues until the user explicitly signs out of that browser, performs a security-sensitive account action, or browser storage is manually cleared. The application always uses local-scope sign-out, so signing out or switching accounts in one browser does not revoke sessions on other devices. Requesting or opening a magic link in another browser must not revoke an existing session.
 
 ## 4. Understand accounts and access
 

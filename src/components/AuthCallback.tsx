@@ -28,17 +28,46 @@ export function AuthCallback() {
       }
 
       try {
+        let completedSession = null;
+        const tokenHash = url.searchParams.get("token_hash");
+        const verificationType = url.searchParams.get("type");
         const code = url.searchParams.get("code");
-        if (code) {
+
+        if (tokenHash || code) {
+          url.searchParams.delete("token_hash");
+          url.searchParams.delete("type");
           url.searchParams.delete("code");
           window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
-          const { error: exchangeError } = await client.auth.exchangeCodeForSession(code);
-          if (exchangeError) throw exchangeError;
         }
 
-        const { data, error: sessionError } = await client.auth.getSession();
-        if (sessionError) throw sessionError;
-        if (!data.session) throw new Error("The sign-in link is invalid or has expired. Please request a new one.");
+        if (tokenHash && code) {
+          throw new Error("The sign-in link is invalid. Please request a new one.");
+        }
+
+        if (tokenHash) {
+          if (verificationType !== "email") {
+            throw new Error("The sign-in link is invalid. Please request a new one.");
+          }
+
+          const { data, error: verificationError } = await client.auth.verifyOtp({
+            token_hash: tokenHash,
+            type: "email"
+          });
+          if (verificationError) throw verificationError;
+          completedSession = data.session;
+        } else if (code) {
+          const { data, error: exchangeError } = await client.auth.exchangeCodeForSession(code);
+          if (exchangeError) throw exchangeError;
+          completedSession = data.session;
+        }
+
+        if (!completedSession) {
+          const { data, error: sessionError } = await client.auth.getSession();
+          if (sessionError) throw sessionError;
+          completedSession = data.session;
+        }
+
+        if (!completedSession) throw new Error("The sign-in link is invalid or has expired. Please request a new one.");
         window.location.replace(next);
       } catch (authError) {
         setError(readableError(authError));

@@ -46,6 +46,7 @@ type InstructorTab = "profile" | "inquiries" | "membership";
 export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean }) {
   const { session, account, isAdmin, isOwner, loading, error, configured, refresh } = useMarketplaceSession();
   const [signingOut, setSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
   const [workspaceMode, setWorkspaceMode] = useState<"admin" | "account" | "organizer">("admin");
   const [entryIntent, setEntryIntent] = useState<AccountIntent | null | undefined>(undefined);
   const [entryReturnTo, setEntryReturnTo] = useState<string | null>(null);
@@ -154,7 +155,13 @@ export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean })
     const client = getMarketplaceClient();
     if (!client) return;
     setSigningOut(true);
-    await client.auth.signOut();
+    setSignOutError(null);
+    const { error: localSignOutError } = await client.auth.signOut({ scope: "local" });
+    if (localSignOutError) {
+      setSignOutError(localSignOutError.message);
+      setSigningOut(false);
+      return;
+    }
     window.location.replace("/");
   }
 
@@ -162,7 +169,7 @@ export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean })
     const client = getMarketplaceClient();
     if (!client || !entryInvitationToken) return;
     setSigningOut(true);
-    const { error: signOutError } = await client.auth.signOut();
+    const { error: signOutError } = await client.auth.signOut({ scope: "local" });
     if (signOutError) {
       setInvitationError(signOutError.message);
       setSigningOut(false);
@@ -267,6 +274,8 @@ export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean })
           {signingOut ? "Signing out..." : "Sign out"}
         </button>
       </div>
+
+      {signOutError ? <p className={styles.error} role="alert">{signOutError}</p> : null}
 
       {!adminOnly && isAdmin ? (
         <div className={styles.tabs} role="tablist" aria-label="Workspace selection">
