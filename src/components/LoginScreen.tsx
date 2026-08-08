@@ -164,7 +164,6 @@ export function LoginScreen() {
     || expiredClaimWithAccount;
   const initialDeadline = invitationDeadline(invitation?.initialClaimDeadlineAt ?? null);
   const submissionDeadline = invitationDeadline(invitation?.profileSubmissionDeadlineAt ?? null);
-  const eyebrow = intent === "instructor" ? "For instructors" : intent === "organizer" ? "For organizers" : null;
   const title = intent === "instructor"
     ? invited ? "Your private instructor invitation" : "Sign in to build your instructor profile"
     : intent === "organizer"
@@ -180,7 +179,6 @@ export function LoginScreen() {
 
   return (
     <section className={`${styles.shell} ${styles.narrow}`}>
-      {eyebrow ? <p className={styles.eyebrow}>{eyebrow}</p> : null}
       <h1 className={styles.title}>{title}</h1>
       <p className={styles.subtitle}>{subtitle}</p>
 

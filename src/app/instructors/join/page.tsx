@@ -10,9 +10,12 @@ export const metadata = {
 export default function JoinPage() {
   return (
     <section className="page-shell">
-      <p className="eyebrow">For instructors</p>
       <h1>Get booked by people planning events in your city.</h1>
       <p className="lede">Hire Line Dancers helps event planners, couples, and companies find instructors who can get their guests dancing. Build a profile, appear in relevant local searches, and receive event inquiries by email.</p>
+
+      <p className="founding-offer">
+        <strong>Founding instructor offer:</strong> The first 100 instructors to join get their first two months free (a $30 value), in addition to our ongoing <Link href="/legal/refund-policy/">90-day money-back guarantee</Link>.
+      </p>
 
       <div className="hero-actions" style={{ marginTop: 28 }}>
         <Link className="button primary" href={signInUrl("/account/", "instructor")}>Apply to get listed <ArrowRight size={18} /></Link>
@@ -46,7 +49,7 @@ export default function JoinPage() {
           <article className="step">
             <div className="step-num"><ClipboardCheck size={20} /></div>
             <h3>1. Apply</h3>
-            <p>Submit your background and upload a headshot plus a few photos of you teaching or dancing. If you received a private offer, deliberately claim it within 14 days, then create your account and submit your profile within the next 7 days.</p>
+            <p>Submit your background and upload a headshot plus a few photos of you teaching or dancing.</p>
           </article>
           <article className="step">
             <div className="step-num"><ShieldCheck size={20} /></div>
@@ -56,7 +59,7 @@ export default function JoinPage() {
           <article className="step">
             <div className="step-num"><CreditCard size={20} /></div>
             <h3>3. Activate &amp; go live</h3>
-            <p>Once approved, add a payment method and activate your $14.99 USD monthly membership through Stripe. For eligible private-offer memberships, the first two monthly billing cycles are free. We publish your approved profile after Stripe confirms your membership and send planner inquiries to you.</p>
+            <p>Once approved, add a payment method and activate your membership through Stripe. If you are among the first 100 instructors to join, your first two months are free. We publish your approved profile after Stripe confirms your membership and send planner inquiries to you.</p>
           </article>
         </div>
       </div>
@@ -68,10 +71,10 @@ export default function JoinPage() {
         <div className="pricing-grid">
           <article className="price-card featured">
             <BadgeCheck size={28} />
-            <h2>Instructor Membership</h2>
-            <p className="price">$14.99 USD <span>per month</span></p>
-            <p>Add a payment method after approval to activate your profile. Your membership renews monthly until canceled, and billing is managed securely through Stripe.</p>
-            <p>Eligible instructors who claim a private offer within 14 days and create an account and submit a complete profile within the following 7 days receive <strong>their first two monthly billing cycles free</strong>. Our review may finish later without affecting an offer that was claimed and submitted on time.</p>
+            <h2>Two months free</h2>
+            <p className="price">$14.99 USD <span>per month after offer</span></p>
+            <p>The first 100 instructors to join receive their first two months free (a $30 value). Add a payment method after approval to activate your profile. Billing starts after the two free months, then your membership renews monthly until canceled. Stripe manages billing securely.</p>
+            <p>The founding instructor offer is in addition to our ongoing 90-day money-back guarantee. Your 90-day guarantee begins when Stripe collects your first paid invoice after the free period.</p>
             <Link className="button primary" href={signInUrl("/account/", "instructor")}>Apply for a profile</Link>
           </article>
         </div>
@@ -89,8 +92,8 @@ export default function JoinPage() {
       </div>
 
       <div className="policy-box">
-        <h2>Our guarantee and an honest ask</h2>
-        <p>Every new paid membership includes a 90-day booking guarantee. The guarantee begins when Stripe records the first invoice that collects a positive membership payment. For an eligible private-offer membership, that invoice comes after the first two monthly billing cycles. If Hire Line Dancers does not help you get booked for a qualifying paid event during those 90 days, you may request a review for a refund of eligible membership fees paid during the guarantee period.</p>
+        <h2>Our 90-day money-back guarantee</h2>
+        <p>Every new paid membership includes our ongoing 90-day money-back guarantee. The guarantee begins when Stripe collects your first paid membership invoice. For instructors who receive the founding offer, that happens after the two free months. If Hire Line Dancers does not help you get booked for a qualifying paid event during those 90 days, you may request a review for a refund of eligible membership fees paid during the guarantee period.</p>
         <p>The honest ask is time. We are building local awareness, improving search visibility, and introducing event professionals to line dancing as a participatory option. We would rather earn your trust through useful work than promise a specific number of inquiries or bookings.</p>
         <p>You may request a guarantee review only after the 90-day period ends and within the next 30 days. Requests are reviewed manually. Approval and refunds are not automatic. Terms require a complete approved profile, current contact and service-area details, and reasonable inquiry response. See the <Link href="/legal/refund-policy/">full refund policy</Link>.</p>
       </div>

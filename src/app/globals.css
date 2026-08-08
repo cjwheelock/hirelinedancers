@@ -571,6 +571,17 @@ main { display: block; }
   line-height: 1;
 }
 .page-shell > h1 + .lede { margin-top: 18px; }
+.founding-offer {
+  max-width: 760px;
+  margin-top: 26px;
+  padding: 18px 20px;
+  color: var(--ink-2);
+  background: var(--panel);
+  border: 2px solid var(--ink);
+  border-left: 8px solid var(--gold);
+}
+.founding-offer strong { color: var(--ink); }
+.founding-offer a { color: var(--sunset-deep); font-weight: 900; text-decoration: underline; text-underline-offset: 3px; }
 .split-page, .profile-grid, .pricing-grid {
   display: grid;
   gap: clamp(24px, 4vw, 48px);
@@ -677,15 +688,24 @@ main { display: block; }
 }
 .price-card.featured { border: 2px solid var(--sunset); box-shadow: var(--shadow); position: relative; }
 .price-card.featured::before {
-  content: "Founding member";
+  content: "Founding instructor offer";
   position: absolute; top: -13px; left: 28px;
   background: var(--sunset); color: #fff;
   font-size: 12px; font-weight: 700; letter-spacing: .04em;
   padding: 5px 12px; border-radius: 0;
 }
 .price-card svg { color: var(--sunset); }
-.price { font-family: var(--font-display); font-size: 44px; font-weight: 600; }
-.price span { font-family: var(--font-sans); font-size: 16px; font-weight: 500; color: var(--muted); }
+.price {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+  font-family: var(--font-display);
+  font-size: 44px;
+  font-weight: 600;
+  line-height: 1;
+}
+.price span { font-family: var(--font-sans); font-size: 16px; font-weight: 500; line-height: 1.35; color: var(--muted); }
 .price-card .button { margin-top: 12px; }
 .policy-box {
   background: var(--panel);
