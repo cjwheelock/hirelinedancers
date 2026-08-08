@@ -70,6 +70,8 @@ grant select on all tables in schema public to anon;
 grant select, insert, update, delete on all tables in schema public to authenticated;
 grant all on all tables in schema public to service_role;
 grant usage, select on all sequences in schema public to authenticated, service_role;
+revoke all on public.instructor_payment_setups from anon, authenticated;
+revoke delete on public.instructor_private_settings from authenticated;
 
 -- Internal trigger helpers are not callable through the API. Browser and
 -- service RPCs retain only the grants needed by their respective workflows.
@@ -107,6 +109,122 @@ select pg_temp.test_assert(
       'execute'
     ),
   'checkout and paid-invoice mutation must remain service only'
+);
+select pg_temp.test_assert(
+  has_function_privilege(
+    'service_role',
+    'public.register_instructor_payment_setup(uuid,text,text,text,text,timestamp with time zone,boolean,text)',
+    'execute'
+  )
+    and not has_function_privilege(
+      'authenticated',
+      'public.register_instructor_payment_setup(uuid,text,text,text,text,timestamp with time zone,boolean,text)',
+      'execute'
+    )
+    and has_function_privilege(
+      'service_role',
+      'public.complete_instructor_payment_setup(text,uuid,uuid,text,text,text,text,boolean,text,timestamp with time zone)',
+      'execute'
+    )
+    and not has_function_privilege(
+      'authenticated',
+      'public.complete_instructor_payment_setup(text,uuid,uuid,text,text,text,text,boolean,text,timestamp with time zone)',
+      'execute'
+    )
+    and has_function_privilege(
+      'service_role',
+      'public.admin_approve_instructor_after_payment_setup(uuid,uuid,text,text,text,text,text,text,uuid)',
+      'execute'
+    )
+    and not has_function_privilege(
+      'authenticated',
+      'public.admin_approve_instructor_after_payment_setup(uuid,uuid,text,text,text,text,text,text,uuid)',
+      'execute'
+    )
+    and has_function_privilege(
+      'service_role',
+      'public.reset_instructor_activation_after_payment_failure(uuid,uuid,text,text,text,text,uuid,text,text)',
+      'execute'
+    )
+    and not has_function_privilege(
+      'authenticated',
+      'public.reset_instructor_activation_after_payment_failure(uuid,uuid,text,text,text,text,uuid,text,text)',
+      'execute'
+    )
+    and has_function_privilege(
+      'service_role',
+      'public.redeem_instructor_offer_entitlement(uuid,uuid,text,text)',
+      'execute'
+    )
+    and not has_function_privilege(
+      'authenticated',
+      'public.redeem_instructor_offer_entitlement(uuid,uuid,text,text)',
+      'execute'
+    ),
+  'payment setup, approval, and redemption mutations must remain service only'
+);
+select pg_temp.test_assert(
+  not has_function_privilege(
+    'anon',
+    'public.block_lifetime_access_during_activation()',
+    'execute'
+  )
+    and not has_function_privilege(
+      'authenticated',
+      'public.block_lifetime_access_during_activation()',
+      'execute'
+    )
+    and not has_function_privilege(
+      'service_role',
+      'public.block_lifetime_access_during_activation()',
+      'execute'
+    ),
+  'the activation lifetime race trigger must not be API callable'
+);
+select pg_temp.test_assert(
+  not has_table_privilege(
+    'anon', 'public.instructor_payment_setups', 'select'
+  )
+    and not has_table_privilege(
+      'authenticated', 'public.instructor_payment_setups', 'select'
+    )
+    and has_table_privilege(
+      'service_role', 'public.instructor_payment_setups', 'select'
+    ),
+  'Setup Checkout bearer URLs must remain service-only'
+);
+select pg_temp.test_assert(
+  has_function_privilege(
+    'authenticated',
+    'public.submit_lifetime_instructor_profile_for_review()',
+    'execute'
+  )
+    and not has_function_privilege(
+      'anon',
+      'public.submit_lifetime_instructor_profile_for_review()',
+      'execute'
+    )
+    and has_function_privilege(
+      'authenticated',
+      'public.resubmit_instructor_profile_after_payment_setup()',
+      'execute'
+    )
+    and not has_function_privilege(
+      'anon',
+      'public.resubmit_instructor_profile_after_payment_setup()',
+      'execute'
+    )
+    and has_function_privilege(
+      'authenticated',
+      'public.current_instructor_offer_entitlement()',
+      'execute'
+    )
+    and not has_function_privilege(
+      'anon',
+      'public.current_instructor_offer_entitlement()',
+      'execute'
+    ),
+  'instructor submission and entitlement reads must require authentication'
 );
 select pg_temp.test_assert(
   has_function_privilege('authenticated', 'public.complete_account_onboarding(text,text,text,text,boolean)', 'execute')
@@ -232,6 +350,9 @@ select pg_temp.test_assert(
    where profile.account_id = '00000000-0000-0000-0000-000000000010'),
   'server-side writes must not re-enable SMS'
 );
+select set_config(
+  'hire_line_dancers.allow_profile_submission', 'on', true
+);
 update public.instructor_profiles
 set business_name = 'Austin Steps',
     city = 'Austin',
@@ -239,6 +360,9 @@ set business_name = 'Austin Steps',
     bio = 'Beginner-friendly line dance instruction for private and company events.',
     status = 'pending_review'
 where account_id = '00000000-0000-0000-0000-000000000010';
+select set_config(
+  'hire_line_dancers.allow_profile_submission', 'off', true
+);
 
 select pg_temp.set_request(
   '00000000-0000-0000-0000-000000000011',
@@ -248,6 +372,9 @@ select pg_temp.set_request(
 select public.complete_account_onboarding(
   'instructor', 'Bianca Booking', 'Bay Area Boots', null, false
 );
+select set_config(
+  'hire_line_dancers.allow_profile_submission', 'on', true
+);
 update public.instructor_profiles
 set business_name = 'Bay Area Boots',
     city = 'San Francisco',
@@ -255,6 +382,9 @@ set business_name = 'Bay Area Boots',
     bio = 'Line dance instruction for groups of every experience level.',
     status = 'pending_review'
 where account_id = '00000000-0000-0000-0000-000000000011';
+select set_config(
+  'hire_line_dancers.allow_profile_submission', 'off', true
+);
 
 select pg_temp.set_request(
   '00000000-0000-0000-0000-000000000012',
@@ -264,11 +394,17 @@ select pg_temp.set_request(
 select public.complete_account_onboarding(
   'instructor', 'Casey Existing', 'Casey Dance Co.', null, false
 );
+select set_config(
+  'hire_line_dancers.allow_profile_submission', 'on', true
+);
 update public.instructor_profiles
 set city = 'Nashville',
     region = 'TN',
     status = 'pending_review'
 where account_id = '00000000-0000-0000-0000-000000000012';
+select set_config(
+  'hire_line_dancers.allow_profile_submission', 'off', true
+);
 
 -- Organizer onboarding never creates an instructor profile and also forces the
 -- retired SMS preference off.
@@ -317,6 +453,12 @@ select pg_temp.set_request(
   'owner@example.test',
   'authenticated'
 );
+reset role;
+select pg_temp.set_request(
+  '00000000-0000-0000-0000-000000000001',
+  'owner@example.test',
+  'service_role'
+);
 select public.review_instructor_profile(
   (select id from public.instructor_profiles where account_id = '00000000-0000-0000-0000-000000000010'),
   'approve', 'alice-refund-austin-tx', 'Lifecycle approval'
@@ -328,6 +470,12 @@ select public.review_instructor_profile(
 select public.review_instructor_profile(
   (select id from public.instructor_profiles where account_id = '00000000-0000-0000-0000-000000000012'),
   'approve', 'casey-existing-nashville-tn', 'Lifecycle approval'
+);
+set local role authenticated;
+select pg_temp.set_request(
+  '00000000-0000-0000-0000-000000000001',
+  'owner@example.test',
+  'authenticated'
 );
 select pg_temp.test_assert(
   (select count(*) = 3
@@ -1262,9 +1410,15 @@ select pg_temp.set_request(
 select public.complete_account_onboarding(
   'instructor', 'Gina Grant', 'Grant Dance Co.', null, false
 );
+select set_config(
+  'hire_line_dancers.allow_profile_submission', 'on', true
+);
 update public.instructor_profiles
 set city = 'Denver', region = 'CO', status = 'pending_review'
 where account_id = '00000000-0000-0000-0000-000000000014';
+select set_config(
+  'hire_line_dancers.allow_profile_submission', 'off', true
+);
 
 select pg_temp.set_request(
   '00000000-0000-0000-0000-000000000030',
@@ -1302,9 +1456,21 @@ select pg_temp.test_assert(
   ),
   'an administrator must be able to grant lifetime access'
 );
+reset role;
+select pg_temp.set_request(
+  '00000000-0000-0000-0000-000000000001',
+  'owner@example.test',
+  'service_role'
+);
 select public.review_instructor_profile(
   (select id from public.instructor_profiles where account_id = '00000000-0000-0000-0000-000000000014'),
   'approve', 'gina-grant-denver-co', 'Lifetime profile approval'
+);
+set local role authenticated;
+select pg_temp.set_request(
+  '00000000-0000-0000-0000-000000000001',
+  'owner@example.test',
+  'authenticated'
 );
 select pg_temp.test_assert(
   (select status = 'published'
@@ -1436,9 +1602,21 @@ select pg_temp.set_request(
 update public.instructor_profiles
 set city = 'Raleigh', region = 'NC', status = 'pending_review'
 where account_id = '00000000-0000-0000-0000-000000000013';
+reset role;
+select pg_temp.set_request(
+  '00000000-0000-0000-0000-000000000001',
+  'owner@example.test',
+  'service_role'
+);
 select public.review_instructor_profile(
   (select id from public.instructor_profiles where account_id = '00000000-0000-0000-0000-000000000013'),
   'approve', 'lena-lifetime-raleigh-nc', 'Invited lifetime approval'
+);
+set local role authenticated;
+select pg_temp.set_request(
+  '00000000-0000-0000-0000-000000000001',
+  'owner@example.test',
+  'authenticated'
 );
 select pg_temp.test_assert(
   (select status = 'published'
@@ -1550,10 +1728,16 @@ insert into public.profile_media (
 select profile.id, 'headshot', 'https://example.test/opal-offer.jpg', 'Opal Offer', 'ready'
 from public.instructor_profiles profile
 where profile.account_id = '00000000-0000-0000-0000-000000000015';
+select set_config(
+  'hire_line_dancers.allow_profile_submission', 'on', true
+);
 update public.instructor_profiles
 set event_types = array['corporate-events'],
     status = 'pending_review'
 where account_id = '00000000-0000-0000-0000-000000000015';
+select set_config(
+  'hire_line_dancers.allow_profile_submission', 'off', true
+);
 select pg_temp.test_assert(
   (select (offer ->> 'offerEligible')::boolean
       and (offer ->> 'offerEarnedAt') is not null
@@ -1570,9 +1754,21 @@ select pg_temp.set_request(
   'owner@example.test',
   'authenticated'
 );
+reset role;
+select pg_temp.set_request(
+  '00000000-0000-0000-0000-000000000001',
+  'owner@example.test',
+  'service_role'
+);
 select public.review_instructor_profile(
   (select id from public.instructor_profiles where account_id = '00000000-0000-0000-0000-000000000015'),
   'approve', 'opal-offer-tampa-fl', 'Offer lifecycle approval'
+);
+set local role authenticated;
+select pg_temp.set_request(
+  '00000000-0000-0000-0000-000000000001',
+  'owner@example.test',
+  'authenticated'
 );
 select pg_temp.test_assert(
   (select invitation.offer_eligible and invitation.offer_earned_at is not null
@@ -1967,6 +2163,1385 @@ select pg_temp.expect_error(
   ),
   'The founding member program is closed to new assignments',
   'new founding assignment after program closure'
+);
+
+-- Setup Checkout keeps a completed instructor private through review, assigns
+-- one non-stackable offer, and makes approval durable before paid activation.
+reset role;
+select pg_temp.set_request(null, null, 'postgres');
+insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data) values
+  ('00000000-0000-0000-0000-000000000040', 'setup-incomplete@example.test', now(), '{"full_name":"Setup Incomplete"}'),
+  ('00000000-0000-0000-0000-000000000041', 'setup-main@example.test', now(), '{"full_name":"Setup Main"}'),
+  ('00000000-0000-0000-0000-000000000042', 'setup-private@example.test', now(), '{"full_name":"Setup Private"}'),
+  ('00000000-0000-0000-0000-000000000043', 'setup-lifetime@example.test', now(), '{"full_name":"Setup Lifetime"}');
+
+set local role authenticated;
+select pg_temp.set_request(
+  '00000000-0000-0000-0000-000000000040',
+  'setup-incomplete@example.test',
+  'authenticated'
+);
+select public.complete_account_onboarding(
+  'instructor', 'Setup Incomplete', null, null, false
+);
+select pg_temp.set_request(
+  '00000000-0000-0000-0000-000000000041',
+  'setup-main@example.test',
+  'authenticated'
+);
+select public.complete_account_onboarding(
+  'instructor', 'Setup Main', 'Setup Main Dance', null, false
+);
+update public.instructor_profiles
+set bio = 'Line dance instruction for corporate and private events.',
+    city = 'Charlotte',
+    region = 'NC',
+    event_types = array['corporate-events']
+where account_id = '00000000-0000-0000-0000-000000000041';
+select pg_temp.set_request(
+  '00000000-0000-0000-0000-000000000042',
+  'setup-private@example.test',
+  'authenticated'
+);
+select public.complete_account_onboarding(
+  'instructor', 'Setup Private', 'Setup Private Dance', null, false
+);
+update public.instructor_profiles
+set bio = 'Line dance instruction for community and private events.',
+    city = 'Richmond',
+    region = 'VA',
+    event_types = array['private-events']
+where account_id = '00000000-0000-0000-0000-000000000042';
+select pg_temp.set_request(
+  '00000000-0000-0000-0000-000000000043',
+  'setup-lifetime@example.test',
+  'authenticated'
+);
+select public.complete_account_onboarding(
+  'instructor', 'Setup Lifetime', 'Lifetime Setup Dance', null, false
+);
+update public.instructor_profiles
+set bio = 'Line dance instruction for schools and community events.',
+    city = 'Columbus',
+    region = 'OH',
+    event_types = array['school-events']
+where account_id = '00000000-0000-0000-0000-000000000043';
+
+reset role;
+select pg_temp.set_request(null, null, 'postgres');
+insert into public.profile_media (
+  instructor_profile_id, media_type, external_url, caption, status
+)
+select profile.id, 'headshot', media.external_url, profile.display_name, 'ready'
+from public.instructor_profiles profile
+join (
+  values
+    ('00000000-0000-0000-0000-000000000041'::uuid, 'https://example.test/setup-main.jpg'),
+    ('00000000-0000-0000-0000-000000000042'::uuid, 'https://example.test/setup-private.jpg'),
+    ('00000000-0000-0000-0000-000000000043'::uuid, 'https://example.test/setup-lifetime.jpg')
+) media(account_id, external_url) on media.account_id = profile.account_id;
+
+set local role authenticated;
+select pg_temp.set_request(
+  '00000000-0000-0000-0000-000000000041',
+  'setup-main@example.test',
+  'authenticated'
+);
+select pg_temp.expect_error(
+  $statement$
+    update public.instructor_profiles
+    set status = 'pending_review'
+    where account_id = '00000000-0000-0000-0000-000000000041'
+  $statement$,
+  'Complete the payment setup before submitting for review',
+  'direct paid profile submission'
+);
+
+select pg_temp.set_request(
+  '00000000-0000-0000-0000-000000000001',
+  'owner@example.test',
+  'authenticated'
+);
+select pg_temp.expect_error(
+  $statement$
+    insert into public.instructor_profiles (
+      account_id, display_name, status, approved_at, approved_by
+    ) values (
+      '00000000-0000-0000-0000-000000000030',
+      'Browser Approved',
+      'approved',
+      now(),
+      '00000000-0000-0000-0000-000000000001'
+    )
+  $statement$,
+  'New profiles must begin as drafts',
+  'authenticated admin approved profile insert'
+);
+
+reset role;
+select pg_temp.set_request(null, null, 'postgres');
+set local role service_role;
+select pg_temp.set_request(null, null, 'service_role');
+select public.register_instructor_payment_setup(
+  (select id from public.instructor_profiles
+   where account_id = '00000000-0000-0000-0000-000000000040'),
+  'setup-incomplete-request',
+  'cs_test_setupincomplete1',
+  'cus_setupincomplete',
+  'https://checkout.stripe.test/setup-incomplete',
+  now() + interval '1 hour',
+  false,
+  '2026-08-08-payment-setup-v1'
+);
+select pg_temp.expect_error(
+  format(
+    $statement$
+      select public.complete_instructor_payment_setup(
+        'evt_setup_incomplete', %L::uuid, %L::uuid,
+        'cs_test_setupincomplete1', 'seti_setupincomplete1',
+        'cus_setupincomplete', 'pm_setupincomplete1', false,
+        '2026-08-08-payment-setup-v1', now()
+      )
+    $statement$,
+    (select id from public.instructor_profiles
+     where account_id = '00000000-0000-0000-0000-000000000040'),
+    '00000000-0000-0000-0000-000000000040'
+  ),
+  'Complete the profile, inquiry email, and ready headshot',
+  'incomplete profile payment completion'
+);
+select pg_temp.test_assert(
+  (select profile.status = 'draft' and payment_setup.status = 'open'
+   from public.instructor_profiles profile
+   join public.instructor_payment_setups payment_setup
+     on payment_setup.instructor_profile_id = profile.id
+   where profile.account_id = '00000000-0000-0000-0000-000000000040'),
+  'failed completion must leave the profile draft and setup retryable'
+);
+
+select public.register_instructor_payment_setup(
+  (select id from public.instructor_profiles
+   where account_id = '00000000-0000-0000-0000-000000000041'),
+  'setup-main-request-one',
+  'cs_test_setupmain1',
+  'cus_setupmain',
+  'https://checkout.stripe.test/setup-main-one',
+  now() + interval '1 hour',
+  false,
+  '2026-08-08-payment-setup-v1'
+);
+select pg_temp.test_assert(
+  (select completion ->> 'result' = 'completed'
+      and completion ->> 'profileStatus' = 'pending_review'
+      and completion ->> 'entitlementSource' = 'founding_first_100'
+      and (completion ->> 'foundingPosition')::integer = 1
+   from (
+     select public.complete_instructor_payment_setup(
+       'evt_setup_main_one',
+       (select id from public.instructor_profiles
+        where account_id = '00000000-0000-0000-0000-000000000041'),
+       '00000000-0000-0000-0000-000000000041',
+       'cs_test_setupmain1',
+       'seti_setupmain1',
+       'cus_setupmain',
+       'pm_setupmain1',
+       false,
+       '2026-08-08-payment-setup-v1',
+       now()
+     ) as completion
+   ) completed),
+  'verified completion must submit privately and allocate founding position one'
+);
+select pg_temp.test_assert(
+  (select profile.status = 'pending_review'
+      and settings.stripe_payment_setup_checkout_session_id =
+        'cs_test_setupmain1'
+      and settings.stripe_payment_setup_intent_id = 'seti_setupmain1'
+      and settings.stripe_payment_method_id = 'pm_setupmain1'
+      and settings.payment_setup_completed_at is not null
+   from public.instructor_profiles profile
+   join public.instructor_private_settings settings
+     on settings.instructor_profile_id = profile.id
+   where profile.account_id = '00000000-0000-0000-0000-000000000041')
+    and not exists (
+      select 1
+      from public.instructor_directory_profiles directory_profile
+      where directory_profile.id = (
+        select id from public.instructor_profiles
+        where account_id = '00000000-0000-0000-0000-000000000041'
+      )
+    ),
+  'payment completion must persist canonical facts without publishing'
+);
+
+reset role;
+select pg_temp.set_request(null, null, 'postgres');
+select pg_temp.expect_error(
+  format(
+    'insert into public.instructor_lifetime_access (instructor_profile_id, source, granted_by, note) values (%L::uuid, %L, %L::uuid, %L)',
+    (select id from public.instructor_profiles
+     where account_id = '00000000-0000-0000-0000-000000000041'),
+    'admin',
+    '00000000-0000-0000-0000-000000000001',
+    'Pending review lifetime race'
+  ),
+  'Membership activation must finish before lifetime access',
+  'lifetime grant after completed setup while pending review'
+);
+
+set local role service_role;
+select pg_temp.set_request(null, null, 'service_role');
+select pg_temp.test_assert(
+  (select completion ->> 'result' = 'duplicate'
+      and completion ->> 'profileStatus' = 'pending_review'
+      and (completion ->> 'foundingPosition')::integer = 1
+   from (
+     select public.complete_instructor_payment_setup(
+       'evt_setup_main_one_retry',
+       (select id from public.instructor_profiles
+        where account_id = '00000000-0000-0000-0000-000000000041'),
+       '00000000-0000-0000-0000-000000000041',
+       'cs_test_setupmain1',
+       'seti_setupmain1',
+       'cus_setupmain',
+       'pm_setupmain1',
+       false,
+       '2026-08-08-payment-setup-v1',
+       now()
+     ) as completion
+   ) duplicate_completion),
+  'completion retries must preserve one founding position'
+);
+select pg_temp.test_assert(
+  (select count(*) = 1
+   from public.instructor_offer_entitlements entitlement
+   join public.instructor_profiles profile
+     on profile.id = entitlement.instructor_profile_id
+   where profile.account_id = '00000000-0000-0000-0000-000000000041')
+    and (select count(*) = 1
+         from public.instructor_offer_entitlements
+         where founding_position = 1),
+  'founding entitlement allocation must be unique and idempotent'
+);
+
+reset role;
+select pg_temp.set_request(null, null, 'postgres');
+set local role authenticated;
+select pg_temp.set_request(
+  '00000000-0000-0000-0000-000000000041',
+  'setup-main@example.test',
+  'authenticated'
+);
+select pg_temp.test_assert(
+  (select offer ->> 'source' = 'founding_first_100'
+      and (offer ->> 'foundingPosition')::integer = 1
+      and (offer ->> 'freeMonths')::integer = 2
+   from (
+     select public.current_instructor_offer_entitlement() as offer
+   ) current_offer),
+  'the instructor must read only their current founding entitlement through RPC'
+);
+update public.instructor_profiles
+set status = 'draft'
+where account_id = '00000000-0000-0000-0000-000000000041';
+
+reset role;
+select pg_temp.set_request(null, null, 'postgres');
+select pg_temp.expect_error(
+  format(
+    'insert into public.instructor_lifetime_access (instructor_profile_id, source, granted_by, note) values (%L::uuid, %L, %L::uuid, %L)',
+    (select id from public.instructor_profiles
+     where account_id = '00000000-0000-0000-0000-000000000041'),
+    'admin',
+    '00000000-0000-0000-0000-000000000001',
+    'Withdrawn draft lifetime race'
+  ),
+  'Membership activation must finish before lifetime access',
+  'lifetime grant after completed setup while withdrawn to draft'
+);
+set local role service_role;
+select pg_temp.set_request(null, null, 'service_role');
+select pg_temp.test_assert(
+  (select completion ->> 'result' = 'duplicate'
+      and completion ->> 'profileStatus' = 'draft'
+   from (
+     select public.complete_instructor_payment_setup(
+       'evt_setup_main_delayed',
+       (select id from public.instructor_profiles
+        where account_id = '00000000-0000-0000-0000-000000000041'),
+       '00000000-0000-0000-0000-000000000041',
+       'cs_test_setupmain1',
+       'seti_setupmain1',
+       'cus_setupmain',
+       'pm_setupmain1',
+       false,
+       '2026-08-08-payment-setup-v1',
+       now()
+     ) as completion
+   ) delayed_completion),
+  'a delayed completed event must not resubmit a returned draft'
+);
+
+reset role;
+select pg_temp.set_request(null, null, 'postgres');
+set local role authenticated;
+select pg_temp.set_request(
+  '00000000-0000-0000-0000-000000000041',
+  'setup-main@example.test',
+  'authenticated'
+);
+select pg_temp.test_assert(
+  (public.resubmit_instructor_profile_after_payment_setup()
+    ->> 'profileStatus') = 'pending_review',
+  'a returned instructor must resubmit without entering a card again'
+);
+update public.instructor_profiles
+set status = 'draft'
+where account_id = '00000000-0000-0000-0000-000000000041';
+
+reset role;
+select pg_temp.set_request(null, null, 'postgres');
+set local role service_role;
+select pg_temp.set_request(null, null, 'service_role');
+select public.register_instructor_payment_setup(
+  (select id from public.instructor_profiles
+   where account_id = '00000000-0000-0000-0000-000000000041'),
+  'setup-main-request-two',
+  'cs_test_setupmain2',
+  'cus_setupmain',
+  'https://checkout.stripe.test/setup-main-two',
+  now() + interval '1 hour',
+  false,
+  '2026-08-08-payment-setup-v1'
+);
+select public.complete_instructor_payment_setup(
+  'evt_setup_main_two',
+  (select id from public.instructor_profiles
+   where account_id = '00000000-0000-0000-0000-000000000041'),
+  '00000000-0000-0000-0000-000000000041',
+  'cs_test_setupmain2',
+  'seti_setupmain2',
+  'cus_setupmain',
+  'pm_setupmain2',
+  false,
+  '2026-08-08-payment-setup-v1',
+  now()
+);
+select pg_temp.test_assert(
+  (select count(*) = 1
+   from public.instructor_payment_setups payment_setup
+   join public.instructor_profiles profile
+     on profile.id = payment_setup.instructor_profile_id
+   where profile.account_id = '00000000-0000-0000-0000-000000000041'
+     and payment_setup.status = 'completed'
+     and payment_setup.stripe_checkout_session_id = 'cs_test_setupmain2')
+    and (select count(*) = 1
+         from public.instructor_payment_setups payment_setup
+         join public.instructor_profiles profile
+           on profile.id = payment_setup.instructor_profile_id
+         where profile.account_id = '00000000-0000-0000-0000-000000000041'
+           and payment_setup.status = 'superseded'
+           and payment_setup.stripe_checkout_session_id = 'cs_test_setupmain1')
+    and (select count(*) = 1
+         from public.instructor_offer_entitlements entitlement
+         join public.instructor_profiles profile
+           on profile.id = entitlement.instructor_profile_id
+         where profile.account_id = '00000000-0000-0000-0000-000000000041'
+           and entitlement.founding_position = 1),
+  'card replacement must preserve old audit facts and the original entitlement'
+);
+
+reset role;
+select pg_temp.set_request(null, null, 'postgres');
+set local role authenticated;
+select pg_temp.set_request(
+  '00000000-0000-0000-0000-000000000041',
+  'setup-main@example.test',
+  'authenticated'
+);
+update public.instructor_profiles
+set status = 'draft'
+where account_id = '00000000-0000-0000-0000-000000000041';
+
+reset role;
+select pg_temp.set_request(null, null, 'postgres');
+set local role service_role;
+select pg_temp.set_request(null, null, 'service_role');
+select pg_temp.test_assert(
+  (select completion ->> 'result' = 'duplicate'
+      and completion ->> 'profileStatus' = 'draft'
+   from (
+     select public.complete_instructor_payment_setup(
+       'evt_setup_main_superseded_retry',
+       (select id from public.instructor_profiles
+        where account_id = '00000000-0000-0000-0000-000000000041'),
+       '00000000-0000-0000-0000-000000000041',
+       'cs_test_setupmain1',
+       'seti_setupmain1',
+       'cus_setupmain',
+       'pm_setupmain1',
+       false,
+       '2026-08-08-payment-setup-v1',
+       now()
+     ) as completion
+   ) superseded_completion),
+  'a superseded Stripe replay must remain an immutable duplicate'
+);
+
+reset role;
+select pg_temp.set_request(null, null, 'postgres');
+set local role authenticated;
+select pg_temp.set_request(
+  '00000000-0000-0000-0000-000000000041',
+  'setup-main@example.test',
+  'authenticated'
+);
+select public.resubmit_instructor_profile_after_payment_setup();
+
+select pg_temp.set_request(
+  '00000000-0000-0000-0000-000000000001',
+  'owner@example.test',
+  'authenticated'
+);
+update public.instructor_private_settings settings
+set stripe_customer_id = 'cus_browsertamper',
+    stripe_subscription_id = 'sub_browsertamper',
+    subscription_status = 'active',
+    stripe_payment_method_id = 'pm_browsertamper',
+    stripe_payment_setup_intent_id = 'seti_browsertamper',
+    stripe_payment_setup_checkout_session_id = 'cs_test_browsertamper',
+    payment_setup_completed_at = now()
+from public.instructor_profiles profile
+where profile.id = settings.instructor_profile_id
+  and profile.account_id = '00000000-0000-0000-0000-000000000041';
+select pg_temp.test_assert(
+  (select settings.stripe_customer_id = 'cus_setupmain'
+      and settings.stripe_subscription_id is null
+      and settings.subscription_status = 'inactive'
+      and settings.stripe_payment_method_id = 'pm_setupmain2'
+      and settings.stripe_payment_setup_intent_id = 'seti_setupmain2'
+      and settings.stripe_payment_setup_checkout_session_id =
+        'cs_test_setupmain2'
+   from public.instructor_private_settings settings
+   join public.instructor_profiles profile
+     on profile.id = settings.instructor_profile_id
+   where profile.account_id = '00000000-0000-0000-0000-000000000041'),
+  'authenticated administrators must not tamper with verified Stripe fields'
+);
+select pg_temp.expect_error(
+  format(
+    'delete from public.instructor_private_settings where instructor_profile_id = %L::uuid',
+    (select id from public.instructor_profiles
+     where account_id = '00000000-0000-0000-0000-000000000041')
+  ),
+  'permission denied',
+  'authenticated private settings deletion'
+);
+select pg_temp.expect_error(
+  format(
+    'update public.instructor_profiles set status = %L where id = %L::uuid',
+    'approved',
+    (select id from public.instructor_profiles
+     where account_id = '00000000-0000-0000-0000-000000000041')
+  ),
+  'Initial instructor approval requires the verified server workflow',
+  'authenticated admin direct initial approval'
+);
+select pg_temp.expect_error(
+  format(
+    'select public.review_instructor_profile(%L::uuid, %L, %L, null)',
+    (select id from public.instructor_profiles
+     where account_id = '00000000-0000-0000-0000-000000000041'),
+    'approve',
+    'setup-main-charlotte-nc'
+  ),
+  'Initial instructor approval requires the verified server workflow',
+  'legacy browser initial approval RPC'
+);
+
+reset role;
+select pg_temp.set_request(null, null, 'postgres');
+set local role service_role;
+select pg_temp.set_request(null, null, 'service_role');
+select pg_temp.expect_error(
+  format(
+    $statement$
+      select public.admin_approve_instructor_after_payment_setup(
+        %L::uuid, %L::uuid, %L, null,
+        'cs_test_setupmain2', 'cus_setupmain', 'seti_setupmain2',
+        'pm_wrongapproval', %L::uuid
+      )
+    $statement$,
+    (select id from public.instructor_profiles
+     where account_id = '00000000-0000-0000-0000-000000000041'),
+    '00000000-0000-0000-0000-000000000001',
+    'setup-main-charlotte-nc',
+    (select entitlement.id
+     from public.instructor_offer_entitlements entitlement
+     join public.instructor_profiles profile
+       on profile.id = entitlement.instructor_profile_id
+     where profile.account_id = '00000000-0000-0000-0000-000000000041')
+  ),
+  'Verified approval facts changed before durable approval',
+  'approval expected payment method mismatch'
+);
+select pg_temp.test_assert(
+  (select approval ->> 'profileStatus' = 'approved'
+      and not (approval ->> 'hasLifetimeAccess')::boolean
+      and approval ->> 'setupSessionId' = 'cs_test_setupmain2'
+      and approval ->> 'stripeCustomerId' = 'cus_setupmain'
+      and approval ->> 'stripeSetupIntentId' = 'seti_setupmain2'
+      and approval ->> 'stripePaymentMethodId' = 'pm_setupmain2'
+      and approval ->> 'setupTermsVersion' =
+        '2026-08-08-payment-setup-v1'
+      and (approval ->> 'activationId')::uuid = (
+        select payment_setup.id
+        from public.instructor_payment_setups payment_setup
+        join public.instructor_profiles profile
+          on profile.id = payment_setup.instructor_profile_id
+        where profile.account_id = '00000000-0000-0000-0000-000000000041'
+          and payment_setup.status = 'completed'
+      )
+   from (
+     select public.admin_approve_instructor_after_payment_setup(
+       (select id from public.instructor_profiles
+        where account_id = '00000000-0000-0000-0000-000000000041'),
+       '00000000-0000-0000-0000-000000000001',
+       'setup-main-charlotte-nc',
+       'Durable pre-billing approval',
+       'cs_test_setupmain2',
+       'cus_setupmain',
+       'seti_setupmain2',
+       'pm_setupmain2',
+       (select entitlement.id
+        from public.instructor_offer_entitlements entitlement
+        join public.instructor_profiles profile
+          on profile.id = entitlement.instructor_profile_id
+        where profile.account_id = '00000000-0000-0000-0000-000000000041')
+     ) as approval
+   ) durable_approval),
+  'approval must atomically pin and return every verified activation fact'
+);
+select pg_temp.test_assert(
+  (select status = 'approved' and approved_at is not null
+   from public.instructor_profiles
+   where account_id = '00000000-0000-0000-0000-000000000041')
+    and not exists (
+      select 1 from public.instructor_directory_profiles
+      where id = (
+        select id from public.instructor_profiles
+        where account_id = '00000000-0000-0000-0000-000000000041'
+      )
+    ),
+  'durable approval before Stripe activation must remain private'
+);
+
+reset role;
+select pg_temp.set_request(null, null, 'postgres');
+set local role authenticated;
+select pg_temp.set_request(
+  '00000000-0000-0000-0000-000000000001',
+  'owner@example.test',
+  'authenticated'
+);
+select pg_temp.expect_error(
+  format(
+    'select public.review_instructor_profile(%L::uuid, %L, null, null)',
+    (select id from public.instructor_profiles
+     where account_id = '00000000-0000-0000-0000-000000000041'),
+    'return_to_draft'
+  ),
+  'Membership activation is in progress',
+  'return during durable activation gap'
+);
+select pg_temp.expect_error(
+  format(
+    'select public.review_instructor_profile(%L::uuid, %L, null, null)',
+    (select id from public.instructor_profiles
+     where account_id = '00000000-0000-0000-0000-000000000041'),
+    'suspend'
+  ),
+  'Membership activation is in progress',
+  'suspension during durable activation gap'
+);
+
+reset role;
+select pg_temp.set_request(null, null, 'postgres');
+select pg_temp.expect_error(
+  format(
+    'insert into public.instructor_lifetime_access (instructor_profile_id, source, granted_by, note) values (%L::uuid, %L, %L::uuid, %L)',
+    (select id from public.instructor_profiles
+     where account_id = '00000000-0000-0000-0000-000000000041'),
+    'admin',
+    '00000000-0000-0000-0000-000000000001',
+    'Racing lifetime grant'
+  ),
+  'Membership activation must finish before lifetime access',
+  'lifetime grant racing paid activation'
+);
+
+set local role service_role;
+select pg_temp.set_request(null, null, 'service_role');
+select pg_temp.expect_error(
+  format(
+    $statement$
+      select public.reset_instructor_activation_after_payment_failure(
+        %L::uuid, %L::uuid, 'cs_test_setupmain2', 'cus_setupmain',
+        'seti_setupmain2', 'pm_setupmain2', %L::uuid,
+        'api_connection_error', 'Ambiguous network failure'
+      )
+    $statement$,
+    (select id from public.instructor_profiles
+     where account_id = '00000000-0000-0000-0000-000000000041'),
+    '00000000-0000-0000-0000-000000000001',
+    (select entitlement.id
+     from public.instructor_offer_entitlements entitlement
+     join public.instructor_profiles profile
+       on profile.id = entitlement.instructor_profile_id
+     where profile.account_id = '00000000-0000-0000-0000-000000000041')
+  ),
+  'Payment activation reset facts are invalid',
+  'ambiguous Stripe failure reset'
+);
+insert into public.instructor_memberships (
+  instructor_profile_id,
+  stripe_customer_id,
+  stripe_subscription_id,
+  stripe_price_id,
+  status,
+  stripe_created_at
+) values (
+  (select id from public.instructor_profiles
+   where account_id = '00000000-0000-0000-0000-000000000041'),
+  'cus_setupmainunexpected',
+  'sub_setupmainunexpected',
+  'price_hld_monthly',
+  'past_due',
+  now()
+);
+select pg_temp.expect_error(
+  format(
+    $statement$
+      select public.reset_instructor_activation_after_payment_failure(
+        %L::uuid, %L::uuid, 'cs_test_setupmain2', 'cus_setupmain',
+        'seti_setupmain2', 'pm_setupmain2', %L::uuid,
+        'card_declined', 'Unexpected live membership'
+      )
+    $statement$,
+    (select id from public.instructor_profiles
+     where account_id = '00000000-0000-0000-0000-000000000041'),
+    '00000000-0000-0000-0000-000000000001',
+    (select entitlement.id
+     from public.instructor_offer_entitlements entitlement
+     join public.instructor_profiles profile
+       on profile.id = entitlement.instructor_profile_id
+     where profile.account_id = '00000000-0000-0000-0000-000000000041')
+  ),
+  'A Stripe membership already exists for this activation',
+  'live noncanonical membership reset'
+);
+delete from public.instructor_memberships
+where instructor_profile_id = (
+  select id from public.instructor_profiles
+  where account_id = '00000000-0000-0000-0000-000000000041'
+);
+select pg_temp.test_assert(
+  (select reset_result ->> 'profileStatus' = 'draft'
+      and (reset_result ->> 'reset')::boolean
+      and reset_result ->> 'retainedStripeCustomerId' = 'cus_setupmain'
+   from (
+     select public.reset_instructor_activation_after_payment_failure(
+       (select id from public.instructor_profiles
+        where account_id = '00000000-0000-0000-0000-000000000041'),
+       '00000000-0000-0000-0000-000000000001',
+       'cs_test_setupmain2',
+       'cus_setupmain',
+       'seti_setupmain2',
+       'pm_setupmain2',
+       (select entitlement.id
+        from public.instructor_offer_entitlements entitlement
+        join public.instructor_profiles profile
+          on profile.id = entitlement.instructor_profile_id
+        where profile.account_id = '00000000-0000-0000-0000-000000000041'),
+       'card_declined',
+       'Fresh Stripe verification found no subscription'
+     ) as reset_result
+   ) reset_activation),
+  'a definitive card failure must safely reset approval for a new setup'
+);
+select pg_temp.test_assert(
+  (select profile.status = 'draft'
+      and profile.slug is null
+      and profile.approved_at is null
+      and settings.stripe_customer_id = 'cus_setupmain'
+      and settings.stripe_payment_method_id is null
+      and settings.stripe_payment_setup_intent_id is null
+      and settings.stripe_payment_setup_checkout_session_id is null
+      and settings.payment_setup_completed_at is null
+   from public.instructor_profiles profile
+   join public.instructor_private_settings settings
+     on settings.instructor_profile_id = profile.id
+   where profile.account_id = '00000000-0000-0000-0000-000000000041')
+    and (select count(*) = 1
+         from public.instructor_offer_entitlements entitlement
+         join public.instructor_profiles profile
+           on profile.id = entitlement.instructor_profile_id
+         where profile.account_id = '00000000-0000-0000-0000-000000000041'
+           and entitlement.founding_position = 1),
+  'reset must preserve the customer, entitlement, and immutable setup audit'
+);
+select pg_temp.test_assert(
+  (select not (reset_result ->> 'reset')::boolean
+      and reset_result ->> 'profileStatus' = 'draft'
+   from (
+     select public.reset_instructor_activation_after_payment_failure(
+       (select id from public.instructor_profiles
+        where account_id = '00000000-0000-0000-0000-000000000041'),
+       '00000000-0000-0000-0000-000000000001',
+       'cs_test_setupmain2',
+       'cus_setupmain',
+       'seti_setupmain2',
+       'pm_setupmain2',
+       (select entitlement.id
+        from public.instructor_offer_entitlements entitlement
+        join public.instructor_profiles profile
+          on profile.id = entitlement.instructor_profile_id
+        where profile.account_id = '00000000-0000-0000-0000-000000000041'),
+       'card_declined',
+       'Idempotent retry'
+     ) as reset_result
+   ) reset_retry),
+  'card failure reset retries must be idempotent'
+);
+
+reset role;
+select pg_temp.set_request(null, null, 'postgres');
+select pg_temp.expect_error(
+  format(
+    'insert into public.instructor_lifetime_access (instructor_profile_id, source, granted_by, note) values (%L::uuid, %L, %L::uuid, %L)',
+    (select id from public.instructor_profiles
+     where account_id = '00000000-0000-0000-0000-000000000041'),
+    'admin',
+    '00000000-0000-0000-0000-000000000001',
+    'Post-reset lifetime grant'
+  ),
+  'Membership activation must finish before lifetime access',
+  'lifetime grant while a reset founding entitlement is still unredeemed'
+);
+
+set local role service_role;
+select pg_temp.set_request(null, null, 'service_role');
+select public.register_instructor_payment_setup(
+  (select id from public.instructor_profiles
+   where account_id = '00000000-0000-0000-0000-000000000041'),
+  'setup-main-request-three',
+  'cs_test_setupmain3',
+  'cus_setupmain',
+  'https://checkout.stripe.test/setup-main-three',
+  now() + interval '1 hour',
+  false,
+  '2026-08-08-payment-setup-v1'
+);
+select public.complete_instructor_payment_setup(
+  'evt_setup_main_three',
+  (select id from public.instructor_profiles
+   where account_id = '00000000-0000-0000-0000-000000000041'),
+  '00000000-0000-0000-0000-000000000041',
+  'cs_test_setupmain3',
+  'seti_setupmain3',
+  'cus_setupmain',
+  'pm_setupmain3',
+  false,
+  '2026-08-08-payment-setup-v1',
+  now()
+);
+select pg_temp.test_assert(
+  (select approval ->> 'profileStatus' = 'approved'
+      and approval ->> 'setupSessionId' = 'cs_test_setupmain3'
+   from (
+     select public.admin_approve_instructor_after_payment_setup(
+       (select id from public.instructor_profiles
+        where account_id = '00000000-0000-0000-0000-000000000041'),
+       '00000000-0000-0000-0000-000000000001',
+       'setup-main-charlotte-nc',
+       'Approval retry after card replacement',
+       'cs_test_setupmain3',
+       'cus_setupmain',
+       'seti_setupmain3',
+       'pm_setupmain3',
+       (select entitlement.id
+        from public.instructor_offer_entitlements entitlement
+        join public.instructor_profiles profile
+          on profile.id = entitlement.instructor_profile_id
+        where profile.account_id = '00000000-0000-0000-0000-000000000041')
+     ) as approval
+   ) replacement_approval),
+  'a replacement setup must become the only durable activation identity'
+);
+
+-- A blank guarantee shell does not consume the new offer, but any real prior
+-- membership does. This predicate is evaluated before the finite slot lock.
+reset role;
+select pg_temp.set_request(null, null, 'postgres');
+insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data) values
+  ('00000000-0000-0000-0000-000000000044', 'setup-prior@example.test', now(), '{"full_name":"Setup Prior"}'),
+  ('00000000-0000-0000-0000-000000000045', 'setup-blank-guarantee@example.test', now(), '{"full_name":"Setup Blank Guarantee"}');
+
+set local role authenticated;
+select pg_temp.set_request(
+  '00000000-0000-0000-0000-000000000044',
+  'setup-prior@example.test',
+  'authenticated'
+);
+select public.complete_account_onboarding(
+  'instructor', 'Setup Prior', null, null, false
+);
+update public.instructor_profiles
+set bio = 'Experienced instructor returning after an old membership.',
+    city = 'Norfolk',
+    region = 'VA',
+    event_types = array['private-events']
+where account_id = '00000000-0000-0000-0000-000000000044';
+select pg_temp.set_request(
+  '00000000-0000-0000-0000-000000000045',
+  'setup-blank-guarantee@example.test',
+  'authenticated'
+);
+select public.complete_account_onboarding(
+  'instructor', 'Setup Blank Guarantee', null, null, false
+);
+update public.instructor_profiles
+set bio = 'New instructor with an unused administrative guarantee shell.',
+    city = 'Knoxville',
+    region = 'TN',
+    event_types = array['community-events']
+where account_id = '00000000-0000-0000-0000-000000000045';
+
+reset role;
+select pg_temp.set_request(null, null, 'postgres');
+insert into public.profile_media (
+  instructor_profile_id, media_type, external_url, caption, status
+)
+select profile.id, 'headshot', media.external_url, profile.display_name, 'ready'
+from public.instructor_profiles profile
+join (
+  values
+    ('00000000-0000-0000-0000-000000000044'::uuid, 'https://example.test/setup-prior.jpg'),
+    ('00000000-0000-0000-0000-000000000045'::uuid, 'https://example.test/setup-blank.jpg')
+) media(account_id, external_url) on media.account_id = profile.account_id;
+insert into public.instructor_memberships (
+  instructor_profile_id,
+  stripe_customer_id,
+  stripe_subscription_id,
+  stripe_price_id,
+  status,
+  stripe_created_at
+) values (
+  (select id from public.instructor_profiles
+   where account_id = '00000000-0000-0000-0000-000000000044'),
+  'cus_setuppriorold',
+  'sub_setuppriorold',
+  'price_hld_monthly',
+  'canceled',
+  now() - interval '1 year'
+);
+insert into public.instructor_guarantees (
+  instructor_profile_id,
+  founding_status,
+  guarantee_status,
+  guarantee_terms_version
+) values (
+  (select id from public.instructor_profiles
+   where account_id = '00000000-0000-0000-0000-000000000045'),
+  'unassigned',
+  'not_started',
+  '2026-08-04'
+);
+
+set local role service_role;
+select pg_temp.set_request(null, null, 'service_role');
+select public.register_instructor_payment_setup(
+  (select id from public.instructor_profiles
+   where account_id = '00000000-0000-0000-0000-000000000045'),
+  'setup-blank-request',
+  'cs_test_setupblank1',
+  'cus_setupblank',
+  'https://checkout.stripe.test/setup-blank',
+  now() + interval '1 hour',
+  false,
+  '2026-08-08-payment-setup-v1'
+);
+select public.complete_instructor_payment_setup(
+  'evt_setup_blank_one',
+  (select id from public.instructor_profiles
+   where account_id = '00000000-0000-0000-0000-000000000045'),
+  '00000000-0000-0000-0000-000000000045',
+  'cs_test_setupblank1',
+  'seti_setupblank1',
+  'cus_setupblank',
+  'pm_setupblank1',
+  false,
+  '2026-08-08-payment-setup-v1',
+  now()
+);
+select pg_temp.test_assert(
+  (select entitlement.founding_position = 2
+   from public.instructor_offer_entitlements entitlement
+   join public.instructor_profiles profile
+     on profile.id = entitlement.instructor_profile_id
+   where profile.account_id = '00000000-0000-0000-0000-000000000045'),
+  'a blank guarantee shell must not disqualify a genuinely new instructor'
+);
+
+select public.register_instructor_payment_setup(
+  (select id from public.instructor_profiles
+   where account_id = '00000000-0000-0000-0000-000000000044'),
+  'setup-prior-request',
+  'cs_test_setupprior1',
+  'cus_setuppriornew',
+  'https://checkout.stripe.test/setup-prior',
+  now() + interval '1 hour',
+  false,
+  '2026-08-08-payment-setup-v1'
+);
+select public.complete_instructor_payment_setup(
+  'evt_setup_prior_one',
+  (select id from public.instructor_profiles
+   where account_id = '00000000-0000-0000-0000-000000000044'),
+  '00000000-0000-0000-0000-000000000044',
+  'cs_test_setupprior1',
+  'seti_setupprior1',
+  'cus_setuppriornew',
+  'pm_setupprior1',
+  false,
+  '2026-08-08-payment-setup-v1',
+  now()
+);
+select pg_temp.test_assert(
+  not exists (
+    select 1
+    from public.instructor_offer_entitlements entitlement
+    join public.instructor_profiles profile
+      on profile.id = entitlement.instructor_profile_id
+    where profile.account_id = '00000000-0000-0000-0000-000000000044'
+  ),
+  'any prior membership history must disqualify the public founding offer'
+);
+
+reset role;
+select pg_temp.set_request(null, null, 'postgres');
+insert into public.instructor_offer_entitlements (
+  instructor_profile_id, source, offer_code, founding_position, earned_at
+)
+select
+  null,
+  'founding_first_100',
+  'founding_two_months_90_day_v1',
+  slot,
+  now()
+from generate_series(3, 100) slot;
+select pg_temp.expect_error(
+  $statement$
+    insert into public.instructor_offer_entitlements (
+      instructor_profile_id, source, offer_code, founding_position, earned_at
+    ) values (
+      null, 'founding_first_100', 'founding_two_months_90_day_v1', 1, now()
+    )
+  $statement$,
+  'duplicate key',
+  'duplicate founding position'
+);
+select pg_temp.test_assert(
+  (select count(*) = 100
+   from public.instructor_offer_entitlements
+   where source = 'founding_first_100')
+    and (select count(distinct founding_position) = 100
+         from public.instructor_offer_entitlements
+         where source = 'founding_first_100'),
+  'all one hundred founding positions must be unique and non-recyclable'
+);
+delete from public.instructor_profiles
+where account_id = '00000000-0000-0000-0000-000000000045';
+select pg_temp.test_assert(
+  (select count(*) = 1
+      and bool_and(instructor_profile_id is null)
+   from public.instructor_offer_entitlements
+   where founding_position = 2),
+  'deleting a profile must preserve its consumed founding position as a tombstone'
+);
+
+insert into public.instructor_invitations (
+  email,
+  token_hash,
+  request_key,
+  grants_lifetime_access,
+  status,
+  invited_by,
+  expires_at,
+  sent_at,
+  accepted_at,
+  accepted_by,
+  accepted_profile_id,
+  offer_code,
+  claimed_at,
+  claimed_by,
+  profile_submission_deadline_at,
+  account_created_at,
+  profile_submitted_at,
+  offer_eligible,
+  offer_earned_at,
+  created_at
+) values (
+  'setup-private@example.test',
+  repeat('9', 64),
+  'setup-private-offer',
+  false,
+  'accepted',
+  '00000000-0000-0000-0000-000000000001',
+  now() + interval '10 days',
+  now() - interval '3 days',
+  now() - interval '2 days',
+  '00000000-0000-0000-0000-000000000042',
+  (select id from public.instructor_profiles
+   where account_id = '00000000-0000-0000-0000-000000000042'),
+  'outreach_two_months_90_day_v1',
+  now() - interval '3 days',
+  '00000000-0000-0000-0000-000000000042',
+  now() + interval '4 days',
+  now() - interval '2 days',
+  now() - interval '1 day',
+  true,
+  now() - interval '1 day',
+  now() - interval '4 days'
+);
+
+set local role service_role;
+select pg_temp.set_request(null, null, 'service_role');
+select public.register_instructor_payment_setup(
+  (select id from public.instructor_profiles
+   where account_id = '00000000-0000-0000-0000-000000000042'),
+  'setup-private-request',
+  'cs_test_setupprivate1',
+  'cus_setupprivate',
+  'https://checkout.stripe.test/setup-private',
+  now() + interval '1 hour',
+  false,
+  '2026-08-08-payment-setup-v1'
+);
+select public.complete_instructor_payment_setup(
+  'evt_setup_private_one',
+  (select id from public.instructor_profiles
+   where account_id = '00000000-0000-0000-0000-000000000042'),
+  '00000000-0000-0000-0000-000000000042',
+  'cs_test_setupprivate1',
+  'seti_setupprivate1',
+  'cus_setupprivate',
+  'pm_setupprivate1',
+  false,
+  '2026-08-08-payment-setup-v1',
+  now()
+);
+select pg_temp.test_assert(
+  (select entitlement.source = 'private_invitation'
+      and entitlement.offer_code = 'outreach_two_months_90_day_v1'
+      and entitlement.founding_position is null
+      and entitlement.instructor_invitation_id = invitation.id
+   from public.instructor_offer_entitlements entitlement
+   join public.instructor_profiles profile
+     on profile.id = entitlement.instructor_profile_id
+   join public.instructor_invitations invitation
+     on invitation.accepted_profile_id = profile.id
+   where profile.account_id = '00000000-0000-0000-0000-000000000042'),
+  'an earned private invitation may fall back only after all public slots fill'
+);
+
+-- Stripe activation uses the already durable approval. Membership sync is the
+-- only operation that publishes, and offer redemption closes the activation
+-- guard before normal moderation can resume.
+select pg_temp.test_assert(
+  public.apply_stripe_subscription_event(
+    'evt_setup_main_subscription',
+    'instructor.payment_setup.approved',
+    now(),
+    'authenticated-admin-payment-setup-v1',
+    false,
+    (select id from public.instructor_profiles
+     where account_id = '00000000-0000-0000-0000-000000000041'),
+    'cus_setupmain',
+    'sub_setupmain',
+    'price_hld_monthly',
+    'active',
+    now(),
+    now() + interval '1 month',
+    false,
+    'cs_test_setupmain3',
+    null,
+    now(),
+    now()
+  ) = 'processed',
+  'the exact canonical membership must synchronize after durable approval'
+);
+select pg_temp.test_assert(
+  (select status = 'published'
+   from public.instructor_profiles
+   where account_id = '00000000-0000-0000-0000-000000000041')
+    and exists (
+      select 1
+      from public.instructor_directory_profiles directory_profile
+      where directory_profile.id = (
+        select id from public.instructor_profiles
+        where account_id = '00000000-0000-0000-0000-000000000041'
+      )
+    )
+    and (select guarantee_status = 'not_started'
+            and guarantee_started_at is null
+            and guarantee_ends_at is null
+            and claim_deadline_at is null
+            and activation_checkout_session_id = 'cs_test_setupmain3'
+         from public.instructor_guarantees guarantee_record
+         join public.instructor_profiles profile
+           on profile.id = guarantee_record.instructor_profile_id
+         where profile.account_id = '00000000-0000-0000-0000-000000000041'),
+  'membership sync must publish and create an unstarted 90-day guarantee'
+);
+
+reset role;
+select pg_temp.set_request(null, null, 'postgres');
+set local role authenticated;
+select pg_temp.set_request(
+  '00000000-0000-0000-0000-000000000001',
+  'owner@example.test',
+  'authenticated'
+);
+select pg_temp.expect_error(
+  format(
+    'select public.review_instructor_profile(%L::uuid, %L, null, null)',
+    (select id from public.instructor_profiles
+     where account_id = '00000000-0000-0000-0000-000000000041'),
+    'suspend'
+  ),
+  'Membership activation is in progress',
+  'published profile moderation before offer redemption'
+);
+
+reset role;
+select pg_temp.set_request(null, null, 'postgres');
+set local role service_role;
+select pg_temp.set_request(null, null, 'service_role');
+select pg_temp.test_assert(
+  public.redeem_instructor_offer_entitlement(
+    (select id from public.instructor_profiles
+     where account_id = '00000000-0000-0000-0000-000000000041'),
+    (select entitlement.id
+     from public.instructor_offer_entitlements entitlement
+     join public.instructor_profiles profile
+       on profile.id = entitlement.instructor_profile_id
+     where profile.account_id = '00000000-0000-0000-0000-000000000041'),
+    'cs_test_setupmain3',
+    'sub_setupmain'
+  ) = 'redeemed',
+  'membership activation must redeem its one founding entitlement'
+);
+select pg_temp.test_assert(
+  public.redeem_instructor_offer_entitlement(
+    (select id from public.instructor_profiles
+     where account_id = '00000000-0000-0000-0000-000000000041'),
+    (select entitlement.id
+     from public.instructor_offer_entitlements entitlement
+     join public.instructor_profiles profile
+       on profile.id = entitlement.instructor_profile_id
+     where profile.account_id = '00000000-0000-0000-0000-000000000041'),
+    'cs_test_setupmain3',
+    'sub_setupmain'
+  ) = 'duplicate',
+  'offer redemption retries must be idempotent'
+);
+select pg_temp.test_assert(
+  (select entitlement.redeemed_at is not null
+      and entitlement.redeemed_checkout_session_id = 'cs_test_setupmain3'
+      and entitlement.redeemed_subscription_id = 'sub_setupmain'
+   from public.instructor_offer_entitlements entitlement
+   join public.instructor_profiles profile
+     on profile.id = entitlement.instructor_profile_id
+   where profile.account_id = '00000000-0000-0000-0000-000000000041'),
+  'the redeemed offer must remain bound to the canonical activation'
+);
+select pg_temp.test_assert(
+  public.apply_stripe_subscription_event(
+    'evt_setup_main_subscription_canceled',
+    'customer.subscription.deleted',
+    now() + interval '1 second',
+    '2025-07-30.basil',
+    false,
+    (select id from public.instructor_profiles
+     where account_id = '00000000-0000-0000-0000-000000000041'),
+    'cus_setupmain',
+    'sub_setupmain',
+    'price_hld_monthly',
+    'canceled',
+    now(),
+    now() + interval '1 month',
+    false,
+    'cs_test_setupmain3',
+    null,
+    now(),
+    now() + interval '1 second'
+  ) = 'processed',
+  'later cancellation must preserve the exact canonical membership history'
+);
+reset role;
+select pg_temp.set_request(null, null, 'postgres');
+insert into public.instructor_lifetime_access (
+  instructor_profile_id, source, granted_by, note
+) values (
+  (select id from public.instructor_profiles
+   where account_id = '00000000-0000-0000-0000-000000000041'),
+  'admin',
+  '00000000-0000-0000-0000-000000000001',
+  'Post-activation cancellation test'
+);
+select pg_temp.test_assert(
+  exists (
+    select 1
+    from public.instructor_lifetime_access access
+    join public.instructor_profiles profile
+      on profile.id = access.instructor_profile_id
+    where profile.account_id = '00000000-0000-0000-0000-000000000041'
+  ),
+  'completed activation must remain complete after membership cancellation'
+);
+
+-- If lifetime access wins before Setup completion, the completion cannot
+-- allocate an offer or enter paid activation. Lifetime review still succeeds
+-- even if Edge supplies Stripe facts it read before taking the shared lock.
+set local role service_role;
+select pg_temp.set_request(null, null, 'service_role');
+select public.register_instructor_payment_setup(
+  (select id from public.instructor_profiles
+   where account_id = '00000000-0000-0000-0000-000000000043'),
+  'setup-lifetime-race',
+  'cs_test_setuplifetime1',
+  'cus_setuplifetime',
+  'https://checkout.stripe.test/setup-lifetime',
+  now() + interval '1 hour',
+  false,
+  '2026-08-08-payment-setup-v1'
+);
+
+reset role;
+select pg_temp.set_request(null, null, 'postgres');
+insert into public.instructor_lifetime_access (
+  instructor_profile_id, source, granted_by, note
+) values (
+  (select id from public.instructor_profiles
+   where account_id = '00000000-0000-0000-0000-000000000043'),
+  'admin',
+  '00000000-0000-0000-0000-000000000001',
+  'Lifetime grant won before setup completion'
+);
+
+set local role service_role;
+select pg_temp.set_request(null, null, 'service_role');
+select pg_temp.expect_error(
+  format(
+    $statement$
+      select public.complete_instructor_payment_setup(
+        'evt_setup_lifetime_race', %L::uuid, %L::uuid,
+        'cs_test_setuplifetime1', 'seti_setuplifetime1',
+        'cus_setuplifetime', 'pm_setuplifetime1', false,
+        '2026-08-08-payment-setup-v1', now()
+      )
+    $statement$,
+    (select id from public.instructor_profiles
+     where account_id = '00000000-0000-0000-0000-000000000043'),
+    '00000000-0000-0000-0000-000000000043'
+  ),
+  'This instructor has lifetime access and does not need payment setup',
+  'lifetime grant before payment setup completion'
+);
+select pg_temp.test_assert(
+  (select profile.status = 'draft' and payment_setup.status = 'open'
+   from public.instructor_profiles profile
+   join public.instructor_payment_setups payment_setup
+     on payment_setup.instructor_profile_id = profile.id
+   where profile.account_id = '00000000-0000-0000-0000-000000000043')
+    and not exists (
+      select 1
+      from public.instructor_offer_entitlements entitlement
+      join public.instructor_profiles profile
+        on profile.id = entitlement.instructor_profile_id
+      where profile.account_id = '00000000-0000-0000-0000-000000000043'
+    ),
+  'a lifetime-winning race must leave setup uncompleted and consume no offer'
+);
+
+reset role;
+select pg_temp.set_request(null, null, 'postgres');
+set local role authenticated;
+select pg_temp.set_request(
+  '00000000-0000-0000-0000-000000000043',
+  'setup-lifetime@example.test',
+  'authenticated'
+);
+select pg_temp.test_assert(
+  (public.submit_lifetime_instructor_profile_for_review()
+    ->> 'profileStatus') = 'pending_review',
+  'the lifetime winner must submit without completing payment setup'
+);
+
+reset role;
+select pg_temp.set_request(null, null, 'postgres');
+set local role service_role;
+select pg_temp.set_request(null, null, 'service_role');
+select pg_temp.test_assert(
+  (select approval ->> 'profileStatus' = 'published'
+      and (approval ->> 'hasLifetimeAccess')::boolean
+      and approval ->> 'activationId' is null
+      and approval ->> 'setupSessionId' is null
+      and approval ->> 'entitlementId' is null
+   from (
+     select public.admin_approve_instructor_after_payment_setup(
+       (select id from public.instructor_profiles
+        where account_id = '00000000-0000-0000-0000-000000000043'),
+       '00000000-0000-0000-0000-000000000001',
+       'setup-lifetime-columbus-oh',
+       'Lifetime approval after setup verification',
+       'cs_test_setuplifetime1',
+       'cus_setuplifetime',
+       'seti_setuplifetime1',
+       'pm_setuplifetime1',
+       null
+     ) as approval
+   ) lifetime_approval),
+  'lifetime-winning approval must ignore stale setup facts and stop billing'
+);
+select pg_temp.test_assert(
+  exists (
+    select 1
+    from public.instructor_payment_setups payment_setup
+    join public.instructor_profiles profile
+      on profile.id = payment_setup.instructor_profile_id
+    where profile.account_id = '00000000-0000-0000-0000-000000000043'
+      and payment_setup.status = 'open'
+  )
+    and not exists (
+      select 1
+      from public.instructor_memberships membership
+      join public.instructor_profiles profile
+        on profile.id = membership.instructor_profile_id
+      where profile.account_id = '00000000-0000-0000-0000-000000000043'
+    )
+    and not exists (
+      select 1
+      from public.instructor_offer_entitlements entitlement
+      join public.instructor_profiles profile
+        on profile.id = entitlement.instructor_profile_id
+      where profile.account_id = '00000000-0000-0000-0000-000000000043'
+    )
+    and (select status = 'published'
+         from public.instructor_profiles
+         where account_id = '00000000-0000-0000-0000-000000000043'),
+  'lifetime-winning approval must preserve open setup audit without activation'
 );
 
 -- Revocation immediately removes delegated admin search and finance visibility.

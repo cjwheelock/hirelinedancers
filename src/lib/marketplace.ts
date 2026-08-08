@@ -64,6 +64,10 @@ export type InstructorPrivateSettings = {
   minimum_hours: number | null;
   payment_methods: string[];
   stripe_customer_id: string | null;
+  stripe_payment_method_id: string | null;
+  stripe_payment_setup_intent_id: string | null;
+  stripe_payment_setup_checkout_session_id: string | null;
+  payment_setup_completed_at: string | null;
   stripe_subscription_id: string | null;
   subscription_status: string;
   response_reminders_enabled: boolean;

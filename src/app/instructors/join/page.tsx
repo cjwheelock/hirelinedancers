@@ -14,7 +14,7 @@ export default function JoinPage() {
       <p className="lede">Hire Line Dancers helps event planners, couples, and companies find instructors who can get their guests dancing. Build a profile, appear in relevant local searches, and receive event inquiries by email.</p>
 
       <p className="founding-offer">
-        <strong>Founding instructor offer:</strong> The first 100 instructors to join get their first two months free (a $30 value), in addition to our ongoing <Link href="/legal/refund-policy/">90-day money-back guarantee</Link>.
+        <strong>Founding instructor offer:</strong> The first 100 instructors who complete payment setup get their first two months free (a $30 value), in addition to our ongoing <Link href="/legal/refund-policy/">90-day money-back guarantee</Link>.
       </p>
 
       <div className="hero-actions" style={{ marginTop: 28 }}>
@@ -42,24 +42,24 @@ export default function JoinPage() {
         </div>
       </div>
 
-      {/* HOW JOINING WORKS: approve-then-pay flow */}
+      {/* HOW JOINING WORKS: profile, payment setup, then review */}
       <div className="faq-block">
         <h2>How joining works</h2>
         <div className="step-grid">
           <article className="step">
             <div className="step-num"><ClipboardCheck size={20} /></div>
-            <h3>1. Apply</h3>
-            <p>Submit your background and upload a headshot plus a few photos of you teaching or dancing.</p>
-          </article>
-          <article className="step">
-            <div className="step-num"><ShieldCheck size={20} /></div>
-            <h3>2. Get reviewed</h3>
-            <p>We personally review every application to keep quality high for planners. You&rsquo;ll hear back by email.</p>
+            <h3>1. Build your profile</h3>
+            <p>Add your background, service area, and a headshot, plus photos or videos of you teaching or dancing.</p>
           </article>
           <article className="step">
             <div className="step-num"><CreditCard size={20} /></div>
-            <h3>3. Activate &amp; go live</h3>
-            <p>Once approved, add a payment method and activate your membership through Stripe. If you are among the first 100 instructors to join, your first two months are free. We publish your approved profile after Stripe confirms your membership and send planner inquiries to you.</p>
+            <h3>2. Save your payment method</h3>
+            <p>Continue to Stripe to save a card securely. We do not start a subscription or charge your card before your profile is approved.</p>
+          </article>
+          <article className="step">
+            <div className="step-num"><ShieldCheck size={20} /></div>
+            <h3>3. Get reviewed and go live</h3>
+            <p>We personally review every profile. If approved, your membership starts automatically and we publish your profile. The first 100 instructors who complete payment setup receive their first two months free.</p>
           </article>
         </div>
       </div>
@@ -73,8 +73,8 @@ export default function JoinPage() {
             <BadgeCheck size={28} />
             <h2>Two months free</h2>
             <p className="price">$14.99 USD <span>per month after offer</span></p>
-            <p>The first 100 instructors to join receive their first two months free (a $30 value). Add a payment method after approval to activate your profile. Billing starts after the two free months, then your membership renews monthly until canceled. Stripe manages billing securely.</p>
-            <p>The founding instructor offer is in addition to our ongoing 90-day money-back guarantee. Your 90-day guarantee begins when Stripe collects your first paid invoice after the free period.</p>
+            <p>The first 100 instructors who complete payment setup receive their first two months free (a $30 value). Stripe saves your card when you submit your profile, but no subscription starts and no charge is made before approval. If approved, your membership starts automatically. After the two free months, it renews at $14.99 USD per month until canceled.</p>
+            <p>The founding instructor offer is in addition to our ongoing 90-day money-back guarantee. Your 90-day guarantee begins when Stripe collects your first membership payment after the free period.</p>
             <Link className="button primary" href={signInUrl("/account/", "instructor")}>Apply for a profile</Link>
           </article>
         </div>
@@ -93,7 +93,7 @@ export default function JoinPage() {
 
       <div className="policy-box">
         <h2>Our 90-day money-back guarantee</h2>
-        <p>Every new paid membership includes our ongoing 90-day money-back guarantee. The guarantee begins when Stripe collects your first paid membership invoice. For instructors who receive the founding offer, that happens after the two free months. If Hire Line Dancers does not help you get booked for a qualifying paid event during those 90 days, you may request a review for a refund of eligible membership fees paid during the guarantee period.</p>
+        <p>Every new paid membership includes our ongoing 90-day money-back guarantee. The guarantee begins when Stripe collects your first membership payment. For instructors who receive the founding offer, that happens after the two free months. If Hire Line Dancers does not help you get booked for a qualifying paid event during those 90 days, you may request a review for a refund of eligible membership fees paid during the guarantee period.</p>
         <p>The honest ask is time. We are building local awareness, improving search visibility, and introducing event professionals to line dancing as a participatory option. We would rather earn your trust through useful work than promise a specific number of inquiries or bookings.</p>
         <p>You may request a guarantee review only after the 90-day period ends and within the next 30 days. Requests are reviewed manually. Approval and refunds are not automatic. Terms require a complete approved profile, current contact and service-area details, and reasonable inquiry response. See the <Link href="/legal/refund-policy/">full refund policy</Link>.</p>
       </div>

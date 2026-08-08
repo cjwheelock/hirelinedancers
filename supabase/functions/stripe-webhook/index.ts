@@ -4,6 +4,7 @@ import {
   checkoutSessionHasExactCoupon,
   hldStripeConfig,
   instructorCheckoutOffer,
+  MEMBERSHIP_CHECKOUT_TERMS_VERSION,
   MEMBERSHIP_GUARANTEE_TERMS_VERSION,
   membershipTermsState,
   requiredEnv,
@@ -14,6 +15,12 @@ import {
   verifiedMembershipPrice,
   verifiedPaidMembershipInvoices,
 } from "../_shared/hld-stripe.ts";
+import {
+  INSTRUCTOR_PAYMENT_SETUP_TERMS_VERSION,
+  validCheckoutSessionId,
+  validUuid as validPaymentSetupUuid,
+  verifiedInstructorPaymentSetup,
+} from "../_shared/hld-payment-setup.ts";
 
 function validUuid(value: string | null | undefined): string | null {
   if (!value) return null;
@@ -21,6 +28,47 @@ function validUuid(value: string | null | undefined): string | null {
       .test(value)
     ? value
     : null;
+}
+
+type SetupOfferEntitlement = {
+  id: string;
+  source: "founding_first_100" | "private_invitation";
+  offer_code: string;
+  redeemed_at: string | null;
+  redeemed_checkout_session_id: string | null;
+  redeemed_subscription_id: string | null;
+};
+
+type SetupActivationCheck =
+  | { kind: "not_setup" }
+  | { kind: "ignored"; reason: string }
+  | {
+    kind: "verified";
+    activationId: string;
+    entitlement: SetupOfferEntitlement | null;
+    instructorProfileId: string;
+    membershipAlreadyCanonical: boolean;
+    setupSessionId: string;
+  };
+
+function setupActivationMarker(
+  subscription: Stripe.Subscription,
+): boolean {
+  return Boolean(
+    subscription.metadata.payment_setup_activation_id ||
+      subscription.metadata.payment_setup_checkout_session_id ||
+      subscription.metadata.payment_setup_terms_version,
+  );
+}
+
+function recoverableStripeReadError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const candidate = error as { type?: unknown; statusCode?: unknown };
+  return candidate.type === "StripeAPIError" ||
+    candidate.type === "StripeConnectionError" ||
+    candidate.type === "StripeRateLimitError" ||
+    candidate.statusCode === 429 ||
+    (typeof candidate.statusCode === "number" && candidate.statusCode >= 500);
 }
 
 function normalizedStatus(status: Stripe.Subscription.Status): string {
@@ -96,6 +144,332 @@ const handledEvents = new Set<string>([
 const stripe = new Stripe(requiredEnv("STRIPE_SECRET_KEY"));
 const cryptoProvider = Stripe.createSubtleCryptoProvider();
 
+async function processInstructorPaymentSetupCompleted(
+  event: Stripe.Event,
+  ctx: any,
+  stripeConfig: ReturnType<typeof hldStripeConfig>,
+): Promise<Response> {
+  const eventSession = event.data.object as Stripe.Checkout.Session;
+  const instructorProfileId = validPaymentSetupUuid(
+    eventSession.metadata?.instructor_profile_id ??
+      eventSession.client_reference_id,
+  );
+  const accountId = validPaymentSetupUuid(eventSession.metadata?.account_id);
+  if (!instructorProfileId || !accountId) {
+    console.warn("Ignoring payment setup without valid ownership metadata");
+    return Response.json({ received: true, ignored: true });
+  }
+
+  const [{ data: profile, error: profileError }, {
+    data: settings,
+    error: settingsError,
+  }, { data: lifetimeAccess, error: lifetimeAccessError }] = await Promise.all([
+    ctx.supabaseAdmin
+      .from("instructor_profiles")
+      .select("id, account_id, status")
+      .eq("id", instructorProfileId)
+      .maybeSingle(),
+    ctx.supabaseAdmin
+      .from("instructor_private_settings")
+      .select("stripe_customer_id")
+      .eq("instructor_profile_id", instructorProfileId)
+      .maybeSingle(),
+    ctx.supabaseAdmin
+      .from("instructor_lifetime_access")
+      .select("instructor_profile_id")
+      .eq("instructor_profile_id", instructorProfileId)
+      .maybeSingle(),
+  ]);
+  if (profileError || settingsError || lifetimeAccessError) {
+    throw new Error(
+      `Unable to verify payment setup ownership: ${
+        profileError?.code ?? settingsError?.code ?? lifetimeAccessError?.code
+      }`,
+    );
+  }
+  if (
+    !profile || profile.account_id !== accountId ||
+    !["draft", "pending_review", "approved", "published", "suspended"]
+      .includes(profile.status) ||
+    !settings?.stripe_customer_id || lifetimeAccess
+  ) {
+    console.info(
+      "Ignoring terminal payment setup event",
+      event.id,
+      instructorProfileId,
+    );
+    return Response.json({ received: true, ignored: true });
+  }
+
+  let verified: Awaited<ReturnType<typeof verifiedInstructorPaymentSetup>>;
+  try {
+    verified = await verifiedInstructorPaymentSetup(
+      stripe,
+      stripeConfig,
+      eventSession.id,
+      {
+        accountId,
+        instructorProfileId,
+        customerId: settings.stripe_customer_id,
+      },
+    );
+  } catch (error) {
+    if (recoverableStripeReadError(error)) throw error;
+    console.warn(
+      "Ignoring terminal payment setup verification failure",
+      event.id,
+      error instanceof Error ? error.message : "invalid_payment_setup",
+    );
+    return Response.json({ received: true, ignored: true });
+  }
+  const { data: result, error } = await ctx.supabaseAdmin.rpc(
+    "complete_instructor_payment_setup",
+    {
+      p_event_id: event.id,
+      p_instructor_profile_id: instructorProfileId,
+      p_account_id: accountId,
+      p_stripe_checkout_session_id: verified.session.id,
+      p_stripe_setup_intent_id: verified.setupIntent.id,
+      p_stripe_customer_id: verified.customerId,
+      p_stripe_payment_method_id: verified.paymentMethodId,
+      p_livemode: verified.session.livemode,
+      p_setup_terms_version: INSTRUCTOR_PAYMENT_SETUP_TERMS_VERSION,
+      p_observed_at: new Date().toISOString(),
+    },
+  );
+  if (error) {
+    if (error.code === "P0001" || error.code?.startsWith("23")) {
+      console.warn(
+        "Ignoring terminal payment setup database state",
+        event.id,
+        error.code,
+      );
+      return Response.json({ received: true, ignored: true });
+    }
+    throw new Error(
+      `Unable to complete instructor payment setup: ${error.code}`,
+    );
+  }
+
+  console.info(
+    "Instructor payment setup sync complete",
+    event.id,
+    result?.result,
+  );
+  return Response.json({
+    received: true,
+    result: result?.result,
+    profileStatus: result?.profileStatus,
+    paymentMethodSaved: true,
+    entitlementId: result?.entitlementId ?? null,
+    entitlementSource: result?.entitlementSource ?? null,
+    offerCode: result?.offerCode ?? null,
+    foundingPosition: result?.foundingPosition ?? null,
+  });
+}
+
+async function canonicalSetupActivation(
+  subscription: Stripe.Subscription,
+  customerId: string,
+  membershipItem: Stripe.SubscriptionItem | null,
+  ctx: any,
+  stripeConfig: ReturnType<typeof hldStripeConfig>,
+): Promise<SetupActivationCheck> {
+  if (!setupActivationMarker(subscription)) return { kind: "not_setup" };
+
+  const activationId = validPaymentSetupUuid(
+    subscription.metadata.payment_setup_activation_id,
+  );
+  const setupSessionId = validCheckoutSessionId(
+    subscription.metadata.payment_setup_checkout_session_id,
+  );
+  const instructorProfileId = validPaymentSetupUuid(
+    subscription.metadata.instructor_profile_id,
+  );
+  const accountId = validPaymentSetupUuid(subscription.metadata.account_id);
+  if (
+    !activationId || !setupSessionId || !instructorProfileId || !accountId ||
+    subscription.metadata.product_line !== "hire_line_dancers" ||
+    subscription.metadata.payment_setup_terms_version !==
+      INSTRUCTOR_PAYMENT_SETUP_TERMS_VERSION ||
+    subscription.metadata.checkout_terms_version !==
+      MEMBERSHIP_CHECKOUT_TERMS_VERSION ||
+    subscription.metadata.guarantee_terms_version !==
+      MEMBERSHIP_GUARANTEE_TERMS_VERSION ||
+    subscription.livemode !== stripeConfig.expectedLivemode ||
+    (membershipItem &&
+      (membershipItem.price.id !== stripeConfig.priceId ||
+        membershipItem.quantity !== 1 || subscription.items.data.length !== 1))
+  ) {
+    return { kind: "ignored", reason: "invalid_setup_subscription_metadata" };
+  }
+
+  const [profileResult, settingsResult, setupResult, lifetimeResult,
+    entitlementResult, membershipResult] = await Promise.all([
+    ctx.supabaseAdmin
+      .from("instructor_profiles")
+      .select("id, account_id, status")
+      .eq("id", instructorProfileId)
+      .maybeSingle(),
+    ctx.supabaseAdmin
+      .from("instructor_private_settings")
+      .select(
+        "stripe_customer_id, stripe_subscription_id, stripe_payment_method_id, stripe_payment_setup_intent_id, stripe_payment_setup_checkout_session_id, payment_setup_completed_at",
+      )
+      .eq("instructor_profile_id", instructorProfileId)
+      .maybeSingle(),
+    ctx.supabaseAdmin
+      .from("instructor_payment_setups")
+      .select(
+        "id, instructor_profile_id, stripe_checkout_session_id, stripe_customer_id, stripe_setup_intent_id, stripe_payment_method_id, livemode, setup_terms_version, status",
+      )
+      .eq("id", activationId)
+      .maybeSingle(),
+    ctx.supabaseAdmin
+      .from("instructor_lifetime_access")
+      .select("instructor_profile_id")
+      .eq("instructor_profile_id", instructorProfileId)
+      .maybeSingle(),
+    ctx.supabaseAdmin
+      .from("instructor_offer_entitlements")
+      .select(
+        "id, source, offer_code, redeemed_at, redeemed_checkout_session_id, redeemed_subscription_id",
+      )
+      .eq("instructor_profile_id", instructorProfileId)
+      .maybeSingle(),
+    ctx.supabaseAdmin
+      .from("instructor_memberships")
+      .select(
+        "instructor_profile_id, stripe_customer_id, stripe_subscription_id, stripe_price_id, status, latest_checkout_session_id",
+      )
+      .eq("instructor_profile_id", instructorProfileId)
+      .maybeSingle(),
+  ]);
+  const databaseError = profileResult.error ?? settingsResult.error ??
+    setupResult.error ?? lifetimeResult.error ?? entitlementResult.error ??
+    membershipResult.error;
+  if (databaseError) {
+    throw new Error(
+      `Unable to load canonical payment activation: ${databaseError.code}`,
+    );
+  }
+
+  const profile = profileResult.data;
+  const settings = settingsResult.data;
+  const setup = setupResult.data;
+  if (
+    !profile || !settings || !setup || lifetimeResult.data ||
+    profile.account_id !== accountId ||
+    !["approved", "published", "suspended"].includes(profile.status)
+  ) {
+    return { kind: "ignored", reason: "setup_profile_not_billable" };
+  }
+  if (
+    setup.instructor_profile_id !== instructorProfileId ||
+    setup.status !== "completed" ||
+    setup.stripe_checkout_session_id !== setupSessionId ||
+    setup.stripe_customer_id !== customerId ||
+    setup.livemode !== stripeConfig.expectedLivemode ||
+    setup.setup_terms_version !== INSTRUCTOR_PAYMENT_SETUP_TERMS_VERSION ||
+    !settings.payment_setup_completed_at ||
+    settings.stripe_customer_id !== customerId ||
+    settings.stripe_payment_method_id !== setup.stripe_payment_method_id ||
+    settings.stripe_payment_setup_intent_id !== setup.stripe_setup_intent_id ||
+    settings.stripe_payment_setup_checkout_session_id !== setupSessionId
+  ) {
+    return { kind: "ignored", reason: "setup_activation_not_canonical" };
+  }
+
+  const membership = membershipResult.data;
+  const membershipAlreadyCanonical = Boolean(
+    membership &&
+      membership.stripe_customer_id === customerId &&
+      membership.stripe_subscription_id === subscription.id &&
+      membership.stripe_price_id === stripeConfig.priceId &&
+      membership.latest_checkout_session_id === setupSessionId &&
+      settings.stripe_subscription_id === subscription.id,
+  );
+  if (!membershipItem && !membershipAlreadyCanonical) {
+    return { kind: "ignored", reason: "initial_setup_membership_price_missing" };
+  }
+  if (
+    !membershipAlreadyCanonical &&
+    !["active", "trialing"].includes(subscription.status)
+  ) {
+    return { kind: "ignored", reason: "initial_setup_membership_not_active" };
+  }
+  if (
+    !membershipAlreadyCanonical &&
+    stripeObjectId(subscription.default_payment_method) !==
+      setup.stripe_payment_method_id
+  ) {
+    return { kind: "ignored", reason: "initial_setup_payment_method_changed" };
+  }
+
+  const storedEntitlement = entitlementResult.data as
+    | SetupOfferEntitlement
+    | null;
+  const entitlementRedeemedForSubscription = Boolean(
+    storedEntitlement?.redeemed_at &&
+      storedEntitlement.redeemed_checkout_session_id === setupSessionId &&
+      storedEntitlement.redeemed_subscription_id === subscription.id,
+  );
+  // A benefit redeemed on an older membership is historical only. A later
+  // setup-managed rejoin must carry the explicit no-offer tuple and no
+  // discount, while the original subscription keeps its canonical tuple.
+  const entitlement = storedEntitlement &&
+      (!storedEntitlement.redeemed_at || entitlementRedeemedForSubscription)
+    ? storedEntitlement
+    : null;
+  const metadataEntitlementId = subscription.metadata.offer_entitlement_id;
+  const metadataOfferCode = subscription.metadata.offer_code;
+  const metadataCouponId = subscription.metadata.offer_coupon_id;
+  if (entitlement) {
+    if (
+      validPaymentSetupUuid(metadataEntitlementId) !== entitlement.id ||
+      metadataOfferCode !== entitlement.offer_code ||
+      !metadataCouponId || !/^[A-Za-z0-9_-]+$/.test(metadataCouponId)
+    ) {
+      return { kind: "ignored", reason: "setup_offer_tuple_mismatch" };
+    }
+  } else if (
+    metadataEntitlementId !== "none" || metadataOfferCode !== "none" ||
+    metadataCouponId !== "none"
+  ) {
+    return { kind: "ignored", reason: "unexpected_setup_offer" };
+  }
+
+  if (!membershipAlreadyCanonical) {
+    await verifiedMembershipPrice(stripe, stripeConfig);
+  }
+  if (
+    entitlement && !entitlementRedeemedForSubscription &&
+    !membershipAlreadyCanonical
+  ) {
+    const coupon = await verifiedInstructorOfferCoupon(stripe, stripeConfig);
+    if (
+      coupon.id !== metadataCouponId ||
+      !subscriptionHasExactCoupon(subscription, coupon.id)
+    ) {
+      return { kind: "ignored", reason: "initial_setup_coupon_mismatch" };
+    }
+  } else if (
+    !entitlement && !membershipAlreadyCanonical &&
+    !subscriptionHasExactCoupon(subscription, null)
+  ) {
+    return { kind: "ignored", reason: "unexpected_initial_setup_discount" };
+  }
+
+  return {
+    kind: "verified",
+    activationId,
+    entitlement,
+    instructorProfileId,
+    membershipAlreadyCanonical,
+    setupSessionId,
+  };
+}
+
 export default {
   fetch: withSupabase<any>({ auth: "none", cors: false }, async (req, ctx) => {
     if (req.method !== "POST") {
@@ -125,6 +499,18 @@ export default {
       return new Response("Invalid Stripe signature", { status: 400 });
     }
 
+    const setupSession = event.type === "checkout.session.completed"
+      ? event.data.object as Stripe.Checkout.Session
+      : null;
+    if (
+      setupSession?.mode === "setup" &&
+      (setupSession.metadata?.product_line !== "hire_line_dancers" ||
+        setupSession.metadata?.payment_setup_terms_version !==
+          INSTRUCTOR_PAYMENT_SETUP_TERMS_VERSION)
+    ) {
+      return Response.json({ received: true, ignored: true });
+    }
+
     let stripeConfig: ReturnType<typeof hldStripeConfig>;
     try {
       stripeConfig = hldStripeConfig();
@@ -150,6 +536,26 @@ export default {
       return Response.json({ received: true, ignored: true });
     }
 
+    if (setupSession?.mode === "setup") {
+      try {
+        return await processInstructorPaymentSetupCompleted(
+          event,
+          ctx,
+          stripeConfig,
+        );
+      } catch (error) {
+        const message = error instanceof Error
+          ? error.message
+          : "Unknown payment setup sync error";
+        console.error(
+          "Stripe payment setup webhook processing failed",
+          event.id,
+          message,
+        );
+        return new Response("Payment setup sync failed", { status: 500 });
+      }
+    }
+
     const identifiers = eventSubscriptionId(event);
     if (!identifiers.subscriptionId) {
       console.info(
@@ -166,10 +572,17 @@ export default {
         identifiers.subscriptionId,
         { expand: ["items.data.price", "discounts"] },
       );
+      const isSetupManagedSubscription = setupActivationMarker(subscription);
       if (subscription.livemode !== stripeConfig.expectedLivemode) {
+        if (isSetupManagedSubscription) {
+          return Response.json({ received: true, ignored: true });
+        }
         throw new Error("Subscription is in the wrong Stripe mode");
       }
       if (subscription.items.has_more) {
+        if (isSetupManagedSubscription) {
+          return Response.json({ received: true, ignored: true });
+        }
         throw new Error("Subscription has too many items to verify safely");
       }
 
@@ -177,32 +590,68 @@ export default {
       const membershipItems = subscription.items.data.filter((item) =>
         item.price.id === expectedPriceId
       );
-      const membershipItem = membershipItems[0] ?? null;
+      let membershipItem: Stripe.SubscriptionItem | null =
+        membershipItems[0] ?? null;
       if (
         membershipItem &&
         (membershipItems.length !== 1 || membershipItem.quantity !== 1 ||
           subscription.items.data.length !== 1)
       ) {
-        throw new Error(
-          "Subscription is not exactly one instructor membership",
-        );
+        if (isSetupManagedSubscription) {
+          membershipItem = null;
+        } else {
+          throw new Error(
+            "Subscription is not exactly one instructor membership",
+          );
+        }
       }
 
       const customerId = stripeObjectId(subscription.customer);
       if (!customerId) {
+        if (isSetupManagedSubscription) {
+          return Response.json({ received: true, ignored: true });
+        }
         throw new Error("Subscription is missing a customer identifier");
       }
 
       let instructorProfileId = validUuid(
         subscription.metadata?.instructor_profile_id,
       ) ?? identifiers.instructorProfileId;
-      const subscriptionUsesCurrentTerms = membershipTermsState(
-        subscription.metadata,
-      ) === "current";
-      if (subscriptionUsesCurrentTerms && !instructorProfileId) {
+      const subscriptionUsesCurrentTerms = isSetupManagedSubscription ||
+        membershipTermsState(subscription.metadata) === "current";
+      if (
+        subscriptionUsesCurrentTerms && !instructorProfileId &&
+        !isSetupManagedSubscription
+      ) {
         throw new Error(
           "Current membership terms require an instructor profile identifier",
         );
+      }
+
+      let setupActivation: Extract<
+        SetupActivationCheck,
+        { kind: "verified" }
+      > | null = null;
+      if (isSetupManagedSubscription) {
+        const setupCheck = await canonicalSetupActivation(
+          subscription,
+          customerId,
+          membershipItem,
+          ctx,
+          stripeConfig,
+        );
+        if (setupCheck.kind === "ignored") {
+          console.warn(
+            "Ignoring terminal setup membership event",
+            event.id,
+            setupCheck.reason,
+          );
+          return Response.json({ received: true, ignored: true });
+        }
+        if (setupCheck.kind !== "verified") {
+          return Response.json({ received: true, ignored: true });
+        }
+        setupActivation = setupCheck;
       }
 
       let checkoutSession: Stripe.Checkout.Session | null = null;
@@ -367,7 +816,8 @@ export default {
           p_current_period_start: currentPeriodStart,
           p_current_period_end: currentPeriodEnd,
           p_cancel_at_period_end: subscription.cancel_at_period_end,
-          p_checkout_session_id: checkoutSession?.id ?? null,
+          p_checkout_session_id: setupActivation?.setupSessionId ??
+            checkoutSession?.id ?? null,
           p_latest_invoice_id: latestInvoiceId,
           p_subscription_created_at: new Date(subscription.created * 1000)
             .toISOString(),
@@ -376,6 +826,17 @@ export default {
       );
 
       if (syncError) {
+        if (
+          setupActivation &&
+          (syncError.code === "P0001" || syncError.code?.startsWith("23"))
+        ) {
+          console.warn(
+            "Ignoring terminal setup membership database state",
+            event.id,
+            syncError.code,
+          );
+          return Response.json({ received: true, ignored: true });
+        }
         console.error(
           "Stripe subscription sync failed",
           event.id,
@@ -387,6 +848,27 @@ export default {
 
       let offerResult: string | null = null;
       if (
+        membershipItem && setupActivation?.entitlement &&
+        ["active", "trialing"].includes(subscription.status) &&
+        syncResult !== "lifetime_access_ignored" &&
+        syncResult !== "stale_subscription"
+      ) {
+        const { data, error } = await ctx.supabaseAdmin.rpc(
+          "redeem_instructor_offer_entitlement",
+          {
+            p_instructor_profile_id: setupActivation.instructorProfileId,
+            p_entitlement_id: setupActivation.entitlement.id,
+            p_stripe_checkout_session_id: setupActivation.setupSessionId,
+            p_stripe_subscription_id: subscription.id,
+          },
+        );
+        if (error) {
+          throw new Error(
+            `Unable to redeem the setup membership offer: ${error.code}`,
+          );
+        }
+        offerResult = data;
+      } else if (
         checkoutSession && checkoutOffer &&
         syncResult !== "lifetime_access_ignored" &&
         syncResult !== "stale_subscription"

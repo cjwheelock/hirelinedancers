@@ -6,13 +6,12 @@ export default function RefundPolicyPage() {
   return (
     <section className="page-shell article-page">
       <h1>Instructor Membership Refund Policy</h1>
-      <p>Last updated: August 7, 2026.</p>
+      <p>Last updated: August 8, 2026.</p>
       <p>This policy is offered by {site.legalName}, which operates Hire Line Dancers.</p>
-      <h2>Private offer timing</h2>
-      <p>The invitation-only free period applies to an eligible instructor who deliberately claims a personal private offer within 14 days after it is issued, then creates an account and submits a complete instructor profile within the following 7 days. Hire Line Dancers may complete its review after that submission deadline without affecting an offer that was claimed and submitted on time.</p>
-      <p>After approval, the eligible instructor may activate a recurring $14.99 USD monthly membership with the first two monthly billing cycles free. A valid payment method is required at activation. Stripe displays the free period, first charge date, and recurring price before the instructor confirms the membership.</p>
+      <h2>Founding instructor offer timing</h2>
+      <p>The first 100 instructors who complete payment setup are eligible for two free monthly billing cycles if their profiles are approved. Stripe saves a valid payment method during profile submission, but no subscription begins and no charge is made before approval. If approved, the membership starts automatically. After the two free months, it renews at $14.99 USD per month until canceled.</p>
       <h2>90-day booking guarantee</h2>
-      <p>Every membership first activated on or after August 7, 2026 includes the 90-day booking guarantee. The guarantee begins on the date Stripe records the first invoice that collects a positive membership payment. For an eligible private-offer membership, that invoice comes after the first two monthly billing cycles. For a regular membership, it is the first invoice that collects a positive membership payment after activation.</p>
+      <p>Every membership first activated on or after August 7, 2026 includes the 90-day booking guarantee. The guarantee begins on the date Stripe records the first invoice that collects a positive membership payment. For a membership with two free months, that invoice comes after the free period. For a membership without a free period, it is the first positive paid invoice after activation.</p>
       <p>If Hire Line Dancers does not help an eligible instructor get booked for a qualifying paid event during those 90 days, the instructor may request a refund review for eligible membership payments collected during the guarantee period. The request must be submitted after the 90-day guarantee period ends and within the next 30 days.</p>
       <ul className="check-list">
         <li>The instructor must maintain a complete approved profile.</li>

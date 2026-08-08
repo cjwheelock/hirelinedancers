@@ -172,7 +172,7 @@ export function LoginScreen() {
   const subtitle = intent === "instructor"
     ? invited
       ? "Review the invitation first. Nothing is claimed until you choose the button below."
-      : "Create your instructor workspace, complete your public profile, add photos and videos, and submit it for review."
+      : "Create your instructor workspace, complete your profile, and save a card securely to submit it for review. No subscription starts and no charge is made before approval."
     : intent === "organizer"
       ? "Create a planner account to contact instructors and keep your event inquiries organized."
       : "Browse instructors without an account. Sign in when you are ready to send an inquiry, or to manage your instructor profile.";
@@ -191,12 +191,12 @@ export function LoginScreen() {
           <div className={styles.stack}>
             <h2>Claim your invitation</h2>
             <p>
-              Claim by {initialDeadline ?? "the date in your invitation email"}. Claiming starts a seven-day window to sign in with the invited email, create your instructor account, and submit a complete profile.
+              Claim by {initialDeadline ?? "the date in your invitation email"}. Claiming starts a seven-day window to sign in with the invited email, create your instructor account, and complete your profile{invitation?.grantsLifetimeAccess ? "." : " and payment setup."}
             </p>
             {invitation?.grantsLifetimeAccess ? (
               <p className={styles.notice}>This invitation includes complimentary lifetime instructor access.</p>
             ) : invitation?.offerCode === "outreach_two_months_90_day_v1" ? (
-              <p className={styles.notice}>Complete the steps on time to earn your first two monthly billing cycles free. Every new paid membership also includes the request-based 90-day booking guarantee, subject to the terms shown during activation.</p>
+              <p className={styles.notice}>Complete the steps on time to earn your first two monthly billing cycles free. Stripe saves your card during submission, but no subscription starts and no charge is made before approval. Every new paid membership also includes the request-based 90-day booking guarantee.</p>
             ) : null}
             <button className={styles.button} type="button" disabled={busy !== null} onClick={() => void claimInvitation()}>
               {busy === "claim" ? "Claiming invitation..." : "Claim invitation"}
@@ -207,7 +207,9 @@ export function LoginScreen() {
             <h2>This invitation window has ended</h2>
             <p className={styles.error}>
               {invitation?.status === "claim_expired"
-                ? "The seven-day account and profile submission window has ended."
+                ? invitation?.grantsLifetimeAccess
+                  ? "The seven-day account and profile submission window has ended."
+                  : "The seven-day account, profile, and payment-setup window has ended."
                 : "The 14-day invitation claim window has ended."}
             </p>
             <Link className={styles.secondaryButton} href="/instructors/join/">View instructor membership options</Link>
@@ -222,7 +224,9 @@ export function LoginScreen() {
                     : "Your instructor account is ready, but the private offer submission window has ended. Continue to finish your profile without the invitation offer."
                   : invitation?.status === "accepted"
                   ? "This invitation has already been accepted. Continue to open the linked account."
-                  : `Invitation claimed. Continue by ${submissionDeadline ?? "your submission deadline"} to create your account and submit a complete profile.`}
+                  : invitation?.grantsLifetimeAccess
+                    ? `Invitation claimed. Continue by ${submissionDeadline ?? "your submission deadline"} to create your account and submit a complete profile.`
+                    : `Invitation claimed. Continue by ${submissionDeadline ?? "your submission deadline"} to create your account, complete your profile, and finish payment setup.`}
               </p>
               <button className={styles.button} type="button" onClick={() => window.location.assign(next)}>
                 Continue with signed-in account

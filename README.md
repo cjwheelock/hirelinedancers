@@ -13,9 +13,9 @@ and party planners find line dance instructors near them.
 - One headshot, up to three additional images, one welcome video, and up to three teaching or dancing videos
 - Authenticated inquiry forms, inquiry status tracking, and self-reported booking outcomes
 - Durable Resend email notification jobs for inquiries, booking follow-ups, and event follow-ups
-- Personally reviewed approve-then-activate Stripe Checkout flow at $14.99 per month
+- Pre-review Stripe card setup with no charge before approval, followed by automatic membership activation at $14.99 per month when an instructor is approved
 - Stripe Customer Portal and signature-verified membership webhooks
-- Private instructor offers with a 14-day claim window, a 7-day account-and-profile submission window after claim, and the first two monthly billing cycles free after approval and membership activation
+- A founding offer that gives the first 100 instructors who complete payment setup two free months after approval, plus compatible private instructor invitations without offer stacking
 - Admin tracking for the request-based 90-day booking guarantee on new paid memberships, preserved legacy guarantees, claims, and manually issued Stripe-verified refunds
 - Legal pages, buyer cost guide, blog, RSS feed, `sitemap.xml`, `robots.txt`, `llms.txt`, schema markup, and `CNAME`
 - Auto-deploy to GitHub Pages via GitHub Actions

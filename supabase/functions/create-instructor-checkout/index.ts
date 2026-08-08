@@ -110,13 +110,110 @@ export default {
 
     const { data: settings, error: settingsError } = await ctx.supabaseAdmin
       .from("instructor_private_settings")
-      .select("inquiry_email, stripe_customer_id, stripe_subscription_id, subscription_status")
+      .select("inquiry_email, stripe_customer_id, stripe_subscription_id, subscription_status, stripe_payment_method_id, stripe_payment_setup_intent_id, stripe_payment_setup_checkout_session_id, payment_setup_completed_at")
       .eq("instructor_profile_id", profile.id)
       .maybeSingle();
 
     if (settingsError || !settings?.inquiry_email) {
       console.error("Unable to read instructor billing settings", settingsError?.code);
       return json({ error: "Complete your instructor contact settings before checkout" }, 409);
+    }
+
+    const [completedPaymentSetupResult, setupMembershipResult,
+      setupEntitlementResult, setupGuaranteeResult] = await Promise.all([
+      ctx.supabaseAdmin
+        .from("instructor_payment_setups")
+        .select("id, stripe_checkout_session_id, stripe_customer_id, stripe_setup_intent_id, stripe_payment_method_id")
+        .eq("instructor_profile_id", profile.id)
+        .eq("status", "completed")
+        .limit(1)
+        .maybeSingle(),
+      ctx.supabaseAdmin
+        .from("instructor_memberships")
+        .select("instructor_profile_id, stripe_customer_id, stripe_subscription_id, stripe_price_id, status, latest_checkout_session_id")
+        .eq("instructor_profile_id", profile.id)
+        .maybeSingle(),
+      ctx.supabaseAdmin
+        .from("instructor_offer_entitlements")
+        .select("id, redeemed_at, redeemed_checkout_session_id, redeemed_subscription_id")
+        .eq("instructor_profile_id", profile.id)
+        .maybeSingle(),
+      ctx.supabaseAdmin
+        .from("instructor_guarantees")
+        .select("activation_checkout_session_id, first_stripe_customer_id, first_stripe_subscription_id, guarantee_terms_version")
+        .eq("instructor_profile_id", profile.id)
+        .maybeSingle(),
+    ]);
+    const setupStateError = completedPaymentSetupResult.error ??
+      setupMembershipResult.error ?? setupEntitlementResult.error ??
+      setupGuaranteeResult.error;
+    if (setupStateError) {
+      console.error(
+        "Unable to verify pre-review payment setup history",
+        setupStateError.code,
+      );
+      return json({ error: "Unable to verify checkout eligibility" }, 500);
+    }
+    const completedPaymentSetup = completedPaymentSetupResult.data;
+    const setupMembership = setupMembershipResult.data;
+    const setupEntitlement = setupEntitlementResult.data;
+    const setupGuarantee = setupGuaranteeResult.data;
+    const hasPaymentSetupState = Boolean(
+      completedPaymentSetup || settings.payment_setup_completed_at ||
+      settings.stripe_payment_method_id ||
+      settings.stripe_payment_setup_intent_id ||
+      settings.stripe_payment_setup_checkout_session_id,
+    );
+    const canonicalSetup = completedPaymentSetup &&
+      settings.payment_setup_completed_at &&
+      completedPaymentSetup.stripe_checkout_session_id ===
+        settings.stripe_payment_setup_checkout_session_id &&
+      completedPaymentSetup.stripe_customer_id === settings.stripe_customer_id &&
+      completedPaymentSetup.stripe_setup_intent_id ===
+        settings.stripe_payment_setup_intent_id &&
+      completedPaymentSetup.stripe_payment_method_id ===
+        settings.stripe_payment_method_id
+      ? completedPaymentSetup
+      : null;
+    const canonicalSetupMembership = canonicalSetup && setupMembership &&
+        setupMembership.stripe_customer_id === canonicalSetup.stripe_customer_id &&
+        setupMembership.stripe_subscription_id === settings.stripe_subscription_id &&
+        setupMembership.stripe_price_id === priceId &&
+        setupMembership.latest_checkout_session_id ===
+          canonicalSetup.stripe_checkout_session_id
+      ? setupMembership
+      : null;
+    const canonicalSetupGuarantee = canonicalSetup && setupGuarantee &&
+        setupGuarantee.guarantee_terms_version ===
+          MEMBERSHIP_GUARANTEE_TERMS_VERSION &&
+        setupGuarantee.activation_checkout_session_id ===
+          canonicalSetup.stripe_checkout_session_id &&
+        setupGuarantee.first_stripe_customer_id ===
+          canonicalSetup.stripe_customer_id &&
+        typeof setupGuarantee.first_stripe_subscription_id === "string" &&
+        /^sub_[A-Za-z0-9]+$/.test(setupGuarantee.first_stripe_subscription_id)
+      ? setupGuarantee
+      : null;
+    const canonicalSetupSubscriptionId =
+      canonicalSetupMembership?.stripe_subscription_id ??
+      canonicalSetupGuarantee?.first_stripe_subscription_id ?? null;
+    const setupEntitlementSettled = !setupEntitlement || Boolean(
+      setupEntitlement.redeemed_at && canonicalSetupSubscriptionId &&
+        setupEntitlement.redeemed_checkout_session_id ===
+          canonicalSetup?.stripe_checkout_session_id &&
+        setupEntitlement.redeemed_subscription_id ===
+          canonicalSetupSubscriptionId,
+    );
+    if (
+      hasPaymentSetupState &&
+      ((!canonicalSetupMembership && !canonicalSetupGuarantee) ||
+        !setupEntitlementSettled)
+    ) {
+      return json({
+        error:
+          "Automatic membership activation is still being completed. Contact support before opening another Checkout.",
+        code: "payment_setup_activation_incomplete",
+      }, 409);
     }
 
     if (["trialing", "active", "past_due", "unpaid", "paused"].includes(settings.subscription_status)) {
@@ -127,15 +224,9 @@ export default {
     }
 
     const [
-      { data: membershipHistory, error: membershipHistoryError },
       { data: completedCheckout, error: completedCheckoutError },
       { data: earnedInvitation, error: earnedInvitationError },
     ] = await Promise.all([
-      ctx.supabaseAdmin
-        .from("instructor_memberships")
-        .select("instructor_profile_id")
-        .eq("instructor_profile_id", profile.id)
-        .maybeSingle(),
       ctx.supabaseAdmin
         .from("stripe_checkout_attempts")
         .select("id")
@@ -154,19 +245,17 @@ export default {
     ]);
 
     if (
-      membershipHistoryError || completedCheckoutError ||
-      earnedInvitationError
+      completedCheckoutError || earnedInvitationError
     ) {
       console.error(
         "Unable to verify instructor offer eligibility",
-        membershipHistoryError?.code ?? completedCheckoutError?.code ??
-          earnedInvitationError?.code,
+        completedCheckoutError?.code ?? earnedInvitationError?.code,
       );
       return json({ error: "Unable to verify checkout eligibility" }, 500);
     }
 
     const hasPriorDatabaseMembership = Boolean(
-      membershipHistory || completedCheckout || settings.stripe_subscription_id,
+      setupMembership || completedCheckout || settings.stripe_subscription_id,
     );
     const earnedOffer = !hasPriorDatabaseMembership &&
         earnedInvitation && !earnedInvitation.offer_redeemed_at

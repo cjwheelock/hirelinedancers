@@ -303,11 +303,13 @@ export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean })
         <section className={`${styles.shell} ${styles.narrow}`}>
           <p className={styles.eyebrow}>Instructor invitation</p>
           <h1 className={styles.title}>Create your instructor account</h1>
-          <p className={styles.subtitle}>Use the email address that received this invitation. Create the account and submit a complete profile{deadline ? ` by ${deadline}` : " within the seven-day window"}.</p>
+          <p className={styles.subtitle}>
+            Use the email address that received this invitation. Create the account and submit a complete profile{invitationLifecycle.grantsLifetimeAccess ? "" : " with payment setup"}{deadline ? ` by ${deadline}` : " within the seven-day window"}.
+          </p>
           {invitationLifecycle.grantsLifetimeAccess ? (
             <p className={styles.notice}>This invitation includes complimentary lifetime instructor access.</p>
           ) : invitationLifecycle.offerCode === "outreach_two_months_90_day_v1" ? (
-            <p className={styles.notice}>A complete profile submitted on time earns your first two monthly billing cycles free. Every new paid membership also includes the request-based 90-day booking guarantee.</p>
+            <p className={styles.notice}>Complete payment setup and submit your profile on time to earn your first two monthly billing cycles free. If approved, your membership will start automatically with the offer applied. Every new paid membership also includes the request-based 90-day booking guarantee.</p>
           ) : null}
           <OnboardingForm
             email={session.user.email ?? ""}
@@ -353,7 +355,9 @@ export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean })
             : missedSubmissionWindow
               ? "Your instructor account is ready, but the private offer submission window has ended. You can still finish your profile."
             : invitationLifecycle.status === "claimed"
-              ? `Confirm that you want to attach this invitation to the signed-in instructor account${deadline ? ` and submit your complete profile by ${deadline}` : ""}.`
+              ? invitationLifecycle.grantsLifetimeAccess
+                ? `Confirm that you want to attach this invitation to the signed-in instructor account${deadline ? ` and submit your complete profile by ${deadline}` : ""}.`
+                : `Confirm that you want to attach this invitation to the signed-in instructor account${deadline ? `, complete payment setup, and submit your complete profile by ${deadline}` : ""}.`
               : "Confirm the signed-in account to open the instructor workspace linked to this invitation."}
         </p>
         <div className={styles.buttonRow}>
@@ -536,6 +540,10 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
   const [checkoutPending, setCheckoutPending] = useState(false);
   const [checkoutRecoveryError, setCheckoutRecoveryError] = useState<string | null>(null);
   const [checkoutRetryVersion, setCheckoutRetryVersion] = useState(0);
+  const [paymentSetupPending, setPaymentSetupPending] = useState(false);
+  const [paymentSetupRecoveryError, setPaymentSetupRecoveryError] = useState<string | null>(null);
+  const [paymentSetupRetryVersion, setPaymentSetupRetryVersion] = useState(0);
+  const [profileNotice, setProfileNotice] = useState<{ tone: "notice" | "success"; message: string } | null>(null);
   const [membershipNotice, setMembershipNotice] = useState<{ tone: "notice" | "success"; message: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -589,7 +597,22 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("checkout") === "success") return;
+    if (params.get("checkout") === "success" || params.get("payment_setup") === "success") return;
+
+    if (params.get("payment_setup") === "canceled") {
+      setTab("profile");
+      setPaymentSetupPending(false);
+      setPaymentSetupRecoveryError(null);
+      setProfileNotice({
+        tone: "notice",
+        message: "Payment setup was canceled. No payment method was saved, no subscription was started, and your profile remains a draft."
+      });
+      const url = new URL(window.location.href);
+      url.searchParams.delete("payment_setup");
+      url.searchParams.delete("session_id");
+      window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+      return;
+    }
 
     if (params.get("checkout") === "canceled") {
       setTab("membership");
@@ -645,6 +668,98 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
       setTab(requestedTab as InstructorTab);
     }
   }, [account.id]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("payment_setup") !== "success") return;
+
+    setTab("profile");
+    setPaymentSetupPending(true);
+    setPaymentSetupRecoveryError(null);
+    setProfileNotice(null);
+    let stopped = false;
+    let attempts = 0;
+    let timer: number | undefined;
+    const sessionId = params.get("session_id");
+
+    if (!sessionId || !/^cs_(?:live|test)_[A-Za-z0-9]+$/.test(sessionId)) {
+      setPaymentSetupPending(false);
+      setPaymentSetupRecoveryError("Stripe returned without a valid payment setup reference. Refresh this page, then contact support if your profile was not submitted.");
+      return;
+    }
+
+    async function reconcilePaymentSetup() {
+      const client = getMarketplaceClient();
+      if (!client || stopped) return;
+      attempts += 1;
+      const { data, error: reconciliationError } = await client.functions.invoke("reconcile-instructor-payment-setup", {
+        body: { sessionId }
+      });
+      if (stopped) return;
+
+      await load(true);
+      if (stopped) return;
+
+      if (
+        !reconciliationError
+        && data?.reconciled === true
+        && data?.paymentMethodSaved === true
+        && ["pending_review", "approved", "published", "suspended"].includes(data?.profileStatus)
+      ) {
+        const reviewMessage = data.profileStatus === "pending_review"
+          ? "Payment method saved. Your profile was submitted. We’ll review it ASAP."
+          : data.profileStatus === "approved"
+            ? "Payment method saved. Your profile is approved."
+            : data.profileStatus === "published"
+              ? "Payment method saved. Your profile is live."
+              : "Payment method saved. Your profile is currently suspended.";
+        const membershipTiming = data.profileStatus === "pending_review"
+          ? "If approved, your membership will start automatically"
+          : data.profileStatus === "approved"
+            ? "Your membership is starting automatically"
+            : data.profileStatus === "published"
+              ? "Your membership is active"
+              : null;
+        const pricingMessage = !membershipTiming
+          ? "This confirmation did not start a new membership. Contact support if you have questions about the suspension."
+          : data.entitlementSource === "founding_first_100"
+          ? `Your two-month founding instructor offer is reserved. ${membershipTiming} with two free months. It will then renew at $14.99 USD per month until canceled.`
+          : data.entitlementSource === "private_invitation"
+            ? `Your two-month private instructor offer is reserved. ${membershipTiming} with two free months. It will then renew at $14.99 USD per month until canceled.`
+            : `${membershipTiming} at $14.99 USD per month until canceled.`;
+        setPaymentSetupPending(false);
+        setPaymentSetupRecoveryError(null);
+        setProfileNotice({
+          tone: "success",
+          message: `${reviewMessage} ${pricingMessage}`
+        });
+        const url = new URL(window.location.href);
+        url.searchParams.delete("payment_setup");
+        url.searchParams.delete("session_id");
+        window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+        return;
+      }
+
+      if (attempts < 4) {
+        const retryDelay = [750, 1500, 3000, 5000][attempts - 1] ?? 5000;
+        timer = window.setTimeout(() => void reconcilePaymentSetup(), retryDelay);
+        return;
+      }
+
+      const recoveryMessage = reconciliationError
+        ? await edgeFunctionError(reconciliationError)
+        : "Stripe is still confirming your saved payment method.";
+      if (stopped) return;
+      setPaymentSetupPending(false);
+      setPaymentSetupRecoveryError(`${recoveryMessage} Use Check payment setup again below. If this continues, contact support and do not start another payment setup.`);
+    }
+
+    timer = window.setTimeout(() => void reconcilePaymentSetup(), 500);
+    return () => {
+      stopped = true;
+      if (timer) window.clearTimeout(timer);
+    };
+  }, [account.id, paymentSetupRetryVersion]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -762,14 +877,14 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
           <p className={styles.eyebrow}>Private outreach offer</p>
           {invitationOffer.offerStatus === "redeemed" ? (
             <>
-              <h2>Two months free activated</h2>
-              <p className={styles.success}>Your earned private offer was applied when you activated your membership, so your first two monthly billing cycles are free.</p>
-              {invitationOffer.offerRedeemedAt ? <p className={styles.help}>Activated {new Date(invitationOffer.offerRedeemedAt).toLocaleString()}.</p> : null}
+              <h2>Two months free applied</h2>
+              <p className={styles.success}>Your earned private offer was applied when your membership started automatically after approval, so your first two monthly billing cycles are free.</p>
+              {invitationOffer.offerRedeemedAt ? <p className={styles.help}>Applied {new Date(invitationOffer.offerRedeemedAt).toLocaleString()}.</p> : null}
             </>
           ) : invitationOffer.offerStatus === "earned" || invitationOffer.offerEligible ? (
             <>
               <h2>Two months free earned</h2>
-              <p className={styles.success}>Your complete profile was submitted on time, so your first two monthly billing cycles will be free after activation. Later review timing will not affect this earned offer.</p>
+              <p className={styles.success}>Your profile and payment setup were completed on time. If approved, your membership will start automatically with the first two monthly billing cycles free. Later review timing will not affect this earned offer.</p>
               <p className={styles.help}>Every new paid membership also includes the request-based 90-day booking guarantee, subject to its terms.</p>
             </>
           ) : invitationOffer.status === "claim_expired" ? (
@@ -784,9 +899,9 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
             </>
           ) : (
             <>
-              <h2>Submit your complete profile on time</h2>
+              <h2>Complete your profile and payment setup on time</h2>
               <p className={styles.notice}>
-                Submit a complete profile{invitationOffer.profileSubmissionDeadlineAt ? ` by ${new Date(invitationOffer.profileSubmissionDeadlineAt).toLocaleString()}` : " within your invitation window"} to earn your first two monthly billing cycles free.
+                Choose Continue to save your payment method and submit a complete profile{invitationOffer.profileSubmissionDeadlineAt ? ` by ${new Date(invitationOffer.profileSubmissionDeadlineAt).toLocaleString()}` : " within your invitation window"} to earn your first two monthly billing cycles free.
               </p>
               <p className={styles.help}>Required details include your public name, bio, location, at least one event type, a valid inquiry email, and a ready headshot.</p>
             </>
@@ -811,8 +926,16 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
 
       {loading ? <div className={styles.loading}>Loading your instructor workspace...</div> : null}
       {error ? <p className={styles.error}>{error}</p> : null}
+      {!loading && tab === "profile" && profileNotice ? <p className={styles[profileNotice.tone]} role="status">{profileNotice.message}</p> : null}
+      {!loading && tab === "profile" && paymentSetupPending ? <p className={styles.notice} role="status">Stripe received your payment setup. We are confirming your saved payment method and submitting your profile now.</p> : null}
+      {!loading && tab === "profile" && paymentSetupRecoveryError ? (
+        <div className={`${styles.card} ${styles.stack}`}>
+          <p className={styles.error} role="alert">{paymentSetupRecoveryError}</p>
+          <button className={styles.button} type="button" onClick={() => setPaymentSetupRetryVersion((current) => current + 1)}>Check payment setup again</button>
+        </div>
+      ) : null}
       {!loading && profile && tab === "profile" ? (
-        <InstructorProfileForm profile={profile} settings={settings} onSaved={() => void load()} />
+        <InstructorProfileForm profile={profile} settings={settings} hasLifetimeAccess={hasLifetimeAccess} onSaved={() => void load()} />
       ) : null}
       {!loading && tab === "inquiries" ? (
         <InquiryList
@@ -849,10 +972,12 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
 function InstructorProfileForm({
   profile,
   settings,
+  hasLifetimeAccess,
   onSaved
 }: {
   profile: InstructorProfile;
   settings: InstructorPrivateSettings | null;
+  hasLifetimeAccess: boolean | null;
   onSaved: () => void;
 }) {
   const [form, setForm] = useState({
@@ -879,9 +1004,10 @@ function InstructorProfileForm({
     minimum_rate: settings?.minimum_rate_cents ? (settings.minimum_rate_cents / 100).toString() : "",
     minimum_hours: settings?.minimum_hours?.toString() ?? ""
   });
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<"save" | "continue" | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const paymentSetupRequestKey = useRef<string | null>(null);
 
   function setValue<Key extends keyof typeof form>(key: Key, value: (typeof form)[Key]) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -896,23 +1022,23 @@ function InstructorProfileForm({
     }));
   }
 
-  async function save(submitForReview: boolean) {
+  async function save(continueToSubmission: boolean) {
     const client = getMarketplaceClient();
     if (!client) return;
-    if (submitForReview && (!form.display_name.trim() || !form.bio.trim() || !form.city.trim() || !form.region.trim() || !form.event_types.length)) {
-      setError("Add your public name, bio, location, and at least one event type before submitting for review.");
+    if (continueToSubmission && (!form.display_name.trim() || !form.bio.trim() || !form.city.trim() || !form.region.trim() || !form.event_types.length)) {
+      setError("Add your public name, bio, location, and at least one event type before continuing.");
       return;
     }
-    if (submitForReview && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.inquiry_email.trim())) {
-      setError("A valid inquiry email is required before submitting for review.");
+    if (continueToSubmission && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.inquiry_email.trim())) {
+      setError("A valid inquiry email is required before continuing.");
       return;
     }
 
-    setBusy(true);
+    setBusy(continueToSubmission ? "continue" : "save");
     setError(null);
     setMessage(null);
 
-    if (submitForReview) {
+    if (continueToSubmission) {
       const { data: readyHeadshots, error: headshotError } = await client
         .from("profile_media")
         .select("id")
@@ -922,12 +1048,12 @@ function InstructorProfileForm({
         .limit(1);
       if (headshotError) {
         setError(headshotError.message);
-        setBusy(false);
+        setBusy(null);
         return;
       }
       if (!readyHeadshots?.length) {
-        setError("Upload a main headshot and wait for it to be ready before submitting for review.");
-        setBusy(false);
+        setError("Upload a main headshot and wait for it to be ready before continuing.");
+        setBusy(null);
         return;
       }
     }
@@ -952,15 +1078,8 @@ function InstructorProfileForm({
       provides_music_playback: form.provides_music_playback,
       liability_insurance_status: form.liability_insurance_status,
       preferred_response_hours: Number(form.preferred_response_hours),
-      status: submitForReview ? "pending_review" : profile.status
+      status: profile.status
     };
-
-    const { error: profileError } = await client.from("instructor_profiles").update(profilePayload).eq("id", profile.id);
-    if (profileError) {
-      setError(profileError.message);
-      setBusy(false);
-      return;
-    }
 
     const { error: settingsError } = await client.from("instructor_private_settings").upsert({
       instructor_profile_id: profile.id,
@@ -970,17 +1089,82 @@ function InstructorProfileForm({
       minimum_rate_cents: form.minimum_rate ? Math.round(Number(form.minimum_rate) * 100) : null,
       minimum_hours: form.minimum_hours ? Number(form.minimum_hours) : null
     });
-    setBusy(false);
     if (settingsError) {
       setError(settingsError.message);
+      setBusy(null);
       return;
     }
-    setMessage(submitForReview ? "Your profile is ready for review." : "Your profile changes are saved.");
-    onSaved();
+
+    const { error: profileError } = await client.from("instructor_profiles").update(profilePayload).eq("id", profile.id);
+    if (profileError) {
+      setError(profileError.message);
+      setBusy(null);
+      return;
+    }
+
+    if (!continueToSubmission) {
+      setBusy(null);
+      setMessage("Your profile changes are saved.");
+      onSaved();
+      return;
+    }
+
+    if (hasLifetimeAccess === null) {
+      setBusy(null);
+      setError("We could not verify your instructor access. Refresh the page before continuing.");
+      return;
+    }
+
+    if (hasLifetimeAccess) {
+      const { error: submissionError } = await client.rpc("submit_lifetime_instructor_profile_for_review");
+      setBusy(null);
+      if (submissionError) {
+        setError(submissionError.message);
+        return;
+      }
+      setMessage("Your profile was submitted. We’ll review it ASAP.");
+      onSaved();
+      return;
+    }
+
+    if (settings?.payment_setup_completed_at) {
+      const { data: resubmissionData, error: resubmissionError } = await client.rpc("resubmit_instructor_profile_after_payment_setup");
+      setBusy(null);
+      if (resubmissionError) {
+        setError(resubmissionError.message.includes("A verified payment setup is required before resubmitting")
+          ? "We could not verify your saved payment method. Refresh the page and try again. If this continues, contact support. You will not be asked to enter your card again unless a replacement is required."
+          : resubmissionError.message);
+        return;
+      }
+      if (resubmissionData?.profileStatus !== "pending_review") {
+        setError("Your updated profile could not be resubmitted for review. Refresh the page and try again.");
+        return;
+      }
+      setMessage("Your saved payment method is confirmed. Your updated profile was resubmitted. We’ll review it ASAP.");
+      onSaved();
+      return;
+    }
+
+    paymentSetupRequestKey.current ??= crypto.randomUUID();
+    const { data, error: setupError } = await client.functions.invoke("create-instructor-payment-setup", {
+      body: { instructorProfileId: profile.id },
+      headers: { "Idempotency-Key": paymentSetupRequestKey.current }
+    });
+    if (setupError) {
+      setBusy(null);
+      setError(await edgeFunctionError(setupError));
+      return;
+    }
+    if (!data?.url || typeof data.url !== "string") {
+      setBusy(null);
+      setError("Stripe payment setup did not return a secure link.");
+      return;
+    }
+    window.location.assign(data.url);
   }
 
   const canEdit = ["draft", "approved", "published"].includes(profile.status);
-  const canSubmitForReview = profile.status === "draft";
+  const canContinue = profile.status === "draft";
   const selectedMarket = cities.find((market) => market.city === form.city && market.state === form.region);
   const allEventTypesSelected = eventTypes.every((item) => form.event_types.includes(item.slug));
 
@@ -1001,7 +1185,7 @@ function InstructorProfileForm({
     <div className={`${styles.card} ${styles.stack}`}>
       <div className={styles.buttonRow}>
         <span className={styles.status}>{profile.status.replace("_", " ")}</span>
-        {profile.status === "pending_review" ? <span className={styles.muted}>We will email you after the review.</span> : null}
+        {profile.status === "pending_review" ? <span className={styles.muted}>Your profile is under review.</span> : null}
       </div>
       {!canEdit ? <p className={styles.notice}>Editing is paused while your profile is in review or suspended.</p> : null}
 
@@ -1129,13 +1313,28 @@ function InstructorProfileForm({
 
       {message ? <p className={styles.success}>{message}</p> : null}
       {error ? <p className={styles.error}>{error}</p> : null}
+      {canContinue && hasLifetimeAccess === false ? (
+        <div className={styles.stack}>
+          {settings?.payment_setup_completed_at ? (
+            <p className={styles.help}>Your payment method is already saved securely. Choose Continue to resubmit your updated profile without entering your card again. No subscription will start and your card will not be charged while your profile is under review. If approved, your membership starts automatically.</p>
+          ) : (
+            <>
+              <p className={styles.help}>Stripe will save your card securely. No subscription will start and your card will not be charged before your profile is approved. If approved, your membership starts automatically. The first 100 instructors who complete payment setup receive two months free, then the membership renews at $14.99 USD per month until canceled. The 90-day money-back guarantee begins when Stripe collects your first membership payment.</p>
+              <p className={styles.muted}>By continuing, you agree to the <a href="/legal/terms/">Terms of Service</a>, acknowledge the <a href="/legal/privacy/">Privacy Policy</a> and <a href="/legal/refund-policy/">Refund Policy</a>, and authorize Hire Line Dancers to start your membership automatically only if your profile is approved.</p>
+            </>
+          )}
+        </div>
+      ) : null}
+      {canContinue && hasLifetimeAccess ? <p className={styles.help}>Your complimentary lifetime access does not require a payment method. Continue to submit your completed profile for review.</p> : null}
       {canEdit ? (
         <div className={styles.buttonRow}>
-          <button className={styles.secondaryButton} type="button" disabled={busy} onClick={() => void save(false)}>
-            {profile.status === "draft" ? "Save draft" : "Save changes"}
+          <button className={styles.secondaryButton} type="button" disabled={busy !== null} onClick={() => void save(false)}>
+            {busy === "save" ? "Saving..." : profile.status === "draft" ? "Save draft" : "Save changes"}
           </button>
-          {canSubmitForReview ? (
-            <button className={styles.button} type="button" disabled={busy} onClick={() => void save(true)}>Submit for review</button>
+          {canContinue ? (
+            <button className={styles.button} type="button" disabled={busy !== null || hasLifetimeAccess === null} onClick={() => void save(true)}>
+              {busy === "continue" ? hasLifetimeAccess || settings?.payment_setup_completed_at ? "Submitting..." : "Opening secure payment setup..." : "Continue"}
+            </button>
           ) : null}
         </div>
       ) : null}
@@ -1354,6 +1553,9 @@ function MembershipCard({
 
   const hasPriorSubscription = Boolean(settings?.stripe_subscription_id);
   const canManage = ["trialing", "active", "past_due", "unpaid", "paused"].includes(settings?.subscription_status ?? "");
+  const membershipStatusLabel = profile.status === "pending_review"
+    ? "payment method saved"
+    : settings?.subscription_status ?? "inactive";
 
   if (hasLifetimeAccess) {
     return (
@@ -1362,7 +1564,7 @@ function MembershipCard({
         <h2>Lifetime access</h2>
         <p>Your instructor account has complimentary lifetime access. You will not be asked to enter payment details or activate a Stripe membership for this profile.</p>
         <p><span className={styles.status}>Lifetime</span></p>
-        {profile.status === "draft" ? <p className={styles.notice}>Complete your profile and submit it for review. Lifetime access will activate it automatically after approval.</p> : null}
+        {profile.status === "draft" ? <p className={styles.notice}>Complete your profile and choose Continue to submit it for review. Lifetime access will publish it automatically after approval.</p> : null}
         {profile.status === "pending_review" ? <p className={styles.notice}>Your profile is under review. It will go live automatically when approved.</p> : null}
         {profile.status === "approved" ? <p className={styles.notice}>Your profile is approved and is being prepared for the directory.</p> : null}
         {profile.status === "published" ? <p className={styles.success}>Your profile is live in the directory.</p> : null}
@@ -1375,8 +1577,8 @@ function MembershipCard({
     <div className={styles.card}>
       <p className={styles.eyebrow}>Instructor membership</p>
       <h2>$14.99 USD per month</h2>
-      <p>Activate your instructor membership after your profile is approved. Stripe securely processes payment, and your membership renews monthly until canceled. If your account has an eligible private offer, Checkout will show that your first two monthly billing cycles are free and will display your first charge date. Every new paid membership includes a request-based 90-day booking guarantee that begins with the first invoice that collects a positive membership payment.</p>
-      <p><span className={styles.status}>{settings?.subscription_status ?? "inactive"}</span></p>
+      <p>New instructors save a payment method before profile review. Stripe does not start a subscription or charge the saved card before approval. If the profile is approved, membership begins automatically. The first 100 instructors who complete payment setup receive their first two months free, then membership renews at $14.99 USD per month until canceled. Every new paid membership includes the 90-day booking guarantee, which begins with the first membership payment.</p>
+      <p><span className={styles.status}>{membershipStatusLabel}</span></p>
       {membershipNotice ? <p className={styles[membershipNotice.tone]} role="status">{membershipNotice.message}</p> : null}
       {checkoutRecoveryError ? (
         <div className={styles.stack}>
@@ -1384,7 +1586,7 @@ function MembershipCard({
           <button className={styles.button} type="button" disabled={busy !== null} onClick={onRetryCheckout}>Check membership again</button>
         </div>
       ) : null}
-      {profile.status === "approved" ? (
+      {profile.status === "approved" && (!settings?.payment_setup_completed_at || hasPriorSubscription) ? (
         <>
           {checkoutPending ? (
             <p className={styles.notice}>Stripe received your checkout. We are confirming your membership now. This usually takes a few seconds.</p>
@@ -1399,9 +1601,9 @@ function MembershipCard({
           )}
         </>
       ) : null}
-      {profile.status === "draft" || profile.status === "pending_review" ? (
-        <p className={styles.notice}>Membership activation becomes available after your profile is approved.</p>
-      ) : null}
+      {profile.status === "approved" && settings?.payment_setup_completed_at && !hasPriorSubscription ? <p className={styles.notice}>Your profile is approved and your automatically started membership is still being confirmed. Do not begin another checkout. Refresh shortly, then contact support if this status does not update.</p> : null}
+      {profile.status === "draft" ? <p className={styles.notice}>{settings?.payment_setup_completed_at ? "Complete your updates and choose Continue to resubmit with your saved payment method." : "Complete your profile and choose Continue to save your payment method securely before review."}</p> : null}
+      {profile.status === "pending_review" ? <p className={styles.notice}>Your payment method is saved. No charge was made and no subscription has started while your profile is under review. If approved, your membership will begin automatically.</p> : null}
       {profile.status === "published" ? <p className={styles.success}>Your profile is live in the directory.</p> : null}
       {canManage ? (
         <button className={styles.secondaryButton} type="button" disabled={busy !== null} onClick={() => void manageMembership()}>
@@ -1441,6 +1643,27 @@ type AdminInstructorLifetimeAccess = {
   access_source: "admin" | "invitation" | null;
   granted_at: string | null;
   granted_by_email: string | null;
+};
+
+type AdminInstructorPaymentSetup = {
+  instructor_profile_id: string;
+  payment_setup_completed_at: string | null;
+  stripe_customer_id: string | null;
+  stripe_payment_setup_checkout_session_id: string | null;
+  stripe_subscription_id: string | null;
+};
+
+type AdminInstructorOfferEntitlement = {
+  instructor_profile_id: string | null;
+  redeemed_at: string | null;
+};
+
+type AdminInstructorActivationMembership = {
+  instructor_profile_id: string;
+  stripe_customer_id: string;
+  stripe_subscription_id: string;
+  latest_checkout_session_id: string | null;
+  status: string;
 };
 
 type AdminInstructorInvitation = {
@@ -2141,6 +2364,9 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
   const [media, setMedia] = useState<ProfileMedia[]>([]);
   const [admins, setAdmins] = useState<AdminAccess[]>([]);
   const [lifetimeAccess, setLifetimeAccess] = useState<AdminInstructorLifetimeAccess[]>([]);
+  const [paymentSetups, setPaymentSetups] = useState<AdminInstructorPaymentSetup[]>([]);
+  const [offerEntitlements, setOfferEntitlements] = useState<AdminInstructorOfferEntitlement[]>([]);
+  const [activationMemberships, setActivationMemberships] = useState<AdminInstructorActivationMembership[]>([]);
   const [invitations, setInvitations] = useState<AdminInstructorInvitation[]>([]);
   const [followupResponses, setFollowupResponses] = useState<AdminFollowupResponse[]>([]);
   const [analytics, setAnalytics] = useState<AdminAnalytics>(emptyAdminAnalytics);
@@ -2178,7 +2404,7 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
     if (!client) return;
     setLoading(true);
     setError(null);
-    const [profileResult, inquiryResult, jobResult, mediaResult, adminResult, feedbackResult, lifetimeResult, invitationResult] = await Promise.all([
+    const [profileResult, inquiryResult, jobResult, mediaResult, adminResult, feedbackResult, lifetimeResult, paymentSetupResult, entitlementResult, membershipResult, invitationResult] = await Promise.all([
       client.from("instructor_profiles").select("*").order("updated_at", { ascending: false }),
       client.from("inquiries").select("*").order("created_at", { ascending: false }).limit(100),
       client.from("inquiry_notification_jobs").select("id,channel,notification_type,status,attempts,last_error,created_at").order("created_at", { ascending: false }).limit(100),
@@ -2186,9 +2412,12 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
       client.rpc("list_marketplace_admins"),
       client.from("inquiry_followup_responses").select("id,inquiry_id,stage,response,confirmed_event_date,private_comment,submitted_at").order("submitted_at", { ascending: false }).limit(100),
       client.rpc("admin_list_instructor_lifetime_access"),
+      client.from("instructor_private_settings").select("instructor_profile_id,payment_setup_completed_at,stripe_customer_id,stripe_payment_setup_checkout_session_id,stripe_subscription_id"),
+      client.from("instructor_offer_entitlements").select("instructor_profile_id,redeemed_at"),
+      client.from("instructor_memberships").select("instructor_profile_id,stripe_customer_id,stripe_subscription_id,latest_checkout_session_id,status"),
       client.rpc("admin_list_instructor_invitations")
     ]);
-    const loadError = profileResult.error ?? inquiryResult.error ?? jobResult.error ?? mediaResult.error ?? adminResult.error ?? feedbackResult.error ?? lifetimeResult.error ?? invitationResult.error;
+    const loadError = profileResult.error ?? inquiryResult.error ?? jobResult.error ?? mediaResult.error ?? adminResult.error ?? feedbackResult.error ?? lifetimeResult.error ?? paymentSetupResult.error ?? entitlementResult.error ?? membershipResult.error ?? invitationResult.error;
     if (loadError) setError(loadError.message);
     const loadedProfiles = (profileResult.data as InstructorProfile[] | null) ?? [];
     setProfiles(loadedProfiles);
@@ -2198,6 +2427,9 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
     setAdmins((adminResult.data as AdminAccess[] | null) ?? []);
     setFollowupResponses((feedbackResult.data as AdminFollowupResponse[] | null) ?? []);
     setLifetimeAccess((lifetimeResult.data as AdminInstructorLifetimeAccess[] | null) ?? []);
+    setPaymentSetups((paymentSetupResult.data as AdminInstructorPaymentSetup[] | null) ?? []);
+    setOfferEntitlements((entitlementResult.data as AdminInstructorOfferEntitlement[] | null) ?? []);
+    setActivationMemberships((membershipResult.data as AdminInstructorActivationMembership[] | null) ?? []);
     setInvitations((invitationResult.data as AdminInstructorInvitation[] | null) ?? []);
     setSlugs((current) => Object.fromEntries(loadedProfiles.map((profile) => [profile.id, current[profile.id] ?? profile.slug ?? suggestedSlug(profile)])));
     setLoading(false);
@@ -2232,18 +2464,63 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
   async function review(profileId: string, decision: "approve" | "return_to_draft" | "suspend") {
     const client = getMarketplaceClient();
     if (!client) return;
+    const targetProfile = profiles.find((profile) => profile.id === profileId);
+    const targetHasLifetimeAccess = lifetimeAccess.some((access) =>
+      access.instructor_profile_id === profileId && access.has_lifetime_access
+    );
+    const targetPaymentSetup = paymentSetups.find((setup) => setup.instructor_profile_id === profileId);
+    const targetUnredeemedEntitlement = offerEntitlements.some((entitlement) =>
+      entitlement.instructor_profile_id === profileId && !entitlement.redeemed_at
+    );
+    const targetActivationIsSynced = activationMemberships.some((membership) =>
+      membership.instructor_profile_id === profileId
+      && membership.stripe_customer_id === targetPaymentSetup?.stripe_customer_id
+      && membership.stripe_subscription_id === targetPaymentSetup?.stripe_subscription_id
+      && membership.latest_checkout_session_id === targetPaymentSetup?.stripe_payment_setup_checkout_session_id
+    );
+    const retriesMembershipActivation = decision === "approve"
+      && ["approved", "published"].includes(targetProfile?.status ?? "")
+      && Boolean(targetPaymentSetup?.payment_setup_completed_at)
+      && (!targetActivationIsSynced || targetUnredeemedEntitlement)
+      && !targetHasLifetimeAccess;
+    const usesVerifiedApproval = decision === "approve"
+      && (targetProfile?.status === "pending_review" || retriesMembershipActivation);
     setBusyId(profileId);
     setError(null);
-    const { error: reviewError } = await client.rpc("review_instructor_profile", {
-      p_instructor_profile_id: profileId,
-      p_decision: decision,
-      p_slug: slugs[profileId] || null,
-      p_note: notes[profileId] || null
-    });
+    let reviewError: string | null = null;
+    if (usesVerifiedApproval) {
+      const { error: approvalError } = await client.functions.invoke("review-instructor-profile", {
+        body: {
+          instructorProfileId: profileId,
+          decision,
+          slug: slugs[profileId] || null,
+          note: notes[profileId] || null
+        }
+      });
+      if (approvalError) reviewError = await edgeFunctionError(approvalError);
+    } else {
+      const { error: decisionError } = await client.rpc("review_instructor_profile", {
+        p_instructor_profile_id: profileId,
+        p_decision: decision,
+        p_slug: slugs[profileId] || null,
+        p_note: notes[profileId] || null
+      });
+      if (decisionError) reviewError = decisionError.message;
+    }
     setBusyId(null);
-    if (reviewError) setError(reviewError.message);
-    else {
-      setMessage(decision === "approve" ? "Instructor approved or reactivated. Active memberships and lifetime access publish automatically." : "Instructor profile updated.");
+    if (reviewError) {
+      setError(reviewError);
+      await loadOperations();
+    } else {
+      setMessage(usesVerifiedApproval
+        ? retriesMembershipActivation
+          ? "Stripe confirmed the automatically started membership, and the profile was published."
+          : targetHasLifetimeAccess
+          ? "Instructor approved. Lifetime access published the profile automatically."
+          : "Instructor approved. Stripe confirmed the automatically started membership, and the profile was published."
+        : decision === "approve"
+          ? "Instructor reactivated. An active membership or lifetime access publishes the profile automatically."
+          : "Instructor profile updated.");
       await loadOperations();
     }
   }
@@ -2507,7 +2784,7 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
         <>
           <div className={styles.card}>
             <h2>Profiles awaiting review</h2>
-            <p className={styles.muted}>Review the profile copy and all uploaded media before approval. Approval publishes profiles with lifetime access and unlocks membership activation for everyone else.</p>
+            <p className={styles.muted}>Review the profile copy and all uploaded media before approval. Approval publishes profiles with lifetime access. For standard instructors, approval starts the saved Stripe membership automatically and publishes the profile after Stripe confirms it.</p>
             {!pending.length ? <p className={styles.notice}>No profiles are waiting for review.</p> : null}
             <div className={styles.list}>
               {pending.map((profile) => {
@@ -2551,15 +2828,32 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
             <div className={styles.tableWrap}>
               <table className={styles.dataTable}>
                 <thead><tr><th>Instructor</th><th>Location</th><th>Status</th><th>Action</th></tr></thead>
-                <tbody>{profiles.map((profile) => (
-                  <tr key={profile.id}>
-                    <td>{profile.display_name}</td><td>{[profile.city, profile.region].filter(Boolean).join(", ")}</td><td><span className={styles.status}>{profile.status.replaceAll("_", " ")}</span></td>
-                    <td>
-                      {["approved", "published"].includes(profile.status) ? <button className={styles.dangerButton} disabled={busyId === profile.id} type="button" onClick={() => void review(profile.id, "suspend")}>Suspend</button> : null}
-                      {profile.status === "suspended" ? <button className={styles.secondaryButton} disabled={busyId === profile.id} type="button" onClick={() => void review(profile.id, "approve")}>Reactivate</button> : null}
-                    </td>
-                  </tr>
-                ))}</tbody>
+                <tbody>{profiles.map((profile) => {
+                  const paymentSetup = paymentSetups.find((setup) => setup.instructor_profile_id === profile.id);
+                  const activationIsSynced = activationMemberships.some((membership) =>
+                    membership.instructor_profile_id === profile.id
+                    && membership.stripe_customer_id === paymentSetup?.stripe_customer_id
+                    && membership.stripe_subscription_id === paymentSetup?.stripe_subscription_id
+                    && membership.latest_checkout_session_id === paymentSetup?.stripe_payment_setup_checkout_session_id
+                  );
+                  const hasUnredeemedEntitlement = offerEntitlements.some((entitlement) =>
+                    entitlement.instructor_profile_id === profile.id && !entitlement.redeemed_at
+                  );
+                  const activationNeedsRetry = ["approved", "published"].includes(profile.status)
+                    && Boolean(paymentSetup?.payment_setup_completed_at)
+                    && (!activationIsSynced || hasUnredeemedEntitlement)
+                    && !lifetimeAccess.some((access) => access.instructor_profile_id === profile.id && access.has_lifetime_access);
+                  return (
+                    <tr key={profile.id}>
+                      <td>{profile.display_name}</td><td>{[profile.city, profile.region].filter(Boolean).join(", ")}</td><td><span className={styles.status}>{profile.status.replaceAll("_", " ")}</span></td>
+                      <td>
+                        {activationNeedsRetry ? <button className={styles.button} disabled={busyId === profile.id} type="button" onClick={() => void review(profile.id, "approve")}>{busyId === profile.id ? "Finishing..." : "Finish membership activation"}</button> : null}
+                        {!activationNeedsRetry && ["approved", "published"].includes(profile.status) ? <button className={styles.dangerButton} disabled={busyId === profile.id} type="button" onClick={() => void review(profile.id, "suspend")}>Suspend</button> : null}
+                        {profile.status === "suspended" ? <button className={styles.secondaryButton} disabled={busyId === profile.id} type="button" onClick={() => void review(profile.id, "approve")}>Reactivate</button> : null}
+                      </td>
+                    </tr>
+                  );
+                })}</tbody>
               </table>
             </div>
           </div>
