@@ -1,10 +1,16 @@
 import { withSupabase } from "npm:@supabase/server@^1";
 import Stripe from "npm:stripe@^22";
 import {
+  checkoutSessionHasExactCoupon,
   hldStripeConfig,
+  instructorCheckoutOffer,
+  membershipTermsState,
   requiredEnv,
   stripeObjectId,
+  subscriptionHasExactCoupon,
+  verifiedInstructorOfferCoupon,
   verifiedMembershipPrice,
+  verifiedPaidMembershipInvoices,
 } from "../_shared/hld-stripe.ts";
 
 function json(body: unknown, status = 200): Response {
@@ -147,7 +153,9 @@ export default {
 
     try {
       const observedAt = new Date().toISOString();
-      const session = await stripe.checkout.sessions.retrieve(sessionId);
+      const session = await stripe.checkout.sessions.retrieve(sessionId, {
+        expand: ["discounts"],
+      });
       const customerId = stripeObjectId(session.customer);
       const subscriptionId = stripeObjectId(session.subscription);
       const ownsSession = Boolean(customerId) &&
@@ -190,19 +198,29 @@ export default {
       }
 
       const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
-        expand: ["items.data.price"],
+        expand: ["items.data.price", "discounts"],
       });
+      if (subscription.items.has_more) {
+        return json({
+          error: "This subscription has too many items to verify safely",
+        }, 409);
+      }
       const subscriptionCustomerId = stripeObjectId(subscription.customer);
-      const membershipItem = subscription.items.data.find((item) =>
+      const membershipItems = subscription.items.data.filter((item) =>
         item.price.id === stripeConfig.priceId
       );
+      const membershipItem = membershipItems[0] ?? null;
       const ownsSubscription =
         subscription.metadata?.instructor_profile_id === profile.id &&
         subscription.metadata?.account_id === accountId &&
         subscription.metadata?.product_line === "hire_line_dancers" &&
         subscriptionCustomerId === customerId;
 
-      if (!subscriptionCustomerId || !ownsSubscription || !membershipItem) {
+      if (
+        !subscriptionCustomerId || !ownsSubscription || !membershipItem ||
+        membershipItems.length !== 1 || membershipItem.quantity !== 1 ||
+        subscription.items.data.length !== 1
+      ) {
         console.warn(
           "Rejected Checkout reconciliation subscription mismatch",
           session.id,
@@ -220,6 +238,57 @@ export default {
         return json({
           error: "Membership checkout is not configured correctly",
         }, 500);
+      }
+
+      const sessionUsesCurrentTerms = membershipTermsState(session.metadata) ===
+        "current";
+      const subscriptionUsesCurrentTerms = membershipTermsState(
+        subscription.metadata,
+      ) === "current";
+      if (sessionUsesCurrentTerms !== subscriptionUsesCurrentTerms) {
+        return json({
+          error: "The Checkout Session and subscription terms do not match",
+        }, 409);
+      }
+
+      let checkoutOffer: ReturnType<typeof instructorCheckoutOffer> = null;
+      if (sessionUsesCurrentTerms) {
+        const sessionOffer = instructorCheckoutOffer(session.metadata);
+        const subscriptionOffer = instructorCheckoutOffer(
+          subscription.metadata,
+        );
+        if (
+          sessionOffer?.invitationId !== subscriptionOffer?.invitationId ||
+          sessionOffer?.offerCode !== subscriptionOffer?.offerCode ||
+          sessionOffer?.couponId !== subscriptionOffer?.couponId
+        ) {
+          return json({
+            error: "The Checkout Session and subscription offer do not match",
+          }, 409);
+        }
+
+        const expectedCouponId = sessionOffer?.couponId ?? null;
+        if (sessionOffer) {
+          const configuredCoupon = await verifiedInstructorOfferCoupon(
+            stripe,
+            stripeConfig,
+          );
+          if (configuredCoupon.id !== sessionOffer.couponId) {
+            return json({
+              error: "The instructor offer Coupon does not match configuration",
+            }, 409);
+          }
+        }
+        if (
+          session.allow_promotion_codes === true ||
+          !checkoutSessionHasExactCoupon(session, expectedCouponId) ||
+          !subscriptionHasExactCoupon(subscription, expectedCouponId)
+        ) {
+          return json({
+            error: "The exact instructor offer Coupon was not applied",
+          }, 409);
+        }
+        checkoutOffer = sessionOffer;
       }
 
       const membershipStatus = normalizedStatus(subscription.status);
@@ -277,10 +346,112 @@ export default {
         }, 409);
       }
 
+      let offerResult: string | null = null;
+      if (checkoutOffer && result !== "stale_subscription") {
+        const { data, error } = await ctx.supabaseAdmin.rpc(
+          "redeem_instructor_checkout_offer",
+          {
+            p_instructor_profile_id: profile.id,
+            p_instructor_invitation_id: checkoutOffer.invitationId,
+            p_offer_code: checkoutOffer.offerCode,
+            p_stripe_checkout_session_id: session.id,
+            p_stripe_subscription_id: subscription.id,
+          },
+        );
+        if (error) {
+          console.error(
+            "Unable to redeem the earned instructor offer",
+            error.code,
+            error.message,
+          );
+          return json({ error: "Unable to confirm your instructor offer" }, 500);
+        }
+        offerResult = data;
+      }
+
+      let paidInvoiceResult:
+        | string[]
+        | "ledger_current"
+        | "zero_amount_ignored"
+        | null = null;
+      if (
+        subscriptionUsesCurrentTerms &&
+        result !== "stale_subscription"
+      ) {
+        const { data: recordedInvoices, error: recordedInvoicesError } =
+          await ctx.supabaseAdmin
+            .from("membership_paid_invoices")
+            .select("stripe_invoice_id")
+            .eq("instructor_profile_id", profile.id)
+            .eq("stripe_subscription_id", subscription.id);
+        if (recordedInvoicesError) {
+          console.error(
+            "Unable to inspect the paid invoice ledger",
+            recordedInvoicesError.code,
+          );
+          return json({
+            error: "Unable to confirm your membership payment yet",
+          }, 500);
+        }
+        const paidInvoices = await verifiedPaidMembershipInvoices(
+          stripe,
+          stripeConfig,
+          {
+            customerId,
+            subscriptionId: subscription.id,
+            instructorProfileId: profile.id,
+          },
+          undefined,
+          (recordedInvoices ?? []).map((invoice) =>
+            invoice.stripe_invoice_id
+          ),
+        );
+        if (paidInvoices.length > 0) {
+          const results: string[] = [];
+          for (const paidInvoice of paidInvoices) {
+            const { data, error } = await ctx.supabaseAdmin.rpc(
+              "record_membership_paid_invoice",
+              {
+                p_instructor_profile_id: profile.id,
+                p_stripe_invoice_id: paidInvoice.invoiceId,
+                p_stripe_customer_id: paidInvoice.customerId,
+                p_stripe_subscription_id: paidInvoice.subscriptionId,
+                p_stripe_price_id: paidInvoice.priceId,
+                p_amount_paid_cents: paidInvoice.amountPaidCents,
+                p_currency: paidInvoice.currency,
+                p_paid_at: paidInvoice.paidAt,
+                p_billing_reason: paidInvoice.billingReason,
+                p_livemode: paidInvoice.livemode,
+                p_source_event_id:
+                  `hld-reconcile-invoice:${session.id}:${paidInvoice.invoiceId}`,
+              },
+            );
+            if (error) {
+              console.error(
+                "Unable to record the paid membership invoice",
+                error.code,
+                error.message,
+              );
+              return json({
+                error: "Unable to confirm your membership payment yet",
+              }, 500);
+            }
+            results.push(data);
+          }
+          paidInvoiceResult = results;
+        } else {
+          paidInvoiceResult = (recordedInvoices ?? []).length > 0
+            ? "ledger_current"
+            : "zero_amount_ignored";
+        }
+      }
+
       return json({
         reconciled: true,
         membershipStatus,
         result,
+        offerResult,
+        paidInvoiceResult,
       });
     } catch (error) {
       const message = error instanceof Error

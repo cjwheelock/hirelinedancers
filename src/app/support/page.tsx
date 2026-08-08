@@ -17,7 +17,7 @@ export default function SupportPage() {
       <h2>Manage or cancel a membership</h2>
       <p>Sign in to your instructor account and select <strong>Manage membership</strong> to open the secure Stripe billing portal. Cancellation takes effect at the end of the current billing period unless applicable law requires otherwise.</p>
       <h2>Refund questions</h2>
-      <p>Review the <Link href="/legal/refund-policy/">Founding Instructor Refund Policy</Link> before submitting a request. Eligible requests can be sent to <a href={`mailto:${site.email}`}>{site.email}</a>.</p>
+      <p>Review the <Link href="/legal/refund-policy/">Instructor Membership Refund Policy</Link> before submitting a request. Eligible requests can be sent to <a href={`mailto:${site.email}`}>{site.email}</a>.</p>
       <h2>Event inquiries</h2>
       <p>Hire Line Dancers is a directory and lead-generation service. Event organizers and instructors agree on event pricing, deposits, cancellations, and payments directly with each other.</p>
     </section>

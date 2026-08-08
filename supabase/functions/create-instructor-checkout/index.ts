@@ -1,13 +1,18 @@
 import { withSupabase } from "npm:@supabase/server@^1";
 import Stripe from "npm:stripe@^22";
 import {
+  checkoutSessionHasExactCoupon,
   checkoutTermsRequired,
   hldStripeConfig,
+  INSTRUCTOR_OUTREACH_OFFER_CODE,
+  INSTRUCTOR_OUTREACH_OFFER_MONTHS,
+  MEMBERSHIP_CHECKOUT_TERMS_VERSION,
+  MEMBERSHIP_GUARANTEE_TERMS_VERSION,
   requiredEnv,
+  stripeObjectId,
+  verifiedInstructorOfferCoupon,
   verifiedMembershipPrice,
 } from "../_shared/hld-stripe.ts";
-
-const CHECKOUT_TERMS_VERSION = "2026-08-production-v1";
 
 function requestKey(req: Request): string {
   const supplied = req.headers.get("Idempotency-Key")?.trim();
@@ -121,6 +126,53 @@ export default {
       }, 409);
     }
 
+    const [
+      { data: membershipHistory, error: membershipHistoryError },
+      { data: completedCheckout, error: completedCheckoutError },
+      { data: earnedInvitation, error: earnedInvitationError },
+    ] = await Promise.all([
+      ctx.supabaseAdmin
+        .from("instructor_memberships")
+        .select("instructor_profile_id")
+        .eq("instructor_profile_id", profile.id)
+        .maybeSingle(),
+      ctx.supabaseAdmin
+        .from("stripe_checkout_attempts")
+        .select("id")
+        .eq("instructor_profile_id", profile.id)
+        .eq("status", "completed")
+        .limit(1)
+        .maybeSingle(),
+      ctx.supabaseAdmin
+        .from("instructor_invitations")
+        .select("id, offer_code, offer_earned_at, offer_redeemed_at")
+        .eq("accepted_profile_id", profile.id)
+        .eq("offer_code", INSTRUCTOR_OUTREACH_OFFER_CODE)
+        .eq("offer_eligible", true)
+        .not("offer_earned_at", "is", null)
+        .maybeSingle(),
+    ]);
+
+    if (
+      membershipHistoryError || completedCheckoutError ||
+      earnedInvitationError
+    ) {
+      console.error(
+        "Unable to verify instructor offer eligibility",
+        membershipHistoryError?.code ?? completedCheckoutError?.code ??
+          earnedInvitationError?.code,
+      );
+      return json({ error: "Unable to verify checkout eligibility" }, 500);
+    }
+
+    const hasPriorDatabaseMembership = Boolean(
+      membershipHistory || completedCheckout || settings.stripe_subscription_id,
+    );
+    const earnedOffer = !hasPriorDatabaseMembership &&
+        earnedInvitation && !earnedInvitation.offer_redeemed_at
+      ? earnedInvitation
+      : null;
+
     const { error: expireError } = await ctx.supabaseAdmin
       .from("stripe_checkout_attempts")
       .update({ status: "expired" })
@@ -133,52 +185,17 @@ export default {
       return json({ error: "Unable to prepare checkout" }, 500);
     }
 
-    const { data: openAttempt } = await ctx.supabaseAdmin
+    const { data: openAttempt, error: openAttemptError } = await ctx.supabaseAdmin
       .from("stripe_checkout_attempts")
-      .select("checkout_url, stripe_checkout_session_id, request_key, expires_at")
+      .select("checkout_url, stripe_checkout_session_id, request_key, expires_at, instructor_invitation_id, offer_code, stripe_coupon_id, checkout_terms_version, guarantee_terms_version")
       .eq("instructor_profile_id", profile.id)
       .eq("status", "open")
       .gt("expires_at", now)
       .maybeSingle();
 
-    if (openAttempt) {
-      try {
-        const existingSession = await stripe.checkout.sessions.retrieve(openAttempt.stripe_checkout_session_id);
-        if (
-          existingSession.status === "open"
-          && existingSession.metadata?.checkout_terms_version === CHECKOUT_TERMS_VERSION
-        ) {
-          return json({
-            url: openAttempt.checkout_url,
-            sessionId: openAttempt.stripe_checkout_session_id,
-            requestId: openAttempt.request_key,
-            reused: true,
-          });
-        }
-
-        if (existingSession.status === "open") {
-          await stripe.checkout.sessions.expire(existingSession.id);
-        }
-      } catch (error) {
-        if (stripeErrorCode(error) === "resource_missing") {
-          console.warn("Existing Checkout Session is unavailable in the current Stripe mode");
-        } else {
-          const message = error instanceof Error ? error.message : "Unknown Stripe error";
-          console.error("Unable to verify an existing Checkout Session", message);
-          return json({ error: "Unable to verify an existing checkout" }, 502);
-        }
-      }
-
-      const { error: closeAttemptError } = await ctx.supabaseAdmin
-        .from("stripe_checkout_attempts")
-        .update({ status: "expired" })
-        .eq("stripe_checkout_session_id", openAttempt.stripe_checkout_session_id)
-        .eq("status", "open");
-
-      if (closeAttemptError) {
-        console.error("Unable to close an outdated Checkout attempt", closeAttemptError.code);
-        return json({ error: "Unable to prepare checkout" }, 500);
-      }
+    if (openAttemptError) {
+      console.error("Unable to inspect an open Checkout attempt", openAttemptError.code);
+      return json({ error: "Unable to prepare checkout" }, 500);
     }
 
     const { data: closedAttemptWithKey, error: closedAttemptWithKeyError } = await ctx.supabaseAdmin
@@ -248,6 +265,26 @@ export default {
         status: "all",
         limit: 100,
       });
+      if (subscriptions.has_more) {
+        console.warn(
+          "Stripe returned more subscriptions than checkout can verify safely",
+          profile.id,
+        );
+        return json({
+          error: "This instructor has membership history that requires support",
+          code: "membership_history_requires_support",
+        }, 409);
+      }
+      if (subscriptions.data.some((subscription) => subscription.items.has_more)) {
+        console.warn(
+          "A Stripe subscription has too many items to verify safely",
+          profile.id,
+        );
+        return json({
+          error: "This instructor has membership history that requires support",
+          code: "membership_history_requires_support",
+        }, 409);
+      }
       const blockingSubscription = subscriptions.data.find((subscription) => (
         ["incomplete", "trialing", "active", "past_due", "unpaid", "paused"].includes(subscription.status)
         && subscription.items.data.some((item) => item.price.id === priceId)
@@ -259,6 +296,117 @@ export default {
           error: "This instructor already has a membership",
           code: "membership_exists",
         }, 409);
+      }
+
+      const hasPriorStripeMembership = subscriptions.data.some((subscription) => (
+        !["incomplete", "incomplete_expired"].includes(subscription.status) &&
+        subscription.items.data.some((item) => item.price.id === priceId)
+      ));
+      const appliedOffer = earnedOffer && !hasPriorStripeMembership
+        ? earnedOffer
+        : null;
+      let offerCoupon: Stripe.Coupon | null = null;
+      if (appliedOffer) {
+        try {
+          offerCoupon = await verifiedInstructorOfferCoupon(stripe, stripeConfig);
+        } catch (error) {
+          const message = error instanceof Error
+            ? error.message
+            : "Unknown Stripe Coupon error";
+          console.error("Instructor offer Coupon validation failed", message);
+          return json({
+            error: "The earned instructor offer is not configured correctly",
+          }, 500);
+        }
+      }
+
+      if (openAttempt) {
+        try {
+          const existingSession = await stripe.checkout.sessions.retrieve(
+            openAttempt.stripe_checkout_session_id,
+            { expand: ["discounts"] },
+          );
+          const expectedOfferCode = appliedOffer?.offer_code ?? "none";
+          const expectedInvitationId = appliedOffer?.id ?? "none";
+          const expectedCouponId = offerCoupon?.id ?? "none";
+          const attemptMatches =
+            openAttempt.checkout_terms_version ===
+              MEMBERSHIP_CHECKOUT_TERMS_VERSION &&
+            openAttempt.guarantee_terms_version ===
+              MEMBERSHIP_GUARANTEE_TERMS_VERSION &&
+            openAttempt.offer_code === (appliedOffer?.offer_code ?? null) &&
+            openAttempt.instructor_invitation_id ===
+              (appliedOffer?.id ?? null) &&
+            openAttempt.stripe_coupon_id === (offerCoupon?.id ?? null);
+          const sessionMatches =
+            existingSession.status === "open" &&
+            existingSession.mode === "subscription" &&
+            existingSession.livemode === stripeConfig.expectedLivemode &&
+            stripeObjectId(existingSession.customer) === customerId &&
+            existingSession.client_reference_id === profile.id &&
+            existingSession.metadata?.instructor_profile_id === profile.id &&
+            existingSession.metadata?.account_id === accountId &&
+            existingSession.metadata?.product_line === "hire_line_dancers" &&
+            existingSession.metadata?.checkout_terms_version ===
+              MEMBERSHIP_CHECKOUT_TERMS_VERSION &&
+            existingSession.metadata?.guarantee_terms_version ===
+              MEMBERSHIP_GUARANTEE_TERMS_VERSION &&
+            existingSession.metadata?.offer_code === expectedOfferCode &&
+            existingSession.metadata?.offer_invitation_id ===
+              expectedInvitationId &&
+            existingSession.metadata?.offer_coupon_id === expectedCouponId &&
+            existingSession.allow_promotion_codes !== true &&
+            checkoutSessionHasExactCoupon(
+              existingSession,
+              offerCoupon?.id ?? null,
+            );
+
+          if (attemptMatches && sessionMatches) {
+            return json({
+              url: openAttempt.checkout_url,
+              sessionId: openAttempt.stripe_checkout_session_id,
+              requestId: openAttempt.request_key,
+              reused: true,
+              offerApplied: Boolean(appliedOffer),
+            });
+          }
+
+          if (existingSession.status === "open") {
+            await stripe.checkout.sessions.expire(existingSession.id);
+          }
+        } catch (error) {
+          if (stripeErrorCode(error) === "resource_missing") {
+            console.warn(
+              "Existing Checkout Session is unavailable in the current Stripe mode",
+            );
+          } else {
+            const message = error instanceof Error
+              ? error.message
+              : "Unknown Stripe error";
+            console.error(
+              "Unable to verify an existing Checkout Session",
+              message,
+            );
+            return json({ error: "Unable to verify an existing checkout" }, 502);
+          }
+        }
+
+        const { error: closeAttemptError } = await ctx.supabaseAdmin
+          .from("stripe_checkout_attempts")
+          .update({ status: "expired" })
+          .eq(
+            "stripe_checkout_session_id",
+            openAttempt.stripe_checkout_session_id,
+          )
+          .eq("status", "open");
+
+        if (closeAttemptError) {
+          console.error(
+            "Unable to close an outdated Checkout attempt",
+            closeAttemptError.code,
+          );
+          return json({ error: "Unable to prepare checkout" }, 500);
+        }
       }
 
       const successUrl = new URL("/account/", stripeConfig.appUrl);
@@ -276,7 +424,7 @@ export default {
         customer: customerId,
         client_reference_id: profile.id,
         line_items: [{ price: priceId, quantity: 1 }],
-        allow_promotion_codes: true,
+        ...(offerCoupon ? { discounts: [{ coupon: offerCoupon.id }] } : {}),
         payment_method_collection: "always",
         ...(requireTermsConsent ? {
           consent_collection: { terms_of_service: "required" as const },
@@ -287,14 +435,22 @@ export default {
           instructor_profile_id: profile.id,
           account_id: accountId,
           product_line: "hire_line_dancers",
-          checkout_terms_version: CHECKOUT_TERMS_VERSION,
+          checkout_terms_version: MEMBERSHIP_CHECKOUT_TERMS_VERSION,
+          guarantee_terms_version: MEMBERSHIP_GUARANTEE_TERMS_VERSION,
+          offer_code: appliedOffer?.offer_code ?? "none",
+          offer_invitation_id: appliedOffer?.id ?? "none",
+          offer_coupon_id: offerCoupon?.id ?? "none",
         },
         subscription_data: {
           metadata: {
             instructor_profile_id: profile.id,
             account_id: accountId,
             product_line: "hire_line_dancers",
-            checkout_terms_version: CHECKOUT_TERMS_VERSION,
+            checkout_terms_version: MEMBERSHIP_CHECKOUT_TERMS_VERSION,
+            guarantee_terms_version: MEMBERSHIP_GUARANTEE_TERMS_VERSION,
+            offer_code: appliedOffer?.offer_code ?? "none",
+            offer_invitation_id: appliedOffer?.id ?? "none",
+            offer_coupon_id: offerCoupon?.id ?? "none",
           },
         },
       }, {
@@ -315,6 +471,15 @@ export default {
           p_stripe_price_id: priceId,
           p_checkout_url: session.url,
           p_expires_at: new Date(session.expires_at * 1000).toISOString(),
+          p_instructor_invitation_id: appliedOffer?.id ?? null,
+          p_offer_code: appliedOffer?.offer_code ?? null,
+          p_offer_earned_at: appliedOffer?.offer_earned_at ?? null,
+          p_stripe_coupon_id: offerCoupon?.id ?? null,
+          p_offer_free_months: appliedOffer
+            ? INSTRUCTOR_OUTREACH_OFFER_MONTHS
+            : null,
+          p_checkout_terms_version: MEMBERSHIP_CHECKOUT_TERMS_VERSION,
+          p_guarantee_terms_version: MEMBERSHIP_GUARANTEE_TERMS_VERSION,
         });
 
       if (!saveError && registered === false) {
@@ -329,26 +494,74 @@ export default {
         if (saveError.code === "23505") {
           const { data: winner } = await ctx.supabaseAdmin
             .from("stripe_checkout_attempts")
-            .select("checkout_url, stripe_checkout_session_id, request_key")
+            .select("checkout_url, stripe_checkout_session_id, request_key, instructor_invitation_id, offer_code, stripe_coupon_id, checkout_terms_version, guarantee_terms_version")
             .eq("instructor_profile_id", profile.id)
             .eq("status", "open")
             .gt("expires_at", new Date().toISOString())
             .maybeSingle();
 
-          if (winner) {
-            if (winner.stripe_checkout_session_id !== session.id) {
-              await stripe.checkout.sessions.expire(session.id).catch(() => undefined);
-            }
-            return json({
-              url: winner.checkout_url,
-              sessionId: winner.stripe_checkout_session_id,
-              requestId: winner.request_key,
-              reused: true,
-            });
-          }
+          const winnerMatches = winner &&
+            winner.checkout_terms_version ===
+              MEMBERSHIP_CHECKOUT_TERMS_VERSION &&
+            winner.guarantee_terms_version ===
+              MEMBERSHIP_GUARANTEE_TERMS_VERSION &&
+            winner.instructor_invitation_id === (appliedOffer?.id ?? null) &&
+            winner.offer_code === (appliedOffer?.offer_code ?? null) &&
+            winner.stripe_coupon_id === (offerCoupon?.id ?? null);
 
-          await stripe.checkout.sessions.expire(session.id).catch(() => undefined);
+          if (winnerMatches) {
+            try {
+              const winnerSession = await stripe.checkout.sessions.retrieve(
+                winner.stripe_checkout_session_id,
+                { expand: ["discounts"] },
+              );
+              const winnerSessionMatches =
+                winnerSession.status === "open" &&
+                winnerSession.mode === "subscription" &&
+                winnerSession.livemode === stripeConfig.expectedLivemode &&
+                stripeObjectId(winnerSession.customer) === customerId &&
+                winnerSession.client_reference_id === profile.id &&
+                winnerSession.metadata?.instructor_profile_id === profile.id &&
+                winnerSession.metadata?.account_id === accountId &&
+                winnerSession.metadata?.product_line === "hire_line_dancers" &&
+                winnerSession.metadata?.checkout_terms_version ===
+                  MEMBERSHIP_CHECKOUT_TERMS_VERSION &&
+                winnerSession.metadata?.guarantee_terms_version ===
+                  MEMBERSHIP_GUARANTEE_TERMS_VERSION &&
+                winnerSession.metadata?.offer_code ===
+                  (appliedOffer?.offer_code ?? "none") &&
+                winnerSession.metadata?.offer_invitation_id ===
+                  (appliedOffer?.id ?? "none") &&
+                winnerSession.metadata?.offer_coupon_id ===
+                  (offerCoupon?.id ?? "none") &&
+                winnerSession.allow_promotion_codes !== true &&
+                checkoutSessionHasExactCoupon(
+                  winnerSession,
+                  offerCoupon?.id ?? null,
+                );
+              if (winnerSessionMatches) {
+                if (winner.stripe_checkout_session_id !== session.id) {
+                  await stripe.checkout.sessions.expire(session.id).catch(
+                    () => undefined,
+                  );
+                }
+                return json({
+                  url: winner.checkout_url,
+                  sessionId: winner.stripe_checkout_session_id,
+                  requestId: winner.request_key,
+                  reused: true,
+                  offerApplied: Boolean(appliedOffer),
+                });
+              }
+            } catch (error) {
+              console.warn(
+                "Unable to verify the winning Checkout attempt",
+                error instanceof Error ? error.message : "unknown_error",
+              );
+            }
+          }
         }
+        await stripe.checkout.sessions.expire(session.id).catch(() => undefined);
         console.error("Unable to save Checkout attempt", saveError.code);
         return json({ error: "Unable to save checkout" }, 500);
       }
@@ -358,6 +571,7 @@ export default {
         sessionId: session.id,
         requestId: key,
         reused: false,
+        offerApplied: Boolean(appliedOffer),
       }, 201);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown Stripe error";

@@ -1,15 +1,18 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import Link from "next/link";
 import {
   callbackUrl,
   cleanAccountIntent,
   cleanInstructorInvitationToken,
   cleanReturnPath,
   getMarketplaceClient,
+  instructorInvitationTokenHash,
   marketplaceConfigured,
   readableError,
-  type AccountIntent
+  type AccountIntent,
+  type InstructorInvitationLifecycle
 } from "@/lib/marketplace";
 import styles from "./Marketplace.module.css";
 
@@ -22,30 +25,90 @@ function accountEntryPath(intent: AccountIntent | null, returnPath: string, invi
   return `/account/?${params.toString()}`;
 }
 
+function invitationDeadline(value: string | null): string | null {
+  if (!value) return null;
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short"
+  }).format(new Date(value));
+}
+
 export function LoginScreen() {
   const [email, setEmail] = useState("");
-  const [busy, setBusy] = useState<"google" | "email" | null>(null);
+  const [busy, setBusy] = useState<"google" | "email" | "claim" | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [next, setNext] = useState("/account/");
   const [intent, setIntent] = useState<AccountIntent | null>(null);
-  const [invited, setInvited] = useState(false);
+  const [invitationToken, setInvitationToken] = useState<string | null>(null);
+  const [invitation, setInvitation] = useState<InstructorInvitationLifecycle | null>(null);
+  const [invitationLoading, setInvitationLoading] = useState(false);
+  const [hasSession, setHasSession] = useState(false);
 
   useEffect(() => {
+    let active = true;
     const params = new URLSearchParams(window.location.search);
     const returnPath = cleanReturnPath(params.get("next"));
-    const invitationToken = cleanInstructorInvitationToken(params.get("invite"));
-    const requestedIntent = invitationToken ? "instructor" : cleanAccountIntent(params.get("role"));
-    const entryPath = accountEntryPath(requestedIntent, returnPath, invitationToken);
+    const token = cleanInstructorInvitationToken(params.get("invite"));
+    const requestedIntent = token ? "instructor" : cleanAccountIntent(params.get("role"));
+    const entryPath = accountEntryPath(requestedIntent, returnPath, token);
     setIntent(requestedIntent);
-    setInvited(Boolean(invitationToken));
+    setInvitationToken(token);
     setNext(entryPath);
 
     const client = getMarketplaceClient();
-    void client?.auth.getSession().then(({ data }) => {
-      if (data.session) window.location.replace(entryPath);
-    });
+    if (!client) return () => { active = false; };
+    const marketplaceClient = client;
+
+    async function loadEntry() {
+      const { data: sessionData } = await marketplaceClient.auth.getSession();
+      if (!active) return;
+      setHasSession(Boolean(sessionData.session));
+
+      if (!token) {
+        if (sessionData.session) window.location.replace(entryPath);
+        return;
+      }
+
+      setInvitationLoading(true);
+      try {
+        const tokenHash = await instructorInvitationTokenHash(token);
+        const { data, error: invitationError } = await marketplaceClient.rpc("get_instructor_invitation_lifecycle", {
+          p_token_hash: tokenHash
+        });
+        if (invitationError) throw invitationError;
+        if (active) setInvitation(data as InstructorInvitationLifecycle);
+      } catch (invitationError) {
+        if (active) setError(readableError(invitationError));
+      } finally {
+        if (active) setInvitationLoading(false);
+      }
+    }
+
+    void loadEntry();
+    return () => { active = false; };
   }, []);
+
+  async function claimInvitation() {
+    const client = getMarketplaceClient();
+    if (!client || !invitationToken) return;
+    setBusy("claim");
+    setError(null);
+    setMessage(null);
+    try {
+      const tokenHash = await instructorInvitationTokenHash(invitationToken);
+      const { data, error: claimError } = await client.rpc("claim_instructor_invitation", {
+        p_token_hash: tokenHash
+      });
+      if (claimError) throw claimError;
+      setInvitation(data as InstructorInvitationLifecycle);
+      setMessage("Invitation claimed. Sign in with the email address that received it to continue.");
+    } catch (claimError) {
+      setError(readableError(claimError));
+    } finally {
+      setBusy(null);
+    }
+  }
 
   async function signInWithGoogle() {
     const client = getMarketplaceClient();
@@ -89,15 +152,27 @@ export function LoginScreen() {
     }
   }
 
+  const invited = Boolean(invitationToken);
+  const invitationUnclaimed = invitation
+    ? ["pending", "sending", "sent", "delivery_failed"].includes(invitation.status)
+    : false;
+  const invitationExpired = invitation?.status === "expired" || invitation?.status === "claim_expired";
+  const expiredClaimWithAccount = invitation?.status === "claim_expired" && Boolean(invitation.accountCreatedAt);
+  const authenticationAvailable = !invited
+    || invitation?.status === "claimed"
+    || invitation?.status === "accepted"
+    || expiredClaimWithAccount;
+  const initialDeadline = invitationDeadline(invitation?.initialClaimDeadlineAt ?? null);
+  const submissionDeadline = invitationDeadline(invitation?.profileSubmissionDeadlineAt ?? null);
   const eyebrow = intent === "instructor" ? "For instructors" : intent === "organizer" ? "For organizers" : null;
   const title = intent === "instructor"
-    ? invited ? "Sign in to accept your instructor invitation" : "Sign in to build your instructor profile"
+    ? invited ? "Your private instructor invitation" : "Sign in to build your instructor profile"
     : intent === "organizer"
       ? "Sign in to contact instructors"
       : "Sign in to Hire Line Dancers";
   const subtitle = intent === "instructor"
     ? invited
-      ? "Use the email address that received your private invitation. After signing in, you can create or update your instructor profile."
+      ? "Review the invitation first. Nothing is claimed until you choose the button below."
       : "Create your instructor workspace, complete your public profile, add photos and videos, and submit it for review."
     : intent === "organizer"
       ? "Create a planner account to contact instructors and keep your event inquiries organized."
@@ -112,36 +187,91 @@ export function LoginScreen() {
       <div className={styles.card}>
         {!marketplaceConfigured ? (
           <p className={styles.error}>Authentication is not configured in this deployment yet.</p>
-        ) : (
-          <>
-            <button
-              className={`${styles.button} ${styles.googleButton}`}
-              type="button"
-              disabled={busy !== null}
-              onClick={() => void signInWithGoogle()}
-            >
-              {busy === "google" ? "Connecting to Google..." : "Continue with Google"}
+        ) : invitationLoading ? (
+          <p className={styles.notice}>Checking your private invitation...</p>
+        ) : invited && invitationUnclaimed ? (
+          <div className={styles.stack}>
+            <h2>Claim your invitation</h2>
+            <p>
+              Claim by {initialDeadline ?? "the date in your invitation email"}. Claiming starts a seven-day window to sign in with the invited email, create your instructor account, and submit a complete profile.
+            </p>
+            {invitation?.grantsLifetimeAccess ? (
+              <p className={styles.notice}>This invitation includes complimentary lifetime instructor access.</p>
+            ) : invitation?.offerCode === "outreach_two_months_90_day_v1" ? (
+              <p className={styles.notice}>Complete the steps on time to earn your first two monthly billing cycles free. Every new paid membership also includes the request-based 90-day booking guarantee, subject to the terms shown during activation.</p>
+            ) : null}
+            <button className={styles.button} type="button" disabled={busy !== null} onClick={() => void claimInvitation()}>
+              {busy === "claim" ? "Claiming invitation..." : "Claim invitation"}
             </button>
-
-            <div className={styles.divider}>or use your email</div>
-
-            <form className={styles.stack} onSubmit={sendMagicLink}>
-              <label className={styles.field}>
-                <span>Email address</span>
-                <input
-                  type="email"
-                  autoComplete="email"
-                  required
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  placeholder="you@company.com"
-                />
-              </label>
-              <button className={styles.secondaryButton} disabled={busy !== null} type="submit">
-                {busy === "email" ? "Sending link..." : "Email me a sign-in link"}
+          </div>
+        ) : invited && invitationExpired && !expiredClaimWithAccount ? (
+          <div className={styles.stack}>
+            <h2>This invitation window has ended</h2>
+            <p className={styles.error}>
+              {invitation?.status === "claim_expired"
+                ? "The seven-day account and profile submission window has ended."
+                : "The 14-day invitation claim window has ended."}
+            </p>
+            <Link className={styles.secondaryButton} href="/instructors/join/">View instructor membership options</Link>
+          </div>
+        ) : authenticationAvailable ? (
+          hasSession && invited ? (
+            <div className={styles.stack}>
+              <p className={styles.notice}>
+                {expiredClaimWithAccount
+                  ? invitation?.grantsLifetimeAccess
+                    ? "Your instructor account and lifetime access are ready. The profile submission window ended, but your lifetime access remains active."
+                    : "Your instructor account is ready, but the private offer submission window has ended. Continue to finish your profile without the invitation offer."
+                  : invitation?.status === "accepted"
+                  ? "This invitation has already been accepted. Continue to open the linked account."
+                  : `Invitation claimed. Continue by ${submissionDeadline ?? "your submission deadline"} to create your account and submit a complete profile.`}
+              </p>
+              <button className={styles.button} type="button" onClick={() => window.location.assign(next)}>
+                Continue with signed-in account
               </button>
-            </form>
-          </>
+            </div>
+          ) : (
+            <>
+              {invited ? (
+                <p className={styles.notice}>
+                  {expiredClaimWithAccount
+                    ? invitation?.grantsLifetimeAccess
+                      ? "Sign in with the email address linked to your instructor account. Your lifetime access remains active, and you can still finish your profile."
+                      : "Sign in with the email address linked to your instructor account. The private offer submission window has ended, but you can still finish your profile."
+                    : `Sign in with the exact email address that received this invitation${invitation?.status === "claimed" && submissionDeadline ? ` by ${submissionDeadline}` : ""}.`}
+                </p>
+              ) : null}
+              <button
+                className={`${styles.button} ${styles.googleButton}`}
+                type="button"
+                disabled={busy !== null}
+                onClick={() => void signInWithGoogle()}
+              >
+                {busy === "google" ? "Connecting to Google..." : "Continue with Google"}
+              </button>
+
+              <div className={styles.divider}>or use your email</div>
+
+              <form className={styles.stack} onSubmit={sendMagicLink}>
+                <label className={styles.field}>
+                  <span>Email address</span>
+                  <input
+                    type="email"
+                    autoComplete="email"
+                    required
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    placeholder="you@company.com"
+                  />
+                </label>
+                <button className={styles.secondaryButton} disabled={busy !== null} type="submit">
+                  {busy === "email" ? "Sending link..." : "Email me a sign-in link"}
+                </button>
+              </form>
+            </>
+          )
+        ) : invited && error ? null : (
+          <p className={styles.notice}>This invitation is not available.</p>
         )}
 
         {message ? <p className={styles.success} role="status">{message}</p> : null}

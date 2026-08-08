@@ -1,22 +1,14 @@
 import { withSupabase } from "npm:@supabase/server@^1";
 import Stripe from "npm:stripe@^22";
-
-function requiredEnv(name: string): string {
-  const value = Deno.env.get(name)?.trim();
-  if (!value) throw new Error(`Missing required secret: ${name}`);
-  return value;
-}
-
-function objectId(value: unknown): string | null {
-  if (typeof value === "string") return value;
-  if (
-    value && typeof value === "object" && "id" in value &&
-    typeof value.id === "string"
-  ) {
-    return value.id;
-  }
-  return null;
-}
+import {
+  hldStripeConfig,
+  MEMBERSHIP_GUARANTEE_TERMS_VERSION,
+  requiredEnv,
+  stripeInvoiceSubscriptionId,
+  stripeObjectId as objectId,
+  verifiedMembershipPrice,
+  verifiedPaidMembershipInvoice,
+} from "../_shared/hld-stripe.ts";
 
 function json(body: unknown, status = 200): Response {
   return Response.json(body, {
@@ -43,10 +35,17 @@ type GuaranteeClaimRow = {
   instructor_profile_id: string;
   status: string;
   approved_refund_amount_cents: number | null;
+  eligible_paid_amount_cents: number | null;
+  received_at: string;
 };
 
 type GuaranteeBillingRow = {
   first_stripe_customer_id: string | null;
+  first_stripe_subscription_id: string | null;
+  guarantee_terms_version: string;
+  guarantee_started_at: string | null;
+  guarantee_ends_at: string | null;
+  claim_deadline_at: string | null;
 };
 
 type MembershipBillingRow = {
@@ -68,6 +67,18 @@ type ExistingRefundRow = {
 
 type ReservedRefundRow = {
   amount_cents: number;
+};
+
+type PaidInvoiceLedgerRow = {
+  stripe_invoice_id: string;
+  instructor_profile_id: string;
+  stripe_customer_id: string;
+  stripe_subscription_id: string;
+  stripe_price_id: string;
+  amount_paid_cents: number;
+  currency: string;
+  paid_at: string;
+  livemode: boolean;
 };
 
 type RefundRpcResult = {
@@ -150,7 +161,9 @@ export default {
 
     const { data: claimData, error: claimError } = await ctx.supabaseAdmin
       .from("guarantee_claims")
-      .select("id,instructor_profile_id,status,approved_refund_amount_cents")
+      .select(
+        "id,instructor_profile_id,status,approved_refund_amount_cents,eligible_paid_amount_cents,received_at",
+      )
       .eq("id", claimId)
       .maybeSingle();
     if (claimError) {
@@ -182,7 +195,9 @@ export default {
     ] = await Promise.all([
       ctx.supabaseAdmin
         .from("instructor_guarantees")
-        .select("first_stripe_customer_id")
+        .select(
+          "first_stripe_customer_id,first_stripe_subscription_id,guarantee_terms_version,guarantee_started_at,guarantee_ends_at,claim_deadline_at",
+        )
         .eq("instructor_profile_id", claim.instructor_profile_id)
         .maybeSingle(),
       ctx.supabaseAdmin
@@ -204,6 +219,81 @@ export default {
     }
     const guarantee = guaranteeData as GuaranteeBillingRow | null;
     const membership = membershipData as MembershipBillingRow | null;
+    if (!guarantee) {
+      return json({ error: "Guarantee record not found" }, 404);
+    }
+
+    const usesCurrentTerms = guarantee.guarantee_terms_version ===
+      MEMBERSHIP_GUARANTEE_TERMS_VERSION;
+    if (usesCurrentTerms) {
+      const claimReceivedAt = Date.parse(claim.received_at);
+      const guaranteeStartedAt = Date.parse(
+        guarantee.guarantee_started_at ?? "",
+      );
+      const guaranteeEndsAt = Date.parse(guarantee.guarantee_ends_at ?? "");
+      const claimDeadlineAt = Date.parse(guarantee.claim_deadline_at ?? "");
+      if (
+        !guarantee.first_stripe_customer_id ||
+        !guarantee.first_stripe_subscription_id ||
+        !guarantee.guarantee_started_at ||
+        !guarantee.guarantee_ends_at ||
+        !guarantee.claim_deadline_at ||
+        !claim.received_at ||
+        !Number.isFinite(claimReceivedAt) ||
+        !Number.isFinite(guaranteeStartedAt) ||
+        !Number.isFinite(guaranteeEndsAt) ||
+        !Number.isFinite(claimDeadlineAt) ||
+        guaranteeStartedAt >= guaranteeEndsAt ||
+        claimReceivedAt < guaranteeEndsAt ||
+        claimReceivedAt > claimDeadlineAt ||
+        !claim.eligible_paid_amount_cents ||
+        claim.eligible_paid_amount_cents <= 0 ||
+        claim.approved_refund_amount_cents >
+          claim.eligible_paid_amount_cents
+      ) {
+        return json({
+          error: "The approved claim does not match the current guarantee terms",
+        }, 409);
+      }
+    } else {
+      const claimReceivedAt = Date.parse(claim.received_at);
+      const guaranteeStartedAt = Date.parse(
+        guarantee.guarantee_started_at ?? "",
+      );
+      const guaranteeEndsAt = Date.parse(guarantee.guarantee_ends_at ?? "");
+      const claimDeadlineAt = Date.parse(guarantee.claim_deadline_at ?? "");
+      if (
+        !guarantee.guarantee_started_at ||
+        !guarantee.guarantee_ends_at ||
+        !guarantee.claim_deadline_at ||
+        !Number.isFinite(claimReceivedAt) ||
+        !Number.isFinite(guaranteeStartedAt) ||
+        !Number.isFinite(guaranteeEndsAt) ||
+        !Number.isFinite(claimDeadlineAt) ||
+        guaranteeStartedAt >= guaranteeEndsAt ||
+        claimReceivedAt < guaranteeEndsAt ||
+        claimReceivedAt > claimDeadlineAt
+      ) {
+        return json({
+          error:
+            "The approved claim does not match the historical guarantee window",
+        }, 409);
+      }
+    }
+
+    let stripeConfig: ReturnType<typeof hldStripeConfig>;
+    try {
+      stripeConfig = hldStripeConfig();
+      if (usesCurrentTerms) {
+        await verifiedMembershipPrice(stripe, stripeConfig);
+      }
+    } catch (error) {
+      console.error(
+        "Refund verification configuration is invalid",
+        error instanceof Error ? error.message : "unknown_error",
+      );
+      return json({ error: "Membership billing is not configured correctly" }, 500);
+    }
 
     let refund: Stripe.Refund;
     try {
@@ -219,6 +309,21 @@ export default {
     }
 
     try {
+      if (
+        refund.amount <= 0 || refund.currency.toLowerCase() !== "usd"
+      ) {
+        return json({
+          error: "That refund has an invalid amount or currency",
+        }, 409);
+      }
+      if (
+        refund.created * 1000 < Date.parse(claim.received_at)
+      ) {
+        return json({
+          error: "That refund was created before the guarantee request",
+        }, 409);
+      }
+
       const chargeId = objectId(refund.charge);
       if (!chargeId) {
         return json({ error: "Stripe refund is missing its charge" }, 409);
@@ -227,16 +332,27 @@ export default {
         ? refund.charge as Stripe.Charge
         : await stripe.charges.retrieve(chargeId);
 
-      if (!charge.paid) {
+      if (
+        !charge.paid || charge.livemode !== stripeConfig.expectedLivemode ||
+        charge.currency.toLowerCase() !== "usd"
+      ) {
         return json(
-          { error: "That refund is not attached to a paid charge" },
+          {
+            error:
+              "That refund is not attached to a paid charge in the expected mode",
+          },
           409,
         );
       }
 
       const customerId = objectId(charge.customer);
       const expectedCustomers = new Set(
-        [guarantee?.first_stripe_customer_id, membership?.stripe_customer_id]
+        (usesCurrentTerms
+          ? [guarantee.first_stripe_customer_id]
+          : [
+            guarantee.first_stripe_customer_id,
+            membership?.stripe_customer_id,
+          ])
           .filter((value): value is string =>
             typeof value === "string" && value.length > 0
           ),
@@ -291,6 +407,7 @@ export default {
       const invoicePayment = invoicePayments.data[0];
       if (
         invoicePayment.status !== "paid" ||
+        invoicePayment.livemode !== stripeConfig.expectedLivemode ||
         objectId(invoicePayment.payment.payment_intent) !== paymentIntentId ||
         invoicePayment.amount_paid === null ||
         invoicePayment.amount_paid < refund.amount ||
@@ -310,6 +427,7 @@ export default {
 
       const invoice = await stripe.invoices.retrieve(invoiceId);
       if (
+        invoice.livemode !== stripeConfig.expectedLivemode ||
         objectId(invoice.customer) !== customerId ||
         invoice.currency.toLowerCase() !== refund.currency.toLowerCase() ||
         invoice.status !== "paid" ||
@@ -321,36 +439,128 @@ export default {
       }
 
       const subscriptionDetails = invoice.parent?.subscription_details;
+      const invoiceSubscriptionId = stripeInvoiceSubscriptionId(invoice);
       if (
         !subscriptionDetails ||
         subscriptionDetails.metadata?.product_line !== "hire_line_dancers" ||
         subscriptionDetails.metadata?.instructor_profile_id !==
-          claim.instructor_profile_id
+          claim.instructor_profile_id ||
+        (guarantee.first_stripe_subscription_id &&
+          invoiceSubscriptionId !== guarantee.first_stripe_subscription_id)
       ) {
         return json({
           error: "That refund is not for this instructor's membership",
         }, 409);
       }
 
-      const expectedPriceId = requiredEnv("STRIPE_PRICE_ID");
-      const lineItems = await stripe.invoices.listLineItems(invoiceId, {
-        limit: 100,
-      });
-      if (lineItems.has_more) {
-        return json({
-          error: "That invoice has too many line items to verify safely",
-        }, 409);
-      }
-      const hasMembershipLine = lineItems.data.some(
-        (line) => line.amount !== 0 && linePriceId(line) === expectedPriceId,
-      );
-      const hasOtherPricedAmount = lineItems.data.some(
-        (line) => line.amount !== 0 && linePriceId(line) !== expectedPriceId,
-      );
-      if (!hasMembershipLine || hasOtherPricedAmount) {
-        return json({
-          error: "That refund is not for the Hire Line Dancers membership",
-        }, 409);
+      if (usesCurrentTerms) {
+        const paidInvoice = await verifiedPaidMembershipInvoice(
+          stripe,
+          stripeConfig,
+          invoiceId,
+          {
+            customerId: guarantee.first_stripe_customer_id!,
+            subscriptionId: guarantee.first_stripe_subscription_id!,
+            instructorProfileId: claim.instructor_profile_id,
+          },
+        );
+        if (!paidInvoice || paidInvoice.amountPaidCents < refund.amount) {
+          return json({
+            error: "That refund does not match a positive membership payment",
+          }, 409);
+        }
+
+        const { data: ledgerData, error: ledgerError } = await ctx
+          .supabaseAdmin
+          .from("membership_paid_invoices")
+          .select(
+            "stripe_invoice_id,instructor_profile_id,stripe_customer_id,stripe_subscription_id,stripe_price_id,amount_paid_cents,currency,paid_at,livemode",
+          )
+          .eq("instructor_profile_id", claim.instructor_profile_id)
+          .eq(
+            "stripe_subscription_id",
+            guarantee.first_stripe_subscription_id!,
+          )
+          .gte("paid_at", guarantee.guarantee_started_at!)
+          .lt("paid_at", guarantee.guarantee_ends_at!);
+        if (ledgerError) {
+          console.error(
+            "Unable to load the paid membership invoice ledger",
+            ledgerError.code,
+          );
+          return json({ error: "Unable to verify the eligible payment" }, 500);
+        }
+        const eligibleInvoices = (ledgerData ?? []) as PaidInvoiceLedgerRow[];
+        const ledger = eligibleInvoices.find((candidate) =>
+          candidate.stripe_invoice_id === invoiceId
+        ) ?? null;
+        const eligiblePaidAmount = eligibleInvoices.reduce(
+          (total, candidate) => total + candidate.amount_paid_cents,
+          0,
+        );
+        const ledgerPaidAt = Date.parse(ledger?.paid_at ?? "");
+        const guaranteeStartedAt = Date.parse(
+          guarantee.guarantee_started_at!,
+        );
+        const guaranteeEndsAt = Date.parse(guarantee.guarantee_ends_at!);
+        if (
+          !ledger ||
+          eligiblePaidAmount !== claim.eligible_paid_amount_cents ||
+          claim.approved_refund_amount_cents > eligiblePaidAmount ||
+          ledger.stripe_customer_id !== paidInvoice.customerId ||
+          ledger.stripe_subscription_id !== paidInvoice.subscriptionId ||
+          ledger.stripe_price_id !== paidInvoice.priceId ||
+          ledger.amount_paid_cents !== paidInvoice.amountPaidCents ||
+          ledger.currency !== paidInvoice.currency ||
+          ledger.livemode !== paidInvoice.livemode ||
+          !Number.isFinite(ledgerPaidAt) ||
+          ledgerPaidAt !== Date.parse(paidInvoice.paidAt) ||
+          ledgerPaidAt < guaranteeStartedAt ||
+          ledgerPaidAt >= guaranteeEndsAt
+        ) {
+          return json({
+            error:
+              "That refund is not attached to an eligible guarantee invoice",
+          }, 409);
+        }
+      } else {
+        const invoicePaidAt = invoice.status_transitions.paid_at;
+        const guaranteeStartedAt = Date.parse(
+          guarantee.guarantee_started_at!,
+        );
+        const guaranteeEndsAt = Date.parse(guarantee.guarantee_ends_at!);
+        if (
+          !invoicePaidAt || invoicePaidAt * 1000 < guaranteeStartedAt ||
+          invoicePaidAt * 1000 >= guaranteeEndsAt
+        ) {
+          return json({
+            error:
+              "That refund is not attached to an invoice in the historical guarantee window",
+          }, 409);
+        }
+        const lineItems = await stripe.invoices.listLineItems(invoiceId, {
+          limit: 100,
+        });
+        if (lineItems.has_more) {
+          return json({
+            error: "That invoice has too many line items to verify safely",
+          }, 409);
+        }
+        const membershipLines = lineItems.data.filter(
+          (line) => linePriceId(line) === stripeConfig.priceId,
+        );
+        const hasOtherPricedAmount = lineItems.data.some(
+          (line) =>
+            line.amount !== 0 && linePriceId(line) !== stripeConfig.priceId,
+        );
+        if (
+          membershipLines.length !== 1 ||
+          membershipLines[0].quantity !== 1 || hasOtherPricedAmount
+        ) {
+          return json({
+            error: "That refund is not for the Hire Line Dancers membership",
+          }, 409);
+        }
       }
 
       const stripeStatus = refundStatus(refund.status);

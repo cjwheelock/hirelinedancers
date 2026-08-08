@@ -46,7 +46,7 @@ export default function JoinPage() {
           <article className="step">
             <div className="step-num"><ClipboardCheck size={20} /></div>
             <h3>1. Apply</h3>
-            <p>Submit your background and upload a headshot plus a few photos of you teaching or dancing.</p>
+            <p>Submit your background and upload a headshot plus a few photos of you teaching or dancing. If you received a private offer, deliberately claim it within 14 days, then create your account and submit your profile within the next 7 days.</p>
           </article>
           <article className="step">
             <div className="step-num"><ShieldCheck size={20} /></div>
@@ -56,23 +56,23 @@ export default function JoinPage() {
           <article className="step">
             <div className="step-num"><CreditCard size={20} /></div>
             <h3>3. Activate &amp; go live</h3>
-            <p>Once approved, add a payment method and activate your $14.99 USD monthly membership through Stripe. We publish your approved profile after Stripe confirms your membership and send planner inquiries to you.</p>
+            <p>Once approved, add a payment method and activate your $14.99 USD monthly membership through Stripe. For eligible private-offer memberships, the first two monthly billing cycles are free. We publish your approved profile after Stripe confirms your membership and send planner inquiries to you.</p>
           </article>
         </div>
       </div>
 
       {/* PRICING: only shown here, gated from buyers */}
       <div className="faq-block">
-        <h2>Founding membership</h2>
+        <h2>Instructor membership</h2>
         <p className="lede">Pricing is shared here for instructors only. It never appears on the pages event planners browse.</p>
         <div className="pricing-grid">
           <article className="price-card featured">
             <BadgeCheck size={28} />
-            <h2>Founding Instructor</h2>
+            <h2>Instructor Membership</h2>
             <p className="price">$14.99 USD <span>per month</span></p>
             <p>Add a payment method after approval to activate your profile. Your membership renews monthly until canceled, and billing is managed securely through Stripe.</p>
-            <p>For our first 100 approved instructors. Founding members receive a <strong>Founding Instructor badge</strong>, a complete public profile, and early placement while we build each local directory. Your first year is protected by our money-back guarantee.</p>
-            <Link className="button primary" href={signInUrl("/account/", "instructor")}>Claim a founding spot</Link>
+            <p>Eligible instructors who claim a private offer within 14 days and create an account and submit a complete profile within the following 7 days receive <strong>their first two monthly billing cycles free</strong>. Our review may finish later without affecting an offer that was claimed and submitted on time.</p>
+            <Link className="button primary" href={signInUrl("/account/", "instructor")}>Apply for a profile</Link>
           </article>
         </div>
         <p style={{ marginTop: 16 }}>You set your rates and payment terms directly with each client. Hire Line Dancers does not take a commission or handle payment for your events.</p>
@@ -85,14 +85,14 @@ export default function JoinPage() {
 
       <div className="faq-block">
         <h2>Why we&rsquo;re building this</h2>
-        <p>Our mission is simple: get more people dancing. We want more rooms full of people moving to music, trying something new, and having fun together. We also want more working instructors making a real living doing it. Founding members aren&rsquo;t just customers; you&rsquo;re helping get this off the ground, and our first goal for every founding instructor is the same: get you at least one booking, so the membership pays for itself and we grow from there together.</p>
+        <p>Our mission is simple: get more people dancing. We want more rooms full of people moving to music, trying something new, and having fun together. We also want more working instructors making a real living doing it. Our first goal for every instructor is the same: help you earn at least one booking, so the membership pays for itself and we grow from there together.</p>
       </div>
 
       <div className="policy-box">
         <h2>Our guarantee and an honest ask</h2>
-        <p>If Hire Line Dancers does not help you get booked for a paid event in your first 12 months, we will refund the membership fees you paid during that first year, subject to the published guarantee terms.</p>
+        <p>Every new paid membership includes a 90-day booking guarantee. The guarantee begins when Stripe records the first invoice that collects a positive membership payment. For an eligible private-offer membership, that invoice comes after the first two monthly billing cycles. If Hire Line Dancers does not help you get booked for a qualifying paid event during those 90 days, you may request a review for a refund of eligible membership fees paid during the guarantee period.</p>
         <p>The honest ask is time. We are building local awareness, improving search visibility, and introducing event professionals to line dancing as a participatory option. We would rather earn your trust through useful work than promise a specific number of inquiries or bookings.</p>
-        <p>Guarantee terms require a complete approved profile, current contact and service-area details, and reasonable inquiry response. See the <Link href="/legal/refund-policy/">full refund policy</Link>.</p>
+        <p>You may request a guarantee review only after the 90-day period ends and within the next 30 days. Requests are reviewed manually. Approval and refunds are not automatic. Terms require a complete approved profile, current contact and service-area details, and reasonable inquiry response. See the <Link href="/legal/refund-policy/">full refund policy</Link>.</p>
       </div>
     </section>
   );

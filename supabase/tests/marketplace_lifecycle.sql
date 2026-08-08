@@ -81,13 +81,50 @@ select pg_temp.test_assert(
 );
 select pg_temp.test_assert(
   not has_function_privilege('anon', 'public.assign_founding_guarantee_from_membership()', 'execute')
-    and not has_function_privilege('authenticated', 'public.assign_founding_guarantee_from_membership()', 'execute'),
-  'founding guarantee trigger helper must not be exposed to API roles'
+    and not has_function_privilege('authenticated', 'public.assign_founding_guarantee_from_membership()', 'execute')
+    and not has_function_privilege('service_role', 'public.assign_founding_guarantee_from_membership()', 'execute'),
+  'membership guarantee trigger helper must not be exposed to API roles'
+);
+select pg_temp.test_assert(
+  has_function_privilege(
+    'service_role',
+    'public.register_instructor_checkout_attempt(uuid,text,text,text,text,text,timestamp with time zone,uuid,text,timestamp with time zone,text,smallint,text,text)',
+    'execute'
+  )
+    and not has_function_privilege(
+      'authenticated',
+      'public.register_instructor_checkout_attempt(uuid,text,text,text,text,text,timestamp with time zone,uuid,text,timestamp with time zone,text,smallint,text,text)',
+      'execute'
+    )
+    and has_function_privilege(
+      'service_role',
+      'public.record_membership_paid_invoice(uuid,text,text,text,text,integer,text,timestamp with time zone,text,boolean,text)',
+      'execute'
+    )
+    and not has_function_privilege(
+      'authenticated',
+      'public.record_membership_paid_invoice(uuid,text,text,text,text,integer,text,timestamp with time zone,text,boolean,text)',
+      'execute'
+    ),
+  'checkout and paid-invoice mutation must remain service only'
 );
 select pg_temp.test_assert(
   has_function_privilege('authenticated', 'public.complete_account_onboarding(text,text,text,text,boolean)', 'execute')
     and not has_function_privilege('anon', 'public.complete_account_onboarding(text,text,text,text,boolean)', 'execute'),
   'account onboarding must remain authenticated only'
+);
+select pg_temp.test_assert(
+  has_function_privilege('anon', 'public.get_instructor_invitation_lifecycle(text)', 'execute')
+    and has_function_privilege('anon', 'public.claim_instructor_invitation(text)', 'execute')
+    and has_function_privilege('authenticated', 'public.accept_instructor_invitation(text,text,text)', 'execute')
+    and not has_function_privilege('anon', 'public.accept_instructor_invitation(text,text,text)', 'execute'),
+  'invitation inspection and claim must be capability-scoped while acceptance requires authentication'
+);
+select pg_temp.test_assert(
+  not has_function_privilege('anon', 'public.lock_instructor_invitation_offer_on_submission()', 'execute')
+    and not has_function_privilege('authenticated', 'public.lock_instructor_invitation_offer_on_submission()', 'execute')
+    and not has_function_privilege('service_role', 'public.lock_instructor_invitation_offer_on_submission()', 'execute'),
+  'the invitation offer trigger helper must not be directly executable'
 );
 select pg_temp.test_assert(
   has_function_privilege(
@@ -376,17 +413,78 @@ select pg_temp.set_request(
   'authenticated'
 );
 
--- Create an unassigned guarantee before Casey subscribes. The subscription
--- trigger must still allocate a founding position to the existing row.
-select public.admin_update_instructor_guarantee(
-  (select id from public.instructor_profiles where account_id = '00000000-0000-0000-0000-000000000012'),
-  'unassigned', 'not_started', 'Preexisting admin record'
-);
-
--- Stripe subscription events are service-only. The first active or trialing
--- subscription publishes the profile and snapshots founding guarantee terms.
+-- These three records represent founding guarantees that were actually
+-- granted under the historical 12-month terms. New memberships never receive
+-- a founding number, but these contractual snapshots must remain unchanged.
 reset role;
 select pg_temp.set_request(null, null, 'postgres');
+insert into public.instructor_guarantees (
+  instructor_profile_id,
+  founding_member_number,
+  founding_status,
+  founding_assigned_at,
+  guarantee_status,
+  guarantee_terms_version,
+  guarantee_started_at,
+  guarantee_ends_at,
+  claim_deadline_at,
+  first_stripe_customer_id,
+  first_stripe_subscription_id
+)
+select
+  profile.id,
+  fixture.founding_number,
+  'active',
+  fixture.guarantee_started_at,
+  'covered',
+  '2026-08-04',
+  fixture.guarantee_started_at,
+  fixture.guarantee_ends_at,
+  fixture.claim_deadline_at,
+  fixture.stripe_customer_id,
+  fixture.stripe_subscription_id
+from public.instructor_profiles profile
+join (
+  values
+    (
+      '00000000-0000-0000-0000-000000000010'::uuid,
+      1::smallint,
+      now() - interval '1 year 15 days',
+      now() - interval '15 days',
+      now() + interval '15 days',
+      'cus_alice'::text,
+      'sub_alice_first'::text
+    ),
+    (
+      '00000000-0000-0000-0000-000000000011'::uuid,
+      2::smallint,
+      now() - interval '30 days',
+      now() + interval '11 months',
+      now() + interval '1 year',
+      'cus_bianca'::text,
+      'sub_bianca_first'::text
+    ),
+    (
+      '00000000-0000-0000-0000-000000000012'::uuid,
+      3::smallint,
+      now() - interval '20 days',
+      now() + interval '345 days',
+      now() + interval '375 days',
+      'cus_casey'::text,
+      'sub_casey_first'::text
+    )
+) as fixture(
+  account_id,
+  founding_number,
+  guarantee_started_at,
+  guarantee_ends_at,
+  claim_deadline_at,
+  stripe_customer_id,
+  stripe_subscription_id
+) on fixture.account_id = profile.account_id;
+
+-- Stripe subscription events are service-only. The first active or trialing
+-- subscription publishes the profile without changing historical guarantees.
 set local role service_role;
 select pg_temp.set_request(null, null, 'service_role');
 select pg_temp.test_assert(
@@ -476,21 +574,25 @@ select pg_temp.test_assert(
   (select founding_member_number = 1
       and founding_status = 'active'
       and guarantee_status = 'covered'
-      and guarantee_started_at = timestamptz '2026-08-04 12:00:00+00'
-      and guarantee_ends_at = timestamptz '2027-08-04 12:00:00+00'
-      and claim_deadline_at = timestamptz '2027-09-03 12:00:00+00'
+      and guarantee_terms_version = '2026-08-04'
+      and guarantee_started_at = now() - interval '1 year 15 days'
+      and guarantee_ends_at = now() - interval '15 days'
+      and claim_deadline_at = now() + interval '15 days'
       and first_stripe_subscription_id = 'sub_alice_first'
    from public.instructor_guarantees guarantee
    join public.instructor_profiles profile on profile.id = guarantee.instructor_profile_id
    where profile.account_id = '00000000-0000-0000-0000-000000000010'),
-  'Alice founding guarantee snapshot must be complete and exact'
+  'an actually granted historical guarantee must remain complete and exact'
 );
 select pg_temp.test_assert(
-  (select founding_member_number = 3 and guarantee_status = 'covered'
+  (select founding_member_number = 3
+      and founding_status = 'active'
+      and guarantee_status = 'covered'
+      and guarantee_terms_version = '2026-08-04'
    from public.instructor_guarantees guarantee
    join public.instructor_profiles profile on profile.id = guarantee.instructor_profile_id
    where profile.account_id = '00000000-0000-0000-0000-000000000012'),
-  'an existing unassigned guarantee must receive the next founding position'
+  'a historical founding guarantee must retain its assigned position'
 );
 
 -- A restarted subscription must not reset the original guarantee clock or IDs.
@@ -518,7 +620,7 @@ reset role;
 select pg_temp.set_request(null, null, 'postgres');
 select pg_temp.test_assert(
   (select founding_member_number = 1
-      and guarantee_started_at = timestamptz '2026-08-04 12:00:00+00'
+      and guarantee_started_at = now() - interval '1 year 15 days'
       and first_stripe_customer_id = 'cus_alice'
       and first_stripe_subscription_id = 'sub_alice_first'
    from public.instructor_guarantees guarantee
@@ -1004,7 +1106,7 @@ select pg_temp.expect_error(
 select pg_temp.expect_error(
   format(
     'select public.apply_verified_membership_refund(%L::uuid, %L, %L, %L, %L, %L, 1499, %L, %L, now(), %L::uuid, null, null)',
-    :'alice_claim_id', 're_wrongcustomer', 'cus_someone_else', 'ch_wrongcustomer',
+    :'alice_claim_id', 're_wrongcustomer', 'cus_someoneelse', 'ch_wrongcustomer',
     'pi_wrongcustomer', 'in_wrongcustomer', 'usd', 'succeeded',
     '00000000-0000-0000-0000-000000000001'
   ),
@@ -1015,7 +1117,7 @@ select pg_temp.expect_error(
 select public.apply_verified_membership_refund(
   :'alice_claim_id'::uuid, 're_alicepartial1', 'cus_alice',
   'ch_alice1', 'pi_alice1', 'in_alice1', 1499, 'usd', 'succeeded',
-  timestamptz '2026-08-21 12:00:00+00',
+  now(),
   '00000000-0000-0000-0000-000000000001', 'evt_refund_alice1', null
 ) as first_refund_state \gset
 select pg_temp.test_assert(
@@ -1059,7 +1161,7 @@ select pg_temp.set_request(null, null, 'service_role');
 select public.apply_verified_membership_refund(
   :'alice_claim_id'::uuid, 're_alicepartial1', 'cus_alice',
   'ch_alice1', 'pi_alice1', 'in_alice1', 1499, 'usd', 'succeeded',
-  timestamptz '2026-08-21 12:00:00+00',
+  now(),
   '00000000-0000-0000-0000-000000000001', 'evt_refund_alice1', null
 ) as duplicate_refund_state \gset
 select pg_temp.test_assert(
@@ -1084,7 +1186,7 @@ select pg_temp.expect_error(
 select public.apply_verified_membership_refund(
   :'alice_claim_id'::uuid, 're_alicepartial2', 'cus_alice',
   'ch_alice2', 'pi_alice2', 'in_alice2', 1499, 'usd', 'succeeded',
-  timestamptz '2026-08-22 12:00:00+00',
+  now(),
   '00000000-0000-0000-0000-000000000001', 'evt_refund_alice2', null
 ) as final_refund_state \gset
 select pg_temp.test_assert(
@@ -1147,9 +1249,9 @@ select pg_temp.expect_error(
 -- the protected admin or invitation workflows.
 reset role;
 select pg_temp.set_request(null, null, 'postgres');
-insert into auth.users (id, email, raw_user_meta_data) values
-  ('00000000-0000-0000-0000-000000000013', 'lifetime-invite@example.test', '{"full_name":"Lena Lifetime"}'),
-  ('00000000-0000-0000-0000-000000000014', 'lifetime-admin@example.test', '{"full_name":"Gina Grant"}');
+insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data) values
+  ('00000000-0000-0000-0000-000000000013', 'lifetime-invite@example.test', now(), '{"full_name":"Lena Lifetime"}'),
+  ('00000000-0000-0000-0000-000000000014', 'lifetime-admin@example.test', now(), '{"full_name":"Gina Grant"}');
 
 set local role authenticated;
 select pg_temp.set_request(
@@ -1238,6 +1340,28 @@ select pg_temp.set_request(
   'authenticated'
 );
 select pg_temp.test_assert(
+  (public.get_instructor_invitation_lifecycle(repeat('a', 64)) ->> 'status') = 'sent',
+  'opening an invitation must report its current state without claiming it'
+);
+reset role;
+select pg_temp.set_request(null, null, 'postgres');
+select pg_temp.test_assert(
+  (select status = 'sent' and claimed_at is null
+   from public.instructor_invitations
+   where token_hash = repeat('a', 64)),
+  'opening an invitation must leave the stored invitation unclaimed'
+);
+set local role authenticated;
+select pg_temp.set_request(
+  '00000000-0000-0000-0000-000000000013',
+  'lifetime-invite@example.test',
+  'authenticated'
+);
+select pg_temp.test_assert(
+  (public.claim_instructor_invitation(repeat('a', 64)) ->> 'status') = 'claimed',
+  'an invitation must be deliberately claimed before acceptance'
+);
+select pg_temp.test_assert(
   public.accept_instructor_invitation(
     repeat('a', 64), 'Lena Lifetime', 'Lifetime Line Dance'
   ),
@@ -1292,13 +1416,14 @@ select pg_temp.set_request(
   'lifetime-invite@example.test',
   'authenticated'
 );
+select public.claim_instructor_invitation(repeat('b', 64));
 select pg_temp.expect_error(
   'select public.accept_instructor_invitation(repeat(''b'', 64), ''Lena Lifetime'', null)',
   'Sign in with the email address',
   'invitation email mismatch'
 );
 select pg_temp.expect_error(
-  'select public.accept_instructor_invitation(repeat(''c'', 64), ''Lena Lifetime'', null)',
+  'select public.claim_instructor_invitation(repeat(''c'', 64))',
   'invitation has expired',
   'expired instructor invitation'
 );
@@ -1328,11 +1453,11 @@ set local role service_role;
 select pg_temp.set_request(null, null, 'service_role');
 select (public.create_instructor_invitation(
   'replacement@example.test', repeat('d', 64), 'replacement-first', false,
-  '00000000-0000-0000-0000-000000000001', now() + interval '30 days'
+  '00000000-0000-0000-0000-000000000001', now() + interval '14 days'
 )).id as replacement_first_id \gset
 select (public.create_instructor_invitation(
   'replacement@example.test', repeat('e', 64), 'replacement-second', true,
-  '00000000-0000-0000-0000-000000000001', now() + interval '30 days'
+  '00000000-0000-0000-0000-000000000001', now() + interval '14 days'
 )).id as replacement_second_id \gset
 select pg_temp.test_assert(
   (select first.status = 'revoked' and second.status = 'pending'
@@ -1341,6 +1466,379 @@ select pg_temp.test_assert(
    where first.id = :'replacement_first_id'::uuid),
   'a newer invitation must atomically revoke the prior open invitation'
 );
+
+-- Standard invitations use a read-only landing view, an explicit 14-day
+-- claim, and one seven-day account and complete-profile deadline. Timely
+-- submission earns an offer that later review cannot remove.
+select (public.create_instructor_invitation(
+  'offer-invite@example.test', repeat('f', 64), 'offer-invite-lifecycle', false,
+  '00000000-0000-0000-0000-000000000001', now() + interval '14 days'
+)).id as offer_invitation_id \gset
+
+set local role anon;
+select pg_temp.set_request(null, null, 'anon');
+select pg_temp.test_assert(
+  (public.get_instructor_invitation_lifecycle(repeat('f', 64)) ->> 'status') = 'pending'
+    and (public.get_instructor_invitation_lifecycle(repeat('f', 64)) ->> 'offerCode') = 'outreach_two_months_90_day_v1',
+  'invitation inspection must expose only the offer lifecycle'
+);
+reset role;
+select pg_temp.set_request(null, null, 'postgres');
+select pg_temp.test_assert(
+  (select status = 'pending' and claimed_at is null
+   from public.instructor_invitations
+   where id = :'offer_invitation_id'::uuid),
+  'anonymous invitation inspection must not claim the stored invitation'
+);
+set local role anon;
+select pg_temp.set_request(null, null, 'anon');
+select pg_temp.test_assert(
+  (select lifecycle ->> 'status' = 'claimed'
+      and (lifecycle ->> 'profileSubmissionDeadlineAt')::timestamptz
+        > now() + interval '6 days 23 hours'
+   from (
+     select public.claim_instructor_invitation(repeat('f', 64)) as lifecycle
+   ) claimed),
+  'explicit claim must start the seven-day account and profile deadline'
+);
+
+reset role;
+select pg_temp.set_request(null, null, 'postgres');
+insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data) values
+  ('00000000-0000-0000-0000-000000000015', 'offer-invite@example.test', now(), '{"full_name":"Opal Offer"}');
+
+set local role authenticated;
+select pg_temp.set_request(
+  '00000000-0000-0000-0000-000000000013',
+  'lifetime-invite@example.test',
+  'authenticated'
+);
+select pg_temp.expect_error(
+  'select public.accept_instructor_invitation(repeat(''f'', 64), ''Lena Lifetime'', null)',
+  'Sign in with the email address',
+  'offer invitation exact-email binding'
+);
+
+select pg_temp.set_request(
+  '00000000-0000-0000-0000-000000000015',
+  'offer-invite@example.test',
+  'authenticated'
+);
+select pg_temp.test_assert(
+  not public.accept_instructor_invitation(
+    repeat('f', 64), 'Opal Offer', 'Offer Dance Co.'
+  ),
+  'a standard invitation must create the exact-email instructor without lifetime access'
+);
+update public.instructor_profiles
+set bio = 'Line dance instruction for private and company events.',
+    city = 'Tampa',
+    region = 'FL'
+where account_id = '00000000-0000-0000-0000-000000000015';
+select pg_temp.expect_error(
+  $statement$
+    update public.instructor_profiles
+    set status = 'pending_review'
+    where account_id = '00000000-0000-0000-0000-000000000015'
+  $statement$,
+  'at least one event type',
+  'offer profile completeness with empty event types'
+);
+insert into public.profile_media (
+  instructor_profile_id, media_type, external_url, caption, status
+)
+select profile.id, 'headshot', 'https://example.test/opal-offer.jpg', 'Opal Offer', 'ready'
+from public.instructor_profiles profile
+where profile.account_id = '00000000-0000-0000-0000-000000000015';
+update public.instructor_profiles
+set event_types = array['corporate-events'],
+    status = 'pending_review'
+where account_id = '00000000-0000-0000-0000-000000000015';
+select pg_temp.test_assert(
+  (select (offer ->> 'offerEligible')::boolean
+      and (offer ->> 'offerEarnedAt') is not null
+      and (offer ->> 'profileSubmittedAt')::timestamptz
+        <= (offer ->> 'profileSubmissionDeadlineAt')::timestamptz
+   from (
+     select public.current_instructor_invitation_offer() as offer
+   ) current_offer),
+  'a complete profile submitted on time must durably earn the offer'
+);
+
+select pg_temp.set_request(
+  '00000000-0000-0000-0000-000000000001',
+  'owner@example.test',
+  'authenticated'
+);
+select public.review_instructor_profile(
+  (select id from public.instructor_profiles where account_id = '00000000-0000-0000-0000-000000000015'),
+  'approve', 'opal-offer-tampa-fl', 'Offer lifecycle approval'
+);
+select pg_temp.test_assert(
+  (select invitation.offer_eligible and invitation.offer_earned_at is not null
+   from public.instructor_invitations invitation
+   where invitation.id = :'offer_invitation_id'::uuid),
+  'administrative review timing must not revoke an earned offer'
+);
+
+-- The earned offer is attached server-side to Opal's first Checkout. A
+-- zero-dollar discounted invoice cannot start the guarantee. The first
+-- positive verified invoice starts an exact 90-day coverage window followed
+-- by a 30-day request window.
+reset role;
+select pg_temp.set_request(null, null, 'postgres');
+set local role service_role;
+select pg_temp.set_request(null, null, 'service_role');
+select pg_temp.test_assert(
+  public.register_instructor_checkout_attempt(
+    (select id from public.instructor_profiles where account_id = '00000000-0000-0000-0000-000000000015'),
+    'opal-offer-checkout',
+    'cs_test_opaloffer1',
+    'cus_opaloffer',
+    'price_hldmonthly',
+    'https://checkout.stripe.test/opal-offer',
+    now() + interval '1 hour',
+    :'offer_invitation_id'::uuid,
+    'outreach_two_months_90_day_v1',
+    (select offer_earned_at from public.instructor_invitations where id = :'offer_invitation_id'::uuid),
+    'couponopal2months',
+    2::smallint,
+    '2026-08-07-membership-v2',
+    '2026-08-07-90-day-paid-invoice-v1'
+  ),
+  'an earned first-membership offer must register with current terms'
+);
+select pg_temp.test_assert(
+  public.apply_stripe_subscription_event(
+    'evt_opal_membership',
+    'customer.subscription.created',
+    now() - interval '91 days',
+    '2025-07-30.basil',
+    false,
+    (select id from public.instructor_profiles where account_id = '00000000-0000-0000-0000-000000000015'),
+    'cus_opaloffer',
+    'sub_opaloffer',
+    'price_hldmonthly',
+    'active',
+    now() - interval '91 days',
+    now() - interval '61 days',
+    false,
+    'cs_test_opaloffer1',
+    'in_opalzero',
+    now() - interval '91 days',
+    now()
+  ) = 'processed',
+  'the current Checkout must activate Opal membership'
+);
+select pg_temp.test_assert(
+  public.redeem_instructor_checkout_offer(
+    (select id from public.instructor_profiles where account_id = '00000000-0000-0000-0000-000000000015'),
+    :'offer_invitation_id'::uuid,
+    'outreach_two_months_90_day_v1',
+    'cs_test_opaloffer1',
+    'sub_opaloffer'
+  ) = 'redeemed',
+  'the completed first membership must redeem the invitation offer once'
+);
+select pg_temp.expect_error(
+  format(
+    'select public.record_membership_paid_invoice(%L::uuid, %L, %L, %L, %L, 0, %L, %L::timestamptz, %L, false, %L)',
+    (select id from public.instructor_profiles where account_id = '00000000-0000-0000-0000-000000000015'),
+    'in_opalzero', 'cus_opaloffer', 'sub_opaloffer',
+    'price_hldmonthly', 'usd', now() - interval '91 days',
+    'subscription_create', 'evt_opal_zero'
+  ),
+  'Paid membership invoice facts are invalid',
+  'zero-dollar guarantee activation invoice'
+);
+select pg_temp.test_assert(
+  (select guarantee_status = 'not_started'
+      and first_paid_invoice_id is null
+      and guarantee_started_at is null
+   from public.instructor_guarantees guarantee_record
+   join public.instructor_profiles profile
+     on profile.id = guarantee_record.instructor_profile_id
+   where profile.account_id = '00000000-0000-0000-0000-000000000015'),
+  'zero-dollar offer invoices must leave the guarantee unstarted'
+);
+select public.record_membership_paid_invoice(
+  (select id from public.instructor_profiles where account_id = '00000000-0000-0000-0000-000000000015'),
+  'in_opalpositive',
+  'cus_opaloffer',
+  'sub_opaloffer',
+  'price_hldmonthly',
+  1499,
+  'usd',
+  now() - interval '91 days',
+  'subscription_cycle',
+  false,
+  'evt_opal_positive'
+);
+select pg_temp.test_assert(
+  (select guarantee_status = 'covered'
+      and guarantee_terms_version = '2026-08-07-90-day-paid-invoice-v1'
+      and founding_member_number is null
+      and founding_status = 'not_available'
+      and first_paid_invoice_id = 'in_opalpositive'
+      and guarantee_started_at = now() - interval '91 days'
+      and guarantee_ends_at = now() - interval '1 day'
+      and claim_deadline_at = now() + interval '29 days'
+      and guarantee_duration_days = 90
+      and claim_request_window_days = 30
+   from public.instructor_guarantees guarantee_record
+   join public.instructor_profiles profile
+     on profile.id = guarantee_record.instructor_profile_id
+   where profile.account_id = '00000000-0000-0000-0000-000000000015'),
+  'the first positive invoice must start the exact current guarantee window'
+);
+
+reset role;
+select pg_temp.set_request(null, null, 'postgres');
+set local role authenticated;
+select pg_temp.set_request(
+  '00000000-0000-0000-0000-000000000015',
+  'offer-invite@example.test',
+  'authenticated'
+);
+select pg_temp.test_assert(
+  (public.current_instructor_invitation_offer() ->> 'offerStatus') = 'redeemed'
+    and (public.current_instructor_invitation_offer() ->> 'offerRedeemedAt') is not null,
+  'the instructor offer lifecycle must expose completed redemption'
+);
+
+select pg_temp.set_request(
+  '00000000-0000-0000-0000-000000000001',
+  'owner@example.test',
+  'authenticated'
+);
+select pg_temp.test_assert(
+  (select count(*) = 1
+   from public.admin_search_instructors('Opal Offer', 100, 0)
+   where guarantee_terms_version = '2026-08-07-90-day-paid-invoice-v1'
+     and eligible_paid_amount_cents = 1499),
+  'the admin workspace must expose current terms and the invoice refund cap'
+);
+select pg_temp.expect_error(
+  format(
+    'select public.admin_log_guarantee_claim(%L::uuid, %L, %L, 1500, null, null)',
+    (select id from public.instructor_profiles where account_id = '00000000-0000-0000-0000-000000000015'),
+    'email', 'offer-invite@example.test'
+  ),
+  'Requested amount exceeds eligible paid membership invoices',
+  'current guarantee claim above eligible paid invoices'
+);
+select public.admin_log_guarantee_claim(
+  (select id from public.instructor_profiles where account_id = '00000000-0000-0000-0000-000000000015'),
+  'email',
+  'offer-invite@example.test',
+  1499,
+  'No qualifying booking was completed during the coverage window.',
+  'Current guarantee fixture.'
+) as opal_claim_id \gset
+select pg_temp.expect_error(
+  format(
+    'select public.admin_review_guarantee_claim(%L::uuid, %L, true, true, true, 1500, null, null)',
+    :'opal_claim_id', 'approved'
+  ),
+  'Approved refund exceeds eligible paid membership invoices',
+  'current guarantee approval above eligible paid invoices'
+);
+select public.admin_review_guarantee_claim(
+  :'opal_claim_id'::uuid,
+  'approved',
+  true,
+  true,
+  true,
+  1499,
+  'Current guarantee requirements confirmed.',
+  'Approved within the request window.'
+);
+
+reset role;
+select pg_temp.set_request(null, null, 'postgres');
+set local role service_role;
+select pg_temp.set_request(null, null, 'service_role');
+select pg_temp.expect_error(
+  format(
+    'select public.apply_verified_membership_refund(%L::uuid, %L, %L, %L, %L, %L, 1499, %L, %L, %L::timestamptz, %L::uuid, null, null)',
+    :'opal_claim_id', 're_opalprerequest', 'cus_opaloffer',
+    'ch_opalprerequest', 'pi_opalprerequest', 'in_opalpositive',
+    'usd', 'succeeded', now() - interval '2 days',
+    '00000000-0000-0000-0000-000000000001'
+  ),
+  'The Stripe refund must be created after the claim request',
+  'refund created before the current guarantee request'
+);
+select pg_temp.expect_error(
+  format(
+    'select public.apply_verified_membership_refund(%L::uuid, %L, %L, %L, %L, %L, 1499, %L, %L, now(), %L::uuid, null, null)',
+    :'opal_claim_id', 're_opalwronginvoice', 'cus_opaloffer',
+    'ch_opalwronginvoice', 'pi_opalwronginvoice', 'in_opaloutside',
+    'usd', 'succeeded', '00000000-0000-0000-0000-000000000001'
+  ),
+  'Refund invoice is outside this guarantee coverage',
+  'current guarantee refund outside eligible invoices'
+);
+select public.apply_verified_membership_refund(
+  :'opal_claim_id'::uuid,
+  're_opalcurrent',
+  'cus_opaloffer',
+  'ch_opalcurrent',
+  'pi_opalcurrent',
+  'in_opalpositive',
+  1499,
+  'usd',
+  'succeeded',
+  now(),
+  '00000000-0000-0000-0000-000000000001',
+  null,
+  null
+) as opal_refund_state \gset
+select pg_temp.test_assert(
+  :'opal_refund_state' = 'refunded'
+    and (select guarantee_status = 'refunded'
+          and founding_status = 'not_available'
+          and founding_member_number is null
+         from public.instructor_guarantees guarantee_record
+         join public.instructor_profiles profile
+           on profile.id = guarantee_record.instructor_profile_id
+         where profile.account_id = '00000000-0000-0000-0000-000000000015'),
+  'a requested and approved current refund must close without founding benefits'
+);
+select public.record_membership_paid_invoice(
+  (select id from public.instructor_profiles where account_id = '00000000-0000-0000-0000-000000000015'),
+  'in_opallateearlier',
+  'cus_opaloffer',
+  'sub_opaloffer',
+  'price_hldmonthly',
+  1499,
+  'usd',
+  now() - interval '92 days',
+  'subscription_create',
+  false,
+  'evt_opal_late_earlier'
+) as opal_late_invoice_state \gset
+select pg_temp.test_assert(
+  :'opal_late_invoice_state' =
+      'recorded:earlier_invoice_requires_manual_review'
+    and (select first_paid_invoice_id = 'in_opalpositive'
+          and guarantee_started_at = now() - interval '91 days'
+         from public.instructor_guarantees guarantee_record
+         join public.instructor_profiles profile
+           on profile.id = guarantee_record.instructor_profile_id
+         where profile.account_id = '00000000-0000-0000-0000-000000000015')
+    and exists (
+      select 1
+      from public.membership_paid_invoices invoice
+      where invoice.stripe_invoice_id = 'in_opallateearlier'
+    ),
+  'a late earlier invoice must be recorded without rewriting a claimed guarantee'
+);
+
+reset role;
+select pg_temp.set_request(null, null, 'postgres');
+set local role service_role;
+select pg_temp.set_request(null, null, 'service_role');
 select pg_temp.test_assert(
   public.apply_stripe_subscription_event(
     'evt_lifetime_canceled', 'customer.subscription.deleted', timestamptz '2026-08-25 12:00:00+00',
@@ -1356,8 +1854,12 @@ select pg_temp.test_assert(
 select pg_temp.test_assert(
   not public.register_instructor_checkout_attempt(
     (select id from public.instructor_profiles where account_id = '00000000-0000-0000-0000-000000000013'),
-    'lifetime-checkout-block', 'cs_lifetime_block', 'cus_lifetime_block',
-    'price_hld_monthly', 'https://checkout.stripe.test/lifetime-block', now() + interval '1 hour'
+    'lifetime-checkout-block', 'cs_test_lifetimeblock', 'cus_lifetimeblock',
+    'price_hldmonthly', 'https://checkout.stripe.test/lifetime-block',
+    now() + interval '1 hour',
+    null, null, null, null, null,
+    '2026-08-07-membership-v2',
+    '2026-08-07-90-day-paid-invoice-v1'
   ),
   'checkout registration must reject lifetime access after the final server check'
 );
@@ -1374,22 +1876,21 @@ select pg_temp.test_assert(
   'a canceled Stripe event cannot unpublish or create billing for lifetime access'
 );
 
--- Founding positions stop at 100 and are never reused when benefits end. The
--- ninety-eighth bulk fixture is marketplace member 101 because three positions
--- were already assigned above.
+-- The historical founding program is closed. New memberships and owner tools
+-- cannot allocate any additional founding numbers.
 reset role;
 select pg_temp.set_request(null, null, 'postgres');
 insert into auth.users (id, email, raw_user_meta_data)
 select
   format('10000000-0000-0000-0000-%s', lpad(series::text, 12, '0'))::uuid,
-  format('bulk-founder-%s@example.test', series),
-  jsonb_build_object('full_name', format('Bulk Founder %s', series))
-from generate_series(1, 98) series
+  format('new-member-%s@example.test', series),
+  jsonb_build_object('full_name', format('New Member %s', series))
+from generate_series(1, 3) series
 order by series;
 
 update public.accounts
 set role = 'instructor', onboarding_completed_at = now()
-where email like 'bulk-founder-%@example.test';
+where email like 'new-member-%@example.test';
 
 insert into public.instructor_profiles (
   account_id, display_name, status, approved_at
@@ -1400,7 +1901,7 @@ select
   'approved',
   now()
 from public.accounts account
-where account.email like 'bulk-founder-%@example.test'
+where account.email like 'new-member-%@example.test'
 order by account.email;
 
 insert into public.instructor_memberships (
@@ -1413,36 +1914,59 @@ insert into public.instructor_memberships (
 )
 select
   profile.id,
-  'cus_bulk_' || row_number() over (order by account.email),
-  'sub_bulk_' || row_number() over (order by account.email),
+  'cus_newmember' || row_number() over (order by account.email),
+  'sub_newmember' || row_number() over (order by account.email),
   'price_hld_monthly',
   'active',
   timestamptz '2026-08-05 00:00:00+00'
     + row_number() over (order by account.email) * interval '1 second'
 from public.instructor_profiles profile
 join public.accounts account on account.id = profile.account_id
-where account.email like 'bulk-founder-%@example.test'
+where account.email like 'new-member-%@example.test'
 order by account.email;
 
 select pg_temp.test_assert(
-  (select count(*) = 100
+  (select count(*) = 3
    from public.instructor_guarantees
    where founding_member_number is not null),
-  'exactly 100 permanent founding positions may be assigned'
+  'only the three explicitly preserved historical positions may remain'
 );
 select pg_temp.test_assert(
-  (select count(*) = 1
-   from public.instructor_guarantees
-   where founding_member_number is null
-     and founding_status = 'not_available'
-     and guarantee_status = 'ineligible'),
-  'marketplace member 101 must not receive founding guarantee coverage'
+  not exists (
+    select 1
+    from public.instructor_guarantees guarantee_record
+    join public.instructor_profiles profile
+      on profile.id = guarantee_record.instructor_profile_id
+    join public.accounts account on account.id = profile.account_id
+    where account.email like 'new-member-%@example.test'
+  ),
+  'memberships without a current Checkout must not create guarantees or founding positions'
+);
+
+set local role authenticated;
+select pg_temp.set_request(
+  '00000000-0000-0000-0000-000000000001',
+  'owner@example.test',
+  'authenticated'
 );
 select pg_temp.test_assert(
-  (select count(distinct founding_member_number) = 100
+  (select count(distinct founding_member_number) = 3
    from public.instructor_guarantees
    where founding_member_number is not null),
-  'founding member numbers must remain unique at the boundary'
+  'preserved founding numbers must remain unique'
+);
+select pg_temp.expect_error(
+  format(
+    'select public.admin_update_instructor_guarantee(%L::uuid, %L, %L, null)',
+    (select profile.id
+     from public.instructor_profiles profile
+     join public.accounts account on account.id = profile.account_id
+     where account.email = 'new-member-1@example.test'),
+    'active',
+    'not_started'
+  ),
+  'The founding member program is closed to new assignments',
+  'new founding assignment after program closure'
 );
 
 -- Revocation immediately removes delegated admin search and finance visibility.

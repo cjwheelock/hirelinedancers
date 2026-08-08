@@ -213,10 +213,10 @@ export default {
       }
     }
 
-    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
     let { data: invitation, error: invitationLookupError } = await ctx.supabaseAdmin
       .from("instructor_invitations")
-      .select("id,email,token_hash,grants_lifetime_access,status,expires_at")
+      .select("id,email,token_hash,grants_lifetime_access,offer_code,status,expires_at")
       .eq("request_key", requestKey)
       .maybeSingle();
 
@@ -251,11 +251,12 @@ export default {
     ) {
       return json({ error: "That invitation request key was already used for different details" }, 409);
     }
-    if (["sent", "accepted"].includes(invitation.status)) {
+    if (["sent", "claimed", "accepted"].includes(invitation.status)) {
       return json({
         invitationId: invitation.id,
         email,
         grantsLifetimeAccess: body.grantsLifetimeAccess,
+        offerCode: invitation.offer_code,
         expiresAt: invitation.expires_at,
         reused: true,
       });
@@ -297,6 +298,7 @@ export default {
         invitationId: invitation.id,
         email,
         grantsLifetimeAccess: body.grantsLifetimeAccess,
+        offerCode: invitation.offer_code,
         expiresAt: invitation.expires_at,
         deliveryPending: true,
       }, 202);
@@ -306,16 +308,26 @@ export default {
     invitationUrl.searchParams.set("role", "instructor");
     invitationUrl.searchParams.set("invite", token);
 
-    const lifetimeText = body.grantsLifetimeAccess
-      ? " This invitation includes complimentary lifetime access, so you will not be asked for payment details to create or activate your profile."
-      : " After your profile is approved, your account will show the available membership activation options.";
+    const accessText = invitation.grants_lifetime_access
+      ? "This invitation includes complimentary lifetime instructor access, so you will not be asked for payment details to create or activate your profile."
+      : invitation.offer_code === "outreach_two_months_90_day_v1"
+        ? "Submit a complete profile within the seven-day window to earn your first two monthly billing cycles free. Every new paid membership also includes the request-based 90-day booking guarantee, subject to the terms shown during activation."
+        : "After your profile is approved, your account will show the available membership activation options.";
+    const timingText = [
+      "Open the private link and select Claim invitation within 14 days. Claiming starts a seven-day window to sign in with this email, create your instructor account, and submit a complete profile.",
+      invitation.offer_code === "outreach_two_months_90_day_v1"
+        ? "Review may happen later and will not affect the two-month offer earned through timely submission."
+        : invitation.grants_lifetime_access
+          ? "Lifetime access is granted when the invitation is accepted. Later profile review will not affect that access."
+          : "Profile review may happen after the submission window."
+    ].join(" ");
     const textBody = [
       "You are invited to join Hire Line Dancers as an instructor.",
-      lifetimeText.trim(),
+      accessText,
       "",
-      `Accept your invitation: ${invitationUrl.toString()}`,
+      `Review and claim your invitation: ${invitationUrl.toString()}`,
       "",
-      "This private invitation expires in 30 days. Sign in with the email address that received it.",
+      timingText,
     ].join("\n");
     const safeUrl = escapeHtml(invitationUrl.toString());
     const htmlBody = `
@@ -323,9 +335,9 @@ export default {
         <p style="font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#b5472b">Hire Line Dancers</p>
         <h1 style="font-size:30px;line-height:1.15">You are invited to join as an instructor</h1>
         <p>Build your instructor profile, share your services, and connect with people planning events in your area.</p>
-        <p>${escapeHtml(lifetimeText.trim())}</p>
-        <p style="margin:28px 0"><a href="${safeUrl}" style="display:inline-block;background:#e7a33c;color:#1c2a44;border:2px solid #1c2a44;padding:12px 18px;font-weight:700;text-decoration:none">Accept instructor invitation</a></p>
-        <p style="font-size:14px;color:#57607a">This private invitation expires in 30 days. Sign in with the email address that received it.</p>
+        <p>${escapeHtml(accessText)}</p>
+        <p style="margin:28px 0"><a href="${safeUrl}" style="display:inline-block;background:#e7a33c;color:#1c2a44;border:2px solid #1c2a44;padding:12px 18px;font-weight:700;text-decoration:none">Review and claim invitation</a></p>
+        <p style="font-size:14px;color:#57607a">${escapeHtml(timingText)}</p>
       </div>
     `;
 
@@ -407,6 +419,7 @@ export default {
       invitationId: invitation.id,
       email,
       grantsLifetimeAccess: body.grantsLifetimeAccess,
+      offerCode: invitation.offer_code,
       expiresAt: invitation.expires_at,
     });
   }),

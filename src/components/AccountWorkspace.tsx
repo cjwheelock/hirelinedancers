@@ -14,6 +14,7 @@ import {
   readableError,
   type AccountIntent,
   type AccountRole,
+  type InstructorInvitationLifecycle,
   type InstructorPrivateSettings,
   type InstructorProfile,
   type MarketplaceAccount,
@@ -43,6 +44,16 @@ type ProfileMedia = {
 
 type InstructorTab = "profile" | "inquiries" | "membership";
 
+type InstructorInvitationOfferStatus = Pick<
+  InstructorInvitationLifecycle,
+  "status" | "claimedAt" | "profileSubmissionDeadlineAt" | "accountCreatedAt" | "profileSubmittedAt" | "offerCode" | "offerEligible" | "offerEarnedAt"
+> & {
+  offerStatus: "pending" | "earned" | "ineligible" | "expired" | "redeemed";
+  offerRedeemedAt: string | null;
+  offerRedeemedCheckoutSessionId: string | null;
+  offerRedeemedSubscriptionId: string | null;
+};
+
 export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean }) {
   const { session, account, isAdmin, isOwner, loading, error, configured, refresh } = useMarketplaceSession();
   const [signingOut, setSigningOut] = useState(false);
@@ -51,9 +62,9 @@ export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean })
   const [entryIntent, setEntryIntent] = useState<AccountIntent | null | undefined>(undefined);
   const [entryReturnTo, setEntryReturnTo] = useState<string | null>(null);
   const [entryInvitationToken, setEntryInvitationToken] = useState<string | null | undefined>(undefined);
-  const [invitationClaim, setInvitationClaim] = useState<"idle" | "claiming" | "accepted" | "error">("idle");
+  const [invitationClaim, setInvitationClaim] = useState<"idle" | "loading" | "ready" | "accepting" | "accepted" | "error">("idle");
+  const [invitationLifecycle, setInvitationLifecycle] = useState<InstructorInvitationLifecycle | null>(null);
   const [invitationError, setInvitationError] = useState<string | null>(null);
-  const invitationClaimStarted = useRef(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -89,52 +100,33 @@ export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean })
   }, [account, entryIntent, entryInvitationToken, entryReturnTo, isAdmin]);
 
   useEffect(() => {
-    if (!entryInvitationToken || !session || !account?.role || invitationClaimStarted.current) return;
-    invitationClaimStarted.current = true;
-    const scrubInvitationUrl = () => {
-      const url = new URL(window.location.href);
-      url.searchParams.delete("invite");
-      window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
-    };
-    if (account.role !== "instructor") {
-      setInvitationError("This invitation requires an instructor account. Contact support to change your account type.");
-      setInvitationClaim("error");
-      scrubInvitationUrl();
-      return;
-    }
-    const accountFullName = account.full_name;
-    const accountCompanyName = account.company_name;
-
-    setInvitationClaim("claiming");
+    if (!entryInvitationToken || !session || !configured) return;
+    let active = true;
+    setInvitationClaim("loading");
     setInvitationError(null);
 
-    async function claimInvitation() {
+    async function inspectInvitation() {
       const client = getMarketplaceClient();
       if (!client || !entryInvitationToken) return;
       try {
         const tokenHash = await instructorInvitationTokenHash(entryInvitationToken);
-        const { error: claimError } = await client.rpc("accept_instructor_invitation", {
-          p_token_hash: tokenHash,
-          p_full_name: accountFullName,
-          p_company_name: accountCompanyName
+        const { data, error: inspectionError } = await client.rpc("get_instructor_invitation_lifecycle", {
+          p_token_hash: tokenHash
         });
-        if (claimError) throw claimError;
-        setInvitationClaim("accepted");
-        setEntryInvitationToken(null);
-        await refresh();
-        const url = new URL(window.location.href);
-        url.searchParams.delete("invite");
-        url.searchParams.delete("intent");
-        window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
-      } catch (claimError) {
-        setInvitationError(readableError(claimError));
+        if (inspectionError) throw inspectionError;
+        if (!active) return;
+        setInvitationLifecycle(data as InstructorInvitationLifecycle);
+        setInvitationClaim("ready");
+      } catch (inspectionError) {
+        if (!active) return;
+        setInvitationError(readableError(inspectionError));
         setInvitationClaim("error");
-        scrubInvitationUrl();
       }
     }
 
-    void claimInvitation();
-  }, [account?.company_name, account?.full_name, account?.role, entryInvitationToken, session]);
+    void inspectInvitation();
+    return () => { active = false; };
+  }, [configured, entryInvitationToken, session]);
 
   useEffect(() => {
     if (!isAdmin) {
@@ -178,6 +170,36 @@ export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean })
     window.location.replace(`${signInUrl("/account/", "instructor")}&invite=${encodeURIComponent(entryInvitationToken)}`);
   }
 
+  function finishInvitationEntry() {
+    setEntryInvitationToken(null);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("invite");
+    url.searchParams.delete("intent");
+    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+  }
+
+  async function acceptInvitationForInstructor() {
+    const client = getMarketplaceClient();
+    if (!client || !entryInvitationToken || !account) return;
+    setInvitationClaim("accepting");
+    setInvitationError(null);
+    try {
+      const tokenHash = await instructorInvitationTokenHash(entryInvitationToken);
+      const { error: acceptanceError } = await client.rpc("accept_instructor_invitation", {
+        p_token_hash: tokenHash,
+        p_full_name: account.full_name,
+        p_company_name: account.company_name
+      });
+      if (acceptanceError) throw acceptanceError;
+      setInvitationClaim("accepted");
+      finishInvitationEntry();
+      await refresh();
+    } catch (acceptanceError) {
+      setInvitationError(readableError(acceptanceError));
+      setInvitationClaim("error");
+    }
+  }
+
   if (loading || entryIntent === undefined || entryInvitationToken === undefined) return <div className={styles.loading}>Loading your account...</div>;
 
   if (!configured) {
@@ -205,33 +227,154 @@ export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean })
     );
   }
 
-  if (entryInvitationToken && account?.role) {
+  if (entryInvitationToken) {
+    const deadline = invitationLifecycle?.profileSubmissionDeadlineAt
+      ? new Date(invitationLifecycle.profileSubmissionDeadlineAt).toLocaleString()
+      : null;
+    const unclaimed = invitationLifecycle
+      ? ["pending", "sending", "sent", "delivery_failed"].includes(invitationLifecycle.status)
+      : false;
+    const expiredWithoutAccount = (invitationLifecycle?.status === "expired"
+      || invitationLifecycle?.status === "claim_expired")
+      && !invitationLifecycle.accountCreatedAt;
+
+    if (invitationClaim === "loading" || invitationClaim === "idle") {
+      return <div className={styles.loading}>Checking your private invitation...</div>;
+    }
+
+    if (invitationClaim === "error" || !invitationLifecycle) {
+      return (
+        <section className={`${styles.shell} ${styles.narrow}`}>
+          <p className={styles.eyebrow}>Instructor invitation</p>
+          <h1 className={styles.title}>We could not open this invitation</h1>
+          <p className={styles.error} role="alert">{invitationError ?? "The invitation is unavailable."}</p>
+          <div className={styles.buttonRow}>
+            <button className={styles.button} type="button" disabled={signingOut} onClick={() => void restartInvitationSignIn()}>
+              {signingOut ? "Signing out..." : "Sign out and try another account"}
+            </button>
+            <a className={styles.secondaryButton} href="/account/">Open my account without this invitation</a>
+          </div>
+        </section>
+      );
+    }
+
+    if (unclaimed) {
+      return (
+        <section className={`${styles.shell} ${styles.narrow}`}>
+          <p className={styles.eyebrow}>Instructor invitation</p>
+          <h1 className={styles.title}>Claim the invitation first</h1>
+          <p className={styles.subtitle}>Opening this page did not claim anything. Return to the invitation screen and choose Claim invitation before continuing.</p>
+          <a className={styles.button} href={`${signInUrl("/account/", "instructor")}&invite=${encodeURIComponent(entryInvitationToken)}`}>Review invitation</a>
+        </section>
+      );
+    }
+
+    if (expiredWithoutAccount) {
+      return (
+        <section className={`${styles.shell} ${styles.narrow}`}>
+          <p className={styles.eyebrow}>Instructor invitation</p>
+          <h1 className={styles.title}>This invitation window has ended</h1>
+          <p className={styles.error}>The private account and profile submission window expired before an instructor account was created.</p>
+          <div className={styles.buttonRow}>
+            <Link className={styles.button} href="/instructors/join/">View instructor membership options</Link>
+            <button className={styles.secondaryButton} type="button" disabled={signingOut} onClick={() => void restartInvitationSignIn()}>
+              {signingOut ? "Signing out..." : "Try another account"}
+            </button>
+          </div>
+        </section>
+      );
+    }
+
+    if (account?.role && account.role !== "instructor") {
+      return (
+        <section className={`${styles.shell} ${styles.narrow}`}>
+          <p className={styles.eyebrow}>Instructor invitation</p>
+          <h1 className={styles.title}>Use the invited instructor account</h1>
+          <p className={styles.error}>This invitation cannot be attached to a {account.role} account. Sign in with the exact email address that received it.</p>
+          <button className={styles.button} type="button" disabled={signingOut} onClick={() => void restartInvitationSignIn()}>
+            {signingOut ? "Signing out..." : "Sign out and try another account"}
+          </button>
+        </section>
+      );
+    }
+
+    if (!account?.role && invitationLifecycle.status === "claimed") {
+      return (
+        <section className={`${styles.shell} ${styles.narrow}`}>
+          <p className={styles.eyebrow}>Instructor invitation</p>
+          <h1 className={styles.title}>Create your instructor account</h1>
+          <p className={styles.subtitle}>Use the email address that received this invitation. Create the account and submit a complete profile{deadline ? ` by ${deadline}` : " within the seven-day window"}.</p>
+          {invitationLifecycle.grantsLifetimeAccess ? (
+            <p className={styles.notice}>This invitation includes complimentary lifetime instructor access.</p>
+          ) : invitationLifecycle.offerCode === "outreach_two_months_90_day_v1" ? (
+            <p className={styles.notice}>A complete profile submitted on time earns your first two monthly billing cycles free. Every new paid membership also includes the request-based 90-day booking guarantee.</p>
+          ) : null}
+          <OnboardingForm
+            email={session.user.email ?? ""}
+            initialName={account?.full_name ?? session.user.user_metadata.full_name ?? ""}
+            fixedRole="instructor"
+            invitationToken={entryInvitationToken}
+            onComplete={async () => {
+              setInvitationClaim("accepted");
+              finishInvitationEntry();
+              if (entryReturnTo) {
+                window.location.replace(entryReturnTo);
+                return;
+              }
+              await refresh();
+            }}
+          />
+        </section>
+      );
+    }
+
+    if (!account?.role) {
+      return (
+        <section className={`${styles.shell} ${styles.narrow}`}>
+          <p className={styles.eyebrow}>Instructor invitation</p>
+          <h1 className={styles.title}>Sign in with the linked account</h1>
+          <p className={styles.error}>This invitation is already attached to an instructor account. Sign in with the email address that accepted it.</p>
+          <button className={styles.button} type="button" disabled={signingOut} onClick={() => void restartInvitationSignIn()}>
+            {signingOut ? "Signing out..." : "Sign out and try another account"}
+          </button>
+        </section>
+      );
+    }
+
+    const missedSubmissionWindow = invitationLifecycle.status === "claim_expired";
+    const lifetimeAccessRemains = missedSubmissionWindow && invitationLifecycle.grantsLifetimeAccess;
     return (
       <section className={`${styles.shell} ${styles.narrow}`}>
         <p className={styles.eyebrow}>Instructor invitation</p>
-        <h1 className={styles.title}>{invitationClaim === "error" ? "We could not accept this invitation" : "Accepting your invitation"}</h1>
-        {invitationClaim === "error" ? (
-          <>
-            <p className={styles.error} role="alert">{invitationError}</p>
-            <div className={styles.buttonRow}>
-              <button className={styles.button} type="button" disabled={signingOut} onClick={() => void restartInvitationSignIn()}>
-                {signingOut ? "Signing out..." : "Sign out and try another account"}
-              </button>
-              <a className={styles.secondaryButton} href="/account/">Open my account without this invitation</a>
-            </div>
-          </>
-        ) : <p className={styles.notice} role="status">Please wait while we prepare your instructor workspace.</p>}
+        <h1 className={styles.title}>{invitationLifecycle.status === "claimed" ? "Link your instructor workspace" : "Open your instructor workspace"}</h1>
+        <p className={missedSubmissionWindow ? styles.notice : styles.subtitle}>
+          {lifetimeAccessRemains
+            ? "Your instructor account and lifetime access are ready. The profile submission window ended, but your lifetime access remains active and you can still finish your profile."
+            : missedSubmissionWindow
+              ? "Your instructor account is ready, but the private offer submission window has ended. You can still finish your profile."
+            : invitationLifecycle.status === "claimed"
+              ? `Confirm that you want to attach this invitation to the signed-in instructor account${deadline ? ` and submit your complete profile by ${deadline}` : ""}.`
+              : "Confirm the signed-in account to open the instructor workspace linked to this invitation."}
+        </p>
+        <div className={styles.buttonRow}>
+          <button className={styles.button} type="button" disabled={invitationClaim === "accepting"} onClick={() => void acceptInvitationForInstructor()}>
+            {invitationClaim === "accepting" ? "Opening workspace..." : invitationLifecycle.status === "claimed" ? "Accept and link invitation" : "Open instructor workspace"}
+          </button>
+          <button className={styles.secondaryButton} type="button" disabled={signingOut} onClick={() => void restartInvitationSignIn()}>
+            {signingOut ? "Signing out..." : "Use another account"}
+          </button>
+        </div>
       </section>
     );
   }
 
-  if (!account?.role && (!isAdmin || Boolean(entryInvitationToken))) {
+  if (!account?.role && !isAdmin) {
     const isInstructorEntry = entryIntent === "instructor";
     const isOrganizerEntry = entryIntent === "organizer";
     return (
       <section className={`${styles.shell} ${styles.narrow}`}>
         <p className={styles.eyebrow}>{isInstructorEntry ? "Instructor account" : isOrganizerEntry ? "Organizer account" : "One quick step"}</p>
-        <h1 className={styles.title}>{entryInvitationToken ? "Accept your instructor invitation" : isInstructorEntry ? "Set up your instructor workspace" : isOrganizerEntry ? "Set up your organizer workspace" : "How will you use Hire Line Dancers?"}</h1>
+        <h1 className={styles.title}>{isInstructorEntry ? "Set up your instructor workspace" : isOrganizerEntry ? "Set up your organizer workspace" : "How will you use Hire Line Dancers?"}</h1>
         <p className={styles.subtitle}>
           {isInstructorEntry
             ? "Add your account details, then complete your public instructor profile."
@@ -244,10 +387,7 @@ export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean })
           email={session.user.email ?? ""}
           initialName={account?.full_name ?? session.user.user_metadata.full_name ?? ""}
           fixedRole={entryIntent ?? undefined}
-          invitationToken={entryInvitationToken ?? undefined}
           onComplete={async () => {
-            setEntryInvitationToken(null);
-            setInvitationClaim("accepted");
             if (entryReturnTo) {
               window.location.replace(entryReturnTo);
               return;
@@ -390,6 +530,7 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
   const [profile, setProfile] = useState<InstructorProfile | null>(null);
   const [settings, setSettings] = useState<InstructorPrivateSettings | null>(null);
   const [hasLifetimeAccess, setHasLifetimeAccess] = useState<boolean | null>(null);
+  const [invitationOffer, setInvitationOffer] = useState<InstructorInvitationOfferStatus | null>(null);
   const [inquiries, setInquiries] = useState<MarketplaceInquiry[]>([]);
   const [loading, setLoading] = useState(true);
   const [checkoutPending, setCheckoutPending] = useState(false);
@@ -419,20 +560,25 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
     const loadedProfile = profileData as InstructorProfile | null;
     setProfile(loadedProfile);
     if (loadedProfile) {
-      const [privateResult, inquiryResult, lifetimeAccessResult] = await Promise.all([
+      const [privateResult, inquiryResult, lifetimeAccessResult, invitationOfferResult] = await Promise.all([
         client.from("instructor_private_settings").select("*").eq("instructor_profile_id", loadedProfile.id).maybeSingle(),
         client.from("inquiries").select("*").eq("instructor_profile_id", loadedProfile.id).order("created_at", { ascending: false }),
-        client.rpc("current_instructor_lifetime_access")
+        client.rpc("current_instructor_lifetime_access"),
+        client.rpc("current_instructor_invitation_offer")
       ]);
-      const loadError = privateResult.error ?? inquiryResult.error ?? lifetimeAccessResult.error;
+      const loadError = privateResult.error ?? inquiryResult.error ?? lifetimeAccessResult.error ?? invitationOfferResult.error;
       if (loadError) setError(loadError.message);
       setSettings(privateResult.data as InstructorPrivateSettings | null);
       setInquiries((inquiryResult.data as MarketplaceInquiry[] | null) ?? []);
       setHasLifetimeAccess(lifetimeAccessResult.error ? null : Boolean(lifetimeAccessResult.data));
+      setInvitationOffer(invitationOfferResult.error
+        ? null
+        : (invitationOfferResult.data as InstructorInvitationOfferStatus | null));
     } else {
       setSettings(null);
       setInquiries([]);
       setHasLifetimeAccess(null);
+      setInvitationOffer(null);
     }
     setLoading(false);
   }
@@ -611,6 +757,43 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
 
   return (
     <>
+      {invitationOffer?.offerCode === "outreach_two_months_90_day_v1" ? (
+        <div className={styles.card}>
+          <p className={styles.eyebrow}>Private outreach offer</p>
+          {invitationOffer.offerStatus === "redeemed" ? (
+            <>
+              <h2>Two months free activated</h2>
+              <p className={styles.success}>Your earned private offer was applied when you activated your membership, so your first two monthly billing cycles are free.</p>
+              {invitationOffer.offerRedeemedAt ? <p className={styles.help}>Activated {new Date(invitationOffer.offerRedeemedAt).toLocaleString()}.</p> : null}
+            </>
+          ) : invitationOffer.offerStatus === "earned" || invitationOffer.offerEligible ? (
+            <>
+              <h2>Two months free earned</h2>
+              <p className={styles.success}>Your complete profile was submitted on time, so your first two monthly billing cycles will be free after activation. Later review timing will not affect this earned offer.</p>
+              <p className={styles.help}>Every new paid membership also includes the request-based 90-day booking guarantee, subject to its terms.</p>
+            </>
+          ) : invitationOffer.status === "claim_expired" ? (
+            <>
+              <h2>Private offer window ended</h2>
+              <p className={styles.notice}>You can still finish and submit your instructor profile, but the private two-month offer is no longer available.</p>
+            </>
+          ) : invitationOffer.profileSubmittedAt ? (
+            <>
+              <h2>Private offer not available</h2>
+              <p className={styles.notice}>Your profile was submitted, but this account is not eligible for the new-instructor two-month offer.</p>
+            </>
+          ) : (
+            <>
+              <h2>Submit your complete profile on time</h2>
+              <p className={styles.notice}>
+                Submit a complete profile{invitationOffer.profileSubmissionDeadlineAt ? ` by ${new Date(invitationOffer.profileSubmissionDeadlineAt).toLocaleString()}` : " within your invitation window"} to earn your first two monthly billing cycles free.
+              </p>
+              <p className={styles.help}>Required details include your public name, bio, location, at least one event type, a valid inquiry email, and a ready headshot.</p>
+            </>
+          )}
+        </div>
+      ) : null}
+
       <div className={styles.tabs} role="tablist" aria-label="Instructor account sections">
         {(["profile", "inquiries", "membership"] as const).map((name) => (
           <button
@@ -716,14 +899,38 @@ function InstructorProfileForm({
   async function save(submitForReview: boolean) {
     const client = getMarketplaceClient();
     if (!client) return;
-    if (submitForReview && (!form.bio.trim() || !form.city.trim() || !form.region.trim() || !form.event_types.length)) {
-      setError("Add a bio, location, and at least one event type before submitting for review.");
+    if (submitForReview && (!form.display_name.trim() || !form.bio.trim() || !form.city.trim() || !form.region.trim() || !form.event_types.length)) {
+      setError("Add your public name, bio, location, and at least one event type before submitting for review.");
+      return;
+    }
+    if (submitForReview && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.inquiry_email.trim())) {
+      setError("A valid inquiry email is required before submitting for review.");
       return;
     }
 
     setBusy(true);
     setError(null);
     setMessage(null);
+
+    if (submitForReview) {
+      const { data: readyHeadshots, error: headshotError } = await client
+        .from("profile_media")
+        .select("id")
+        .eq("instructor_profile_id", profile.id)
+        .eq("media_type", "headshot")
+        .eq("status", "ready")
+        .limit(1);
+      if (headshotError) {
+        setError(headshotError.message);
+        setBusy(false);
+        return;
+      }
+      if (!readyHeadshots?.length) {
+        setError("Upload a main headshot and wait for it to be ready before submitting for review.");
+        setBusy(false);
+        return;
+      }
+    }
 
     const profilePayload = {
       display_name: form.display_name.trim(),
@@ -1168,7 +1375,7 @@ function MembershipCard({
     <div className={styles.card}>
       <p className={styles.eyebrow}>Instructor membership</p>
       <h2>$14.99 USD per month</h2>
-      <p>Activate your instructor membership after your profile is approved. Stripe securely processes payment, and your membership renews monthly until canceled. Eligible founding memberships include the first-year booking guarantee described in the refund policy.</p>
+      <p>Activate your instructor membership after your profile is approved. Stripe securely processes payment, and your membership renews monthly until canceled. If your account has an eligible private offer, Checkout will show that your first two monthly billing cycles are free and will display your first charge date. Every new paid membership includes a request-based 90-day booking guarantee that begins with the first invoice that collects a positive membership payment.</p>
       <p><span className={styles.status}>{settings?.subscription_status ?? "inactive"}</span></p>
       {membershipNotice ? <p className={styles[membershipNotice.tone]} role="status">{membershipNotice.message}</p> : null}
       {checkoutRecoveryError ? (
@@ -1187,7 +1394,7 @@ function MembershipCard({
               <button className={styles.button} type="button" disabled={busy !== null} onClick={() => void activateMembership()}>
                 {busy === "checkout" ? "Opening secure checkout..." : hasPriorSubscription ? "Restart membership" : "Activate membership"}
               </button>
-              <p className={styles.muted}>By selecting this button, you agree to the <a href="/legal/terms/">Terms of Use</a>, acknowledge the <a href="/legal/privacy/">Privacy Policy</a> and <a href="/legal/refund-policy/">Refund Policy</a>, and authorize a recurring $14.99 USD monthly charge until you cancel.</p>
+              <p className={styles.muted}>By selecting this button, you agree to the <a href="/legal/terms/">Terms of Use</a>, acknowledge the <a href="/legal/privacy/">Privacy Policy</a> and <a href="/legal/refund-policy/">Refund Policy</a>, and authorize a recurring $14.99 USD monthly charge after any free period shown in Checkout until you cancel.</p>
             </>
           )}
         </>
@@ -1240,8 +1447,17 @@ type AdminInstructorInvitation = {
   invitation_id: string;
   email: string;
   grants_lifetime_access: boolean;
-  invitation_status: "pending" | "sending" | "sent" | "delivery_failed" | "accepted" | "revoked" | "expired";
+  invitation_status: "pending" | "sending" | "sent" | "delivery_failed" | "claimed" | "accepted" | "revoked" | "expired" | "claim_expired";
+  offer_code: string | null;
+  offer_status: "awaiting_claim" | "awaiting_account" | "awaiting_submission" | "earned" | "expired" | "ineligible" | "redeemed" | null;
   expires_at: string;
+  claimed_at: string | null;
+  profile_submission_deadline_at: string | null;
+  account_created_at: string | null;
+  profile_submitted_at: string | null;
+  offer_eligible: boolean;
+  offer_earned_at: string | null;
+  offer_redeemed_at: string | null;
   sent_at: string | null;
   accepted_at: string | null;
   accepted_profile_id: string | null;
@@ -1266,11 +1482,13 @@ type AdminInstructorMembership = {
   founding_member_number: number | null;
   founding_status: string;
   guarantee_status: string;
+  guarantee_terms_version: string | null;
   guarantee_started_at: string | null;
   guarantee_ends_at: string | null;
   claim_deadline_at: string | null;
   guarantee_admin_note: string | null;
   qualifying_booking_count: number;
+  eligible_paid_amount_cents: number | null;
   claim_id: string | null;
   claim_status: string | null;
   claim_received_at: string | null;
@@ -1616,7 +1834,7 @@ function MembershipGuaranteeAdmin({ isOwner }: { isOwner: boolean }) {
       setError(updateError.message);
       return;
     }
-    setMessage("Founding and guarantee status saved.");
+    setMessage("Legacy founding and guarantee status saved.");
     await loadMemberships();
   }
 
@@ -1752,7 +1970,7 @@ function MembershipGuaranteeAdmin({ isOwner }: { isOwner: boolean }) {
           <table className={`${styles.dataTable} ${styles.membershipTable}`}>
             <caption className={styles.srOnly}>Instructor memberships and guarantees grouped by city</caption>
             <thead>
-              <tr><th scope="col">Instructor</th><th scope="col">Profile</th><th scope="col">Membership</th><th scope="col">Founding</th><th scope="col">Guarantee</th><th scope="col">Bookings</th><th scope="col">Claim</th><th scope="col">Refunds</th></tr>
+              <tr><th scope="col">Instructor</th><th scope="col">Profile</th><th scope="col">Membership</th><th scope="col">Legacy founding</th><th scope="col">Guarantee</th><th scope="col">Bookings</th><th scope="col">Claim</th><th scope="col">Refunds</th></tr>
             </thead>
             {membershipGroups.map((group) => (
               <tbody key={group.city}>
@@ -1773,7 +1991,7 @@ function MembershipGuaranteeAdmin({ isOwner }: { isOwner: boolean }) {
                     <td><span className={styles.status}>{statusLabel(row.profile_status)}</span></td>
                     <td><span className={styles.status}>{statusLabel(row.subscription_status)}</span></td>
                     <td>{row.founding_member_number ? `#${row.founding_member_number} ` : ""}{statusLabel(row.founding_status)}</td>
-                    <td>{statusLabel(row.guarantee_status)}</td>
+                    <td>{statusLabel(row.guarantee_status)}<small>{row.guarantee_terms_version === "2026-08-07-90-day-paid-invoice-v1" ? "Current 90-day terms" : row.guarantee_terms_version ? "Legacy terms" : "Not started"}</small></td>
                     <td>{row.qualifying_booking_count}</td>
                     <td>{row.claim_status ? statusLabel(row.claim_status) : "None"}</td>
                     <td>{row.refunded ? <span className={styles.verifiedBadge}>Verified</span> : money(row.verified_refund_cents)}</td>
@@ -1800,8 +2018,9 @@ function MembershipGuaranteeAdmin({ isOwner }: { isOwner: boolean }) {
             <div className={styles.membershipSummary}>
               <div><span>Profile</span><strong>{statusLabel(selected.profile_status)}</strong></div>
               <div><span>Membership</span><strong>{statusLabel(selected.subscription_status)}</strong></div>
-              <div><span>Founding</span><strong>{selected.founding_member_number ? `#${selected.founding_member_number}, ${statusLabel(selected.founding_status)}` : statusLabel(selected.founding_status)}</strong></div>
+              <div><span>Legacy founding</span><strong>{selected.founding_member_number ? `#${selected.founding_member_number}, ${statusLabel(selected.founding_status)}` : statusLabel(selected.founding_status)}</strong></div>
               <div><span>Guarantee</span><strong>{statusLabel(selected.guarantee_status)}</strong></div>
+              <div><span>Terms</span><strong>{selected.guarantee_terms_version === "2026-08-07-90-day-paid-invoice-v1" ? "Current 90-day" : selected.guarantee_terms_version ? "Legacy" : "Not started"}</strong></div>
               <div><span>Bookings</span><strong>{selected.qualifying_booking_count}</strong></div>
               <div><span>Verified refunds</span><strong>{money(selected.verified_refund_cents)}</strong></div>
             </div>
@@ -1810,6 +2029,7 @@ function MembershipGuaranteeAdmin({ isOwner }: { isOwner: boolean }) {
               <div><dt>Inquiry email</dt><dd>{selected.inquiry_email || "Not set"}</dd></div>
               <div><dt>Guarantee period</dt><dd>{adminDate(selected.guarantee_started_at)} to {adminDate(selected.guarantee_ends_at)}</dd></div>
               <div><dt>Claim deadline</dt><dd>{adminDate(selected.claim_deadline_at)}</dd></div>
+              <div><dt>Maximum eligible refund</dt><dd>{selected.guarantee_terms_version === "2026-08-07-90-day-paid-invoice-v1" ? money(selected.eligible_paid_amount_cents ?? 0) : "Legacy terms apply"}</dd></div>
             </dl>
             {selected.refunded ? (
               <p className={styles.verifiedRefund} role="status">
@@ -1825,10 +2045,10 @@ function MembershipGuaranteeAdmin({ isOwner }: { isOwner: boolean }) {
           {isOwner ? (
             <>
               <form className={`${styles.card} ${styles.stack} ${styles.compactAdminCard}`} onSubmit={saveGuarantee}>
-                <div><h3>Founding and guarantee status</h3><p className={styles.muted}>Founding numbers stay attached to the original instructor record.</p></div>
+                <div><h3>Legacy founding and guarantee status</h3><p className={styles.muted}>Previously granted founding numbers stay attached to the original instructor record. No new founding positions are assigned.</p></div>
                 <div className={styles.grid}>
                   <label className={styles.field}>
-                    <span>Founding status</span>
+                    <span>Legacy founding status</span>
                     <select disabled={selected.refunded || selected.verified_refund_cents > 0} value={foundingStatus} onChange={(event) => setFoundingStatus(event.target.value)}>
                       <option value="unassigned">Unassigned</option>
                       <option value="reserved">Reserved</option>
@@ -2352,7 +2572,7 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
         <div className={styles.compactAdminStack}>
           <section className={`${styles.card} ${styles.compactAdminCard}`}>
             <div className={styles.compactSectionHeader}>
-              <div><h2>Invite instructor</h2><p className={styles.muted}>Send a secure profile signup link, with optional lifetime access.</p></div>
+              <div><h2>Invite instructor</h2><p className={styles.muted}>Standard invitations give eligible new instructors their first two monthly billing cycles free. Choose lifetime access instead only when that separate benefit is intended.</p></div>
             </div>
             <form className={styles.invitationForm} onSubmit={sendInstructorInvitation}>
               <label className={styles.field}>
@@ -2411,13 +2631,32 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
               <div className={`${styles.tableWrap} ${styles.compactTableWrap}`} role="region" aria-label="Recent instructor invitations" tabIndex={0}>
                 <table className={`${styles.dataTable} ${styles.compactDataTable}`}>
                   <caption className={styles.srOnly}>Recently sent instructor invitations</caption>
-                  <thead><tr><th scope="col">Email</th><th scope="col">Sent</th><th scope="col">Access</th><th scope="col">Status</th></tr></thead>
+                  <thead><tr><th scope="col">Email</th><th scope="col">Access</th><th scope="col">Status</th><th scope="col">Claim</th><th scope="col">Profile</th><th scope="col">Offer</th></tr></thead>
                   <tbody>{invitations.map((invitation) => (
                     <tr key={invitation.invitation_id}>
-                      <td>{invitation.email}</td>
-                      <td>{invitation.sent_at ? new Date(invitation.sent_at).toLocaleDateString() : "Not sent"}</td>
-                      <td>{invitation.grants_lifetime_access ? <span className={styles.status}>Lifetime</span> : "Standard"}</td>
+                      <td>
+                        {invitation.email}
+                        <small>{invitation.sent_at ? `Sent ${new Date(invitation.sent_at).toLocaleDateString()}` : "Not sent"}</small>
+                      </td>
+                      <td>{invitation.grants_lifetime_access
+                        ? <span className={styles.status}>Lifetime</span>
+                        : invitation.offer_code === "outreach_two_months_90_day_v1"
+                          ? <span className={styles.status}>2 billing cycles</span>
+                          : "Standard"}</td>
                       <td><span className={styles.status}>{invitation.invitation_status.replaceAll("_", " ")}</span></td>
+                      <td>{invitation.claimed_at
+                        ? <><span className={styles.status}>Claimed</span><small>{new Date(invitation.claimed_at).toLocaleString()}</small></>
+                        : <><span className={styles.muted}>Due</span><small>{new Date(invitation.expires_at).toLocaleString()}</small></>}</td>
+                      <td>{invitation.profile_submitted_at
+                        ? <><span className={styles.status}>Submitted</span><small>{new Date(invitation.profile_submitted_at).toLocaleString()}</small></>
+                        : invitation.profile_submission_deadline_at
+                          ? <><span className={styles.muted}>Due</span><small>{new Date(invitation.profile_submission_deadline_at).toLocaleString()}</small></>
+                          : <span className={styles.muted}>Not started</span>}</td>
+                      <td>{invitation.grants_lifetime_access
+                        ? <span className={styles.status}>Lifetime</span>
+                        : invitation.offer_status
+                          ? <><span className={styles.status}>{invitation.offer_status.replaceAll("_", " ")}</span>{invitation.offer_redeemed_at ? <small>{new Date(invitation.offer_redeemed_at).toLocaleString()}</small> : invitation.offer_earned_at ? <small>{new Date(invitation.offer_earned_at).toLocaleString()}</small> : null}</>
+                          : <span className={styles.muted}>None</span>}</td>
                     </tr>
                   ))}</tbody>
                 </table>

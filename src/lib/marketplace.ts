@@ -3,6 +3,19 @@ import { createClient, type Session, type SupabaseClient, type User } from "@sup
 export type AccountRole = "organizer" | "instructor" | "admin";
 export type AccountIntent = Exclude<AccountRole, "admin">;
 
+export type InstructorInvitationLifecycle = {
+  status: "pending" | "sending" | "sent" | "delivery_failed" | "claimed" | "accepted" | "expired" | "claim_expired";
+  initialClaimDeadlineAt: string;
+  claimedAt: string | null;
+  profileSubmissionDeadlineAt: string | null;
+  accountCreatedAt: string | null;
+  profileSubmittedAt: string | null;
+  offerCode: string | null;
+  offerEligible: boolean;
+  offerEarnedAt: string | null;
+  grantsLifetimeAccess: boolean;
+};
+
 export type MarketplaceAccount = {
   id: string;
   email: string | null;
