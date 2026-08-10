@@ -32,6 +32,19 @@ type NotificationJob = {
   inquiry_message: string | null;
 };
 
+type ProfileSubmissionJob = {
+  job_id: number;
+  attempt_number: number;
+  instructor_profile_id: string;
+  delivered_to_email: string;
+  login_email: string;
+  display_name: string;
+  business_name: string | null;
+  city: string | null;
+  region: string | null;
+  submitted_at: string;
+};
+
 // Keep the Twilio implementation available for a future reviewed launch, but
 // fail closed while the product is operating as email only.
 const SMS_DELIVERY_PAUSED = true;
@@ -288,6 +301,123 @@ async function sendEmail(job: NotificationJob): Promise<string> {
   return payload.id;
 }
 
+function configuredAppUrl(): URL {
+  const value = Deno.env.get("APP_URL")?.trim() || "https://hirelinedancers.com";
+  const url = new URL(value);
+  if (url.protocol !== "https:" && url.hostname !== "localhost" && url.hostname !== "127.0.0.1") {
+    throw new ConfigurationError("APP_URL must use HTTPS outside local development");
+  }
+  return url;
+}
+
+async function profileReviewMagicLink(
+  admin: AdminClient,
+  job: ProfileSubmissionJob,
+): Promise<string> {
+  const appUrl = configuredAppUrl();
+  const nextPath = `/admin/?tab=profiles&profile=${encodeURIComponent(job.instructor_profile_id)}`;
+  const callback = new URL("auth/callback/", appUrl);
+  callback.searchParams.set("next", nextPath);
+
+  const { data, error } = await admin.auth.admin.generateLink({
+    type: "magiclink",
+    email: job.login_email,
+    options: { redirectTo: callback.toString() },
+  });
+  const actionLink = data?.properties?.action_link;
+  if (error || !actionLink) {
+    throw new ProviderError(
+      error?.message || "Unable to create the secure administrator review link",
+      true,
+    );
+  }
+  return actionLink;
+}
+
+function profileSubmissionText(job: ProfileSubmissionJob, reviewUrl: string): string {
+  const location = [job.city, job.region].filter(Boolean).join(", ") || "Not provided";
+  return [
+    `${job.display_name} submitted an instructor profile for review.`,
+    "",
+    `Business: ${display(job.business_name)}`,
+    `Location: ${location}`,
+    `Submitted: ${new Date(job.submitted_at).toLocaleString("en-US", { timeZone: "America/New_York" })} ET`,
+    "",
+    `Review the profile: ${reviewUrl}`,
+    "",
+    "This private link signs in to your Hire Line Dancers administrator account and opens the submitted profile.",
+  ].join("\n");
+}
+
+function profileSubmissionHtml(job: ProfileSubmissionJob, reviewUrl: string): string {
+  const location = [job.city, job.region].filter(Boolean).join(", ") || "Not provided";
+  const submitted = new Date(job.submitted_at).toLocaleString("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "America/New_York",
+  });
+  return `<!doctype html>
+  <html lang="en">
+    <body style="margin:0;background:#fbfaf5;color:#1c2a44;font-family:Arial,sans-serif;line-height:1.55">
+      <div style="max-width:640px;margin:0 auto;padding:32px 20px">
+        <div style="border-top:8px solid #e7a33c;background:#ffffff;padding:30px">
+          <p style="margin:0 0 10px;color:#9b3822;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase">Profile review</p>
+          <h1 style="margin:0 0 16px;font-size:28px;line-height:1.15">${escapeHtml(job.display_name)} submitted a profile</h1>
+          <table role="presentation" style="width:100%;margin:0 0 24px;border-collapse:collapse">
+            <tr><th align="left" style="padding:7px 12px 7px 0;color:#57607a">Business</th><td style="padding:7px 0">${escapeHtml(display(job.business_name))}</td></tr>
+            <tr><th align="left" style="padding:7px 12px 7px 0;color:#57607a">Location</th><td style="padding:7px 0">${escapeHtml(location)}</td></tr>
+            <tr><th align="left" style="padding:7px 12px 7px 0;color:#57607a">Submitted</th><td style="padding:7px 0">${escapeHtml(`${submitted} ET`)}</td></tr>
+          </table>
+          <a href="${escapeHtml(reviewUrl)}" style="display:inline-block;padding:14px 20px;background:#e7a33c;border:2px solid #1c2a44;color:#1c2a44;font-weight:700;text-decoration:none">Sign in and review profile</a>
+          <p style="margin:20px 0 0;color:#57607a;font-size:13px">This private link signs in to your administrator account and opens this submission directly.</p>
+        </div>
+      </div>
+    </body>
+  </html>`;
+}
+
+async function sendProfileSubmissionEmail(
+  admin: AdminClient,
+  job: ProfileSubmissionJob,
+): Promise<string> {
+  const apiKey = requiredEnv("RESEND_API_KEY");
+  const from = requiredEnv("RESEND_FROM_EMAIL");
+  const supportEmail = Deno.env.get("SUPPORT_EMAIL")?.trim() || "hello@hirelinedancers.com";
+  const reviewUrl = await profileReviewMagicLink(admin, job);
+  let response: Response;
+
+  try {
+    response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      signal: AbortSignal.timeout(15_000),
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "Idempotency-Key": `hld-profile-submission-${job.job_id}-email`,
+      },
+      body: JSON.stringify({
+        from,
+        to: [job.delivered_to_email],
+        reply_to: supportEmail,
+        subject: `${job.display_name} submitted an instructor profile`,
+        text: profileSubmissionText(job, reviewUrl),
+        html: profileSubmissionHtml(job, reviewUrl),
+      }),
+    });
+  } catch (error) {
+    throw new ProviderError(error instanceof Error ? error.message : "Resend request failed", true);
+  }
+
+  const payload = await response.json().catch(() => ({})) as { id?: string; message?: string };
+  if (!response.ok || !payload.id) {
+    throw new ProviderError(
+      `Resend returned ${response.status}: ${payload.message || "email was not accepted"}`,
+      retryableStatus(response.status),
+    );
+  }
+  return payload.id;
+}
+
 async function sendSms(job: NotificationJob): Promise<string> {
   if (!job.delivered_to_phone_e164) {
     throw new ProviderError("SMS recipient is missing a phone number", false);
@@ -434,6 +564,60 @@ async function processJob(admin: AdminClient, job: NotificationJob): Promise<str
   }
 }
 
+async function finishProfileSubmissionJob(
+  admin: AdminClient,
+  job: ProfileSubmissionJob,
+  result: { success: boolean; providerMessageId?: string; error?: string; retryable?: boolean },
+): Promise<string> {
+  const { data, error } = await admin.rpc("complete_profile_submission_notification_job", {
+    p_job_id: job.job_id,
+    p_success: result.success,
+    p_provider_message_id: result.providerMessageId ?? null,
+    p_error: result.error?.slice(0, 2000) ?? null,
+    p_retryable: result.retryable ?? false,
+  });
+  if (error) throw new Error(`Unable to complete profile notification job ${job.job_id}: ${error.message}`);
+  return String(data);
+}
+
+async function deferProfileSubmissionJob(
+  admin: AdminClient,
+  job: ProfileSubmissionJob,
+  error: string,
+): Promise<string> {
+  const { data, error: deferError } = await admin.rpc("defer_profile_submission_notification_job", {
+    p_job_id: job.job_id,
+    p_error: error.slice(0, 2000),
+    p_delay: "15 minutes",
+  });
+  if (deferError) throw new Error(`Unable to defer profile notification job ${job.job_id}: ${deferError.message}`);
+  return String(data);
+}
+
+async function processProfileSubmissionJob(
+  admin: AdminClient,
+  job: ProfileSubmissionJob,
+): Promise<string> {
+  try {
+    const providerMessageId = await sendProfileSubmissionEmail(admin, job);
+    return await finishProfileSubmissionJob(admin, job, { success: true, providerMessageId });
+  } catch (error) {
+    if (error instanceof ConfigurationError) {
+      console.error("Profile notification provider is not configured", job.job_id, error.message);
+      return await deferProfileSubmissionJob(admin, job, error.message);
+    }
+    const providerError = error instanceof ProviderError
+      ? error
+      : new ProviderError(error instanceof Error ? error.message : "Profile notification failed", true);
+    console.error("Profile notification request failed", job.job_id, providerError.message);
+    return await finishProfileSubmissionJob(admin, job, {
+      success: false,
+      error: providerError.message,
+      retryable: providerError.retryable,
+    });
+  }
+}
+
 export default {
   fetch: withSupabase<any>({ auth: "secret:automations", cors: false }, async (req, ctx) => {
     if (req.method !== "POST") {
@@ -469,14 +653,31 @@ export default {
     }
 
     const jobs = (data ?? []) as NotificationJob[];
-    const settled = await Promise.allSettled(jobs.map((job) => processJob(ctx.supabaseAdmin, job)));
-    const outcomes = settled.map((result) => result.status === "fulfilled" ? result.value : "worker_error");
+    const { data: profileData, error: profileError } = await ctx.supabaseAdmin.rpc(
+      "claim_profile_submission_notification_jobs",
+      { p_limit: limit, p_lock_timeout: "10 minutes" },
+    );
+    if (profileError) {
+      console.error("Unable to claim profile submission notifications", profileError.code, profileError.message);
+      return Response.json({ error: "Unable to claim profile submission notifications" }, { status: 500 });
+    }
+
+    const profileJobs = (profileData ?? []) as ProfileSubmissionJob[];
+    const [inquirySettled, profileSettled] = await Promise.all([
+      Promise.allSettled(jobs.map((job) => processJob(ctx.supabaseAdmin, job))),
+      Promise.allSettled(profileJobs.map((job) => processProfileSubmissionJob(ctx.supabaseAdmin, job))),
+    ]);
+    const outcomes = inquirySettled.map((result) => result.status === "fulfilled" ? result.value : "worker_error");
+    const profileOutcomes = profileSettled.map((result) => result.status === "fulfilled" ? result.value : "worker_error");
+    const allOutcomes = [...outcomes, ...profileOutcomes];
 
     return Response.json({
-      claimed: jobs.length,
-      sent: outcomes.filter((status) => status === "sent").length,
-      rescheduled: outcomes.filter((status) => status === "pending").length,
-      failed: outcomes.filter((status) => status === "failed" || status === "worker_error").length,
+      claimed: jobs.length + profileJobs.length,
+      inquiryClaimed: jobs.length,
+      profileClaimed: profileJobs.length,
+      sent: allOutcomes.filter((status) => status === "sent").length,
+      rescheduled: allOutcomes.filter((status) => status === "pending").length,
+      failed: allOutcomes.filter((status) => status === "failed" || status === "worker_error").length,
     }, {
       headers: { "Cache-Control": "no-store" },
     });

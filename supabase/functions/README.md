@@ -145,7 +145,9 @@ The Refund ID must begin with `re_`. Rechecking the same matching refund is idem
 
 ### `process-inquiry-notifications`
 
-Internal worker protected by the named Supabase secret key `automations` in the `apikey` header. It atomically claims up to 25 jobs with `FOR UPDATE SKIP LOCKED`, recovers locks older than 10 minutes, and retries temporary failures with exponential backoff. Six provider attempts are allowed. Missing provider secrets defer work without consuming an attempt.
+Internal worker protected by the named Supabase secret key `automations` in the `apikey` header. It atomically claims inquiry and administrator profile-submission jobs with `FOR UPDATE SKIP LOCKED`, recovers locks older than 10 minutes, and retries temporary failures with exponential backoff. Six provider attempts are allowed. Missing provider secrets defer work without consuming an attempt.
+
+When an instructor moves into `pending_review`, the database queues an email to `cjwheelock1@gmail.com`. The message includes the instructor name, business, location, submission time, and a private one-click Supabase magic link for `cj.wheelock1@gmail.com` that opens the exact profile in Admin Profiles. Resubmitting after requested changes creates a new notification. The worker also backfills any profiles already waiting when migration `202608100001` is applied.
 
 New-inquiry email is sent through Resend with the organizer address in `Reply-To`. The worker also queues two email follow-ups through the same durable job system. Follow-up messages use `SUPPORT_EMAIL` in `Reply-To`, with `hello@hirelinedancers.com` as the fallback:
 
@@ -179,7 +181,7 @@ SUPPORT_EMAIL=hello@hirelinedancers.com
 
 `send-instructor-invitation` uses `APP_URL`, `RESEND_API_KEY`, and `RESEND_FROM_EMAIL`. Optionally set `RESEND_INVITATION_FROM_EMAIL` to a verified sender dedicated to instructor invitations. If it is omitted, invitations use `RESEND_FROM_EMAIL`.
 
-`SUPPORT_EMAIL` receives replies to booking and completion follow-ups. If it is omitted, the worker uses `hello@hirelinedancers.com`. Resend handles outbound sending only, so configure an inbound mailbox or forwarding rule separately for that address.
+`SUPPORT_EMAIL` receives replies to booking and completion follow-ups and is the reply address for profile-submission alerts. If it is omitted, the worker uses `hello@hirelinedancers.com`. Resend handles outbound sending only, so configure an inbound mailbox or forwarding rule separately for that address.
 
 SMS is paused, so no Twilio secrets are required. These names remain reserved for a future reviewed SMS launch:
 

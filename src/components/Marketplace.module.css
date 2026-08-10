@@ -524,6 +524,272 @@
   font-size: 0.82rem;
 }
 
+.adminOverviewHeader {
+  margin-top: 0;
+}
+
+.adminOverviewHeader h2 {
+  font-size: 1.05rem;
+}
+
+.adminMetricGrid {
+  margin-top: 0;
+}
+
+.adminMetricCard {
+  min-height: 92px;
+  gap: 5px;
+  padding: 14px 16px;
+  border-width: 1px;
+  align-content: start;
+}
+
+.adminMetricCard strong {
+  margin-top: 2px;
+  font-family: Lato, sans-serif;
+  font-size: 1.85rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.adminMetricCard small {
+  font-size: 0.72rem;
+  line-height: 1.3;
+}
+
+.profileReviewIntro {
+  margin-top: 0;
+}
+
+.profileReviewList {
+  display: grid;
+  gap: 14px;
+}
+
+.profileReviewCard {
+  scroll-margin-top: 110px;
+}
+
+.profileReviewHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-start;
+}
+
+.productionPreview {
+  margin-top: 16px;
+  border: 1px solid #9ba0af;
+  background: #fbfaf5;
+}
+
+.productionPreviewHero {
+  display: grid;
+  grid-template-columns: minmax(140px, 220px) minmax(0, 1fr);
+  gap: clamp(18px, 3vw, 34px);
+  align-items: center;
+  padding: clamp(18px, 3vw, 30px);
+  border-bottom: 1px solid #9ba0af;
+}
+
+.reviewHeadshot {
+  display: grid;
+  aspect-ratio: 1;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid #1c2a44;
+  background: #e8ebf2;
+  color: #6d7488;
+  font: 700 0.72rem/1.3 "IBM Plex Mono", monospace;
+  text-transform: uppercase;
+}
+
+.reviewHeadshot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.productionPreview h4,
+.submittedFields h4 {
+  margin: 0;
+  color: #1c2a44;
+  font-family: Lato, sans-serif;
+  font-size: clamp(1.15rem, 2.2vw, 1.65rem);
+  font-weight: 900;
+  line-height: 1.15;
+  text-transform: none;
+}
+
+.previewLabel {
+  margin: 0 0 7px;
+  color: #9b3822;
+  font: 700 0.67rem/1.25 "IBM Plex Mono", monospace;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.previewHeadline {
+  max-width: 58ch;
+  margin: 10px 0 0;
+  color: #3f4b66;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.missingPreviewCopy {
+  color: #8a5360;
+  font-style: italic;
+}
+
+.previewFacts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 14px;
+}
+
+.previewFacts span {
+  padding: 5px 8px;
+  border: 1px solid #b3b7c2;
+  background: #fff;
+  color: #3f4b66;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.previewContactButton {
+  display: inline-flex;
+  margin-top: 14px;
+  padding: 8px 12px;
+  border: 1px solid #1c2a44;
+  background: #e7a33c;
+  color: #1c2a44;
+  font-size: 0.76rem;
+  font-weight: 900;
+}
+
+.productionPreviewBody {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr) minmax(210px, 0.72fr);
+  gap: 1px;
+  background: #c6c8d0;
+}
+
+.productionPreviewBody > * {
+  min-width: 0;
+  padding: 18px;
+  background: #fff;
+}
+
+.productionPreviewBody p:not(.previewLabel) {
+  margin: 9px 0 0;
+  color: #3f4b66;
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.previewServiceGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.previewServiceGrid strong {
+  font-size: 0.76rem;
+}
+
+.previewBookingPanel {
+  border-top: 4px solid #e7a33c;
+}
+
+.reviewMediaGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding: 18px;
+  border-top: 1px solid #9ba0af;
+  background: #fff;
+}
+
+.reviewMediaItem {
+  min-width: 0;
+  margin: 0;
+  border: 1px solid #b3b7c2;
+  background: #f1efe8;
+}
+
+.reviewMediaItem figcaption {
+  padding: 7px 9px;
+  color: #57607a;
+  font-size: 0.72rem;
+}
+
+.submittedFields {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #c6c8d0;
+}
+
+.submittedFields h4 {
+  font-size: 0.92rem;
+}
+
+.profileFieldGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  margin: 12px 0 0;
+  border: 1px solid #c6c8d0;
+  background: #c6c8d0;
+}
+
+.profileFieldGrid > div {
+  min-width: 0;
+  padding: 9px 10px;
+  background: #fff;
+}
+
+.profileFieldGrid dt {
+  color: #6d7488;
+  font: 700 0.62rem/1.25 "IBM Plex Mono", monospace;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
+}
+
+.profileFieldGrid dd {
+  margin: 4px 0 0;
+  color: #1c2a44;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.profileFieldGrid .emptyProfileField {
+  background: #f4f2ee;
+}
+
+.profileFieldGrid .emptyProfileField dd {
+  color: #8a5360;
+  font-style: italic;
+}
+
+.reviewControls {
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.reviewControls input {
+  min-height: 38px;
+  padding: 8px 10px;
+  font-size: 0.84rem;
+}
+
+.reviewActionBar {
+  margin-top: 12px;
+}
+
 .srOnly {
   position: absolute;
   width: 1px;
@@ -968,6 +1234,18 @@
 }
 
 @media (max-width: 960px) {
+  .productionPreviewBody {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .previewBookingPanel {
+    grid-column: 1 / -1;
+  }
+
+  .profileFieldGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .membershipSummary {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -1000,6 +1278,26 @@
   .membershipSummary,
   .membershipFacts {
     grid-template-columns: 1fr;
+  }
+
+  .productionPreviewHero,
+  .productionPreviewBody,
+  .previewServiceGrid,
+  .reviewMediaGrid,
+  .profileFieldGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .reviewHeadshot {
+    width: min(210px, 72vw);
+  }
+
+  .profileReviewHeader {
+    display: grid;
+  }
+
+  .previewBookingPanel {
+    grid-column: auto;
   }
 
   .topbar {

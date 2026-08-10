@@ -783,12 +783,28 @@ export default {
         syncResult,
       });
     } catch (error) {
+      const message = error instanceof Error
+        ? error.message
+        : "unknown_stripe_error";
       console.error(
         "Instructor approval billing failed",
-        error instanceof Error ? error.message : "unknown_stripe_error",
+        message,
       );
+      if (message.includes("Configured Stripe Coupon")) {
+        return json(
+          {
+            error:
+              "The two-month instructor offer is not configured correctly in Stripe. No profile or membership changes were made.",
+            code: "instructor_offer_configuration_invalid",
+          },
+          503,
+        );
+      }
       return json(
-        { error: "Unable to activate the instructor membership" },
+        {
+          error:
+            "Unable to activate the instructor membership. No duplicate membership was created. Try again or contact support.",
+        },
         502,
       );
     }

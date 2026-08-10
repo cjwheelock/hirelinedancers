@@ -37,7 +37,9 @@ type ProfileMedia = {
   media_type: "headshot" | "image" | "welcome_video" | "video";
   storage_path: string | null;
   external_url: string | null;
+  mime_type: string | null;
   caption: string | null;
+  alt_text: string | null;
   status: string;
   sort_order: number;
 };
@@ -1647,6 +1649,11 @@ type AdminInstructorLifetimeAccess = {
 
 type AdminInstructorPaymentSetup = {
   instructor_profile_id: string;
+  inquiry_email: string;
+  minimum_rate_cents: number | null;
+  minimum_hours: number | null;
+  payment_methods: string[];
+  subscription_status: string;
   payment_setup_completed_at: string | null;
   stripe_customer_id: string | null;
   stripe_payment_setup_checkout_session_id: string | null;
@@ -1859,6 +1866,26 @@ function percent(numerator: number, denominator: number) {
 
 function statusLabel(value: string | null) {
   return (value || "not started").replaceAll("_", " ");
+}
+
+function profileFieldValue(value: string | number | null | undefined) {
+  if (value === null || value === undefined || value === "") return null;
+  return String(value);
+}
+
+function profileListValue(values: string[], labels?: Map<string, string>) {
+  if (!values.length) return null;
+  return values.map((value) => labels?.get(value) ?? statusLabel(value)).join(", ");
+}
+
+function ProfileReviewField({ label, value }: { label: string; value: string | number | null | undefined }) {
+  const displayValue = profileFieldValue(value);
+  return (
+    <div className={displayValue ? undefined : styles.emptyProfileField}>
+      <dt>{label}</dt>
+      <dd>{displayValue ?? "Not provided"}</dd>
+    </div>
+  );
 }
 
 function money(cents: number | null | undefined) {
@@ -2358,6 +2385,7 @@ function MembershipGuaranteeAdmin({ isOwner }: { isOwner: boolean }) {
 
 function AdminDashboard({ isOwner }: { isOwner: boolean }) {
   const [tab, setTab] = useState<"overview" | "profiles" | "memberships" | "invitations" | "delivery" | "access">("overview");
+  const [focusedProfileId, setFocusedProfileId] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<InstructorProfile[]>([]);
   const [inquiries, setInquiries] = useState<MarketplaceInquiry[]>([]);
   const [jobs, setJobs] = useState<AdminNotificationJob[]>([]);
@@ -2412,7 +2440,7 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
       client.rpc("list_marketplace_admins"),
       client.from("inquiry_followup_responses").select("id,inquiry_id,stage,response,confirmed_event_date,private_comment,submitted_at").order("submitted_at", { ascending: false }).limit(100),
       client.rpc("admin_list_instructor_lifetime_access"),
-      client.from("instructor_private_settings").select("instructor_profile_id,payment_setup_completed_at,stripe_customer_id,stripe_payment_setup_checkout_session_id,stripe_subscription_id"),
+      client.from("instructor_private_settings").select("instructor_profile_id,inquiry_email,minimum_rate_cents,minimum_hours,payment_methods,subscription_status,payment_setup_completed_at,stripe_customer_id,stripe_payment_setup_checkout_session_id,stripe_subscription_id"),
       client.from("instructor_offer_entitlements").select("instructor_profile_id,redeemed_at"),
       client.from("instructor_memberships").select("instructor_profile_id,stripe_customer_id,stripe_subscription_id,latest_checkout_session_id,status"),
       client.rpc("admin_list_instructor_invitations")
@@ -2453,8 +2481,24 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
   }
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const requestedTab = params.get("tab");
+    if (["overview", "profiles", "memberships", "invitations", "delivery", "access"].includes(requestedTab ?? "")) {
+      setTab(requestedTab as typeof tab);
+    }
+    setFocusedProfileId(params.get("profile"));
     void loadOperations();
   }, []);
+
+  useEffect(() => {
+    if (loading || tab !== "profiles" || !focusedProfileId) return;
+    window.requestAnimationFrame(() => {
+      document.getElementById(`profile-review-${focusedProfileId}`)?.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+      });
+    });
+  }, [focusedProfileId, loading, tab]);
 
   useEffect(() => {
     if (rangePreset === "custom" && (!customStart || !customEnd || customStart > customEnd)) return;
@@ -2487,27 +2531,33 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
       && (targetProfile?.status === "pending_review" || retriesMembershipActivation);
     setBusyId(profileId);
     setError(null);
+    setMessage(null);
     let reviewError: string | null = null;
-    if (usesVerifiedApproval) {
-      const { error: approvalError } = await client.functions.invoke("review-instructor-profile", {
-        body: {
-          instructorProfileId: profileId,
-          decision,
-          slug: slugs[profileId] || null,
-          note: notes[profileId] || null
-        }
-      });
-      if (approvalError) reviewError = await edgeFunctionError(approvalError);
-    } else {
-      const { error: decisionError } = await client.rpc("review_instructor_profile", {
-        p_instructor_profile_id: profileId,
-        p_decision: decision,
-        p_slug: slugs[profileId] || null,
-        p_note: notes[profileId] || null
-      });
-      if (decisionError) reviewError = decisionError.message;
+    try {
+      if (usesVerifiedApproval) {
+        const { error: approvalError } = await client.functions.invoke("review-instructor-profile", {
+          body: {
+            instructorProfileId: profileId,
+            decision,
+            slug: slugs[profileId] || null,
+            note: notes[profileId] || null
+          }
+        });
+        if (approvalError) reviewError = await edgeFunctionError(approvalError);
+      } else {
+        const { error: decisionError } = await client.rpc("review_instructor_profile", {
+          p_instructor_profile_id: profileId,
+          p_decision: decision,
+          p_slug: slugs[profileId] || null,
+          p_note: notes[profileId] || null
+        });
+        if (decisionError) reviewError = decisionError.message;
+      }
+    } catch (unexpectedError) {
+      reviewError = readableError(unexpectedError);
+    } finally {
+      setBusyId(null);
     }
-    setBusyId(null);
     if (reviewError) {
       setError(reviewError);
       await loadOperations();
@@ -2631,6 +2681,14 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
 
   const summary = analytics.summary;
 
+  function selectAdminTab(nextTab: typeof tab) {
+    setTab(nextTab);
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", nextTab);
+    if (nextTab !== "profiles") url.searchParams.delete("profile");
+    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+  }
+
   return (
     <>
       <div className={styles.tabs} role="tablist" aria-label="Admin dashboard sections">
@@ -2638,18 +2696,18 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
           ? (["overview", "profiles", "memberships", "invitations", "delivery", "access"] as const)
           : (["overview", "profiles", "memberships", "invitations", "delivery"] as const)
         ).map((name) => (
-          <button key={name} className={`${styles.tab} ${tab === name ? styles.activeTab : ""}`} type="button" onClick={() => setTab(name)}>
+          <button key={name} className={`${styles.tab} ${tab === name ? styles.activeTab : ""}`} type="button" onClick={() => selectAdminTab(name)}>
             {name[0].toUpperCase() + name.slice(1)}
           </button>
         ))}
       </div>
-      {error ? <p className={styles.error}>{error}</p> : null}
-      {message ? <p className={styles.success}>{message}</p> : null}
+      {error ? <p className={styles.error} role="alert">{error}</p> : null}
+      {message ? <p className={styles.success} role="status">{message}</p> : null}
       {loading ? <div className={styles.loading}>Loading marketplace operations...</div> : null}
 
       {!loading && tab === "overview" ? (
-        <>
-          <div className={`${styles.card} ${styles.filterBar}`}>
+        <div className={styles.compactAdminStack}>
+          <div className={`${styles.card} ${styles.compactAdminCard} ${styles.filterBar} ${styles.adminOverviewHeader}`}>
             <div>
               <h2>Marketplace performance</h2>
               <p className={styles.muted}>Every submitted contact form counts as one inquiry. Booking activity uses the date it was reported, and completed gigs use the confirmed event date.</p>
@@ -2675,20 +2733,20 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
 
           {analyticsLoading ? <div className={styles.loading}>Calculating marketplace results...</div> : (
             <>
-              <div className={styles.metricGrid}>
-                <article className={styles.metricCard}><span>Inquiries</span><strong>{summary.inquiries}</strong></article>
-                <article className={styles.metricCard}><span>Instructors contacted</span><strong>{summary.instructors}</strong></article>
-                <article className={styles.metricCard}><span>Companies</span><strong>{summary.companies}</strong></article>
-                <article className={styles.metricCard}><span>Bookings reported</span><strong>{summary.booked}</strong><small>{percent(summary.cohort_booked, summary.inquiries)} conversion among selected inquiries</small></article>
-                <article className={styles.metricCard}><span>Completed gigs</span><strong>{summary.completed}</strong><small>{percent(summary.cohort_completed, summary.cohort_booked)} completion among selected bookings</small></article>
-                <article className={styles.metricCard}><span>In progress</span><strong>{summary.in_progress}</strong></article>
+              <div className={`${styles.metricGrid} ${styles.adminMetricGrid}`}>
+                <article className={`${styles.metricCard} ${styles.adminMetricCard}`}><span>Inquiries</span><strong>{summary.inquiries}</strong></article>
+                <article className={`${styles.metricCard} ${styles.adminMetricCard}`}><span>Instructors contacted</span><strong>{summary.instructors}</strong></article>
+                <article className={`${styles.metricCard} ${styles.adminMetricCard}`}><span>Companies</span><strong>{summary.companies}</strong></article>
+                <article className={`${styles.metricCard} ${styles.adminMetricCard}`}><span>Bookings reported</span><strong>{summary.booked}</strong><small>{percent(summary.cohort_booked, summary.inquiries)} conversion</small></article>
+                <article className={`${styles.metricCard} ${styles.adminMetricCard}`}><span>Completed gigs</span><strong>{summary.completed}</strong><small>{percent(summary.cohort_completed, summary.cohort_booked)} completion</small></article>
+                <article className={`${styles.metricCard} ${styles.adminMetricCard}`}><span>In progress</span><strong>{summary.in_progress}</strong></article>
               </div>
 
-              <div className={styles.card}>
+              <div className={`${styles.card} ${styles.compactAdminCard}`}>
                 <h2>Activity over time</h2>
                 {!analytics.series.length ? <p className={styles.notice}>No inquiry activity in this time frame.</p> : (
-                  <div className={styles.tableWrap}>
-                    <table className={styles.dataTable}>
+                  <div className={`${styles.tableWrap} ${styles.compactTableWrap}`}>
+                    <table className={`${styles.dataTable} ${styles.compactDataTable}`}>
                       <thead><tr><th>Period</th><th>Inquiries</th><th>Booked</th><th>Completed</th></tr></thead>
                       <tbody>{analytics.series.map((row) => (
                         <tr key={row.period_start}><td>{new Date(`${row.period_start}T12:00:00`).toLocaleDateString()}</td><td>{row.inquiries}</td><td>{row.booked}</td><td>{row.completed}</td></tr>
@@ -2698,11 +2756,11 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
                 )}
               </div>
 
-              <div className={styles.card}>
+              <div className={`${styles.card} ${styles.compactAdminCard}`}>
                 <h2>Performance by instructor</h2>
                 <p className={styles.muted}>Booking and completion columns show the current results for inquiries submitted during this time frame.</p>
-                <div className={styles.tableWrap}>
-                  <table className={styles.dataTable}>
+                <div className={`${styles.tableWrap} ${styles.compactTableWrap}`}>
+                  <table className={`${styles.dataTable} ${styles.compactDataTable}`}>
                     <thead><tr><th>Instructor</th><th>Inquiries</th><th>Companies</th><th>Booked</th><th>Completed</th><th>Booking rate</th></tr></thead>
                     <tbody>{analytics.instructors.map((row) => (
                       <tr key={row.instructor_key}><td>{row.instructor_name}</td><td>{row.inquiries}</td><td>{row.companies}</td><td>{row.booked}</td><td>{row.completed}</td><td>{percent(row.booked, row.inquiries)}</td></tr>
@@ -2711,11 +2769,11 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
                 </div>
               </div>
 
-              <div className={styles.card}>
+              <div className={`${styles.card} ${styles.compactAdminCard}`}>
                 <h2>Inquiries by instructor and company</h2>
                 <p className={styles.muted}>Use this view to see how many times each company or organizer contacted a specific instructor.</p>
-                <div className={styles.tableWrap}>
-                  <table className={styles.dataTable}>
+                <div className={`${styles.tableWrap} ${styles.compactTableWrap}`}>
+                  <table className={`${styles.dataTable} ${styles.compactDataTable}`}>
                     <thead><tr><th>Instructor</th><th>Company</th><th>Inquiries</th><th>Booked</th><th>Completed</th><th>Latest inquiry</th></tr></thead>
                     <tbody>{analytics.instructor_companies.map((row) => (
                       <tr key={`${row.instructor_key}:${row.company_key}`}>
@@ -2729,10 +2787,10 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
                 </div>
               </div>
 
-              <div className={styles.card}>
+              <div className={`${styles.card} ${styles.compactAdminCard}`}>
                 <h2>Performance by company or organizer</h2>
-                <div className={styles.tableWrap}>
-                  <table className={styles.dataTable}>
+                <div className={`${styles.tableWrap} ${styles.compactTableWrap}`}>
+                  <table className={`${styles.dataTable} ${styles.compactDataTable}`}>
                     <thead><tr><th>Company</th><th>Inquiries</th><th>Instructors</th><th>Booked</th><th>Completed</th><th>Latest inquiry</th></tr></thead>
                     <tbody>{analytics.companies.map((row) => (
                       <tr key={row.company_key}><td>{row.company_name}{row.contact_email ? <small>{row.contact_email}</small> : null}</td><td>{row.inquiries}</td><td>{row.instructors}</td><td>{row.booked}</td><td>{row.completed}</td><td>{new Date(row.latest_inquiry_at).toLocaleDateString()}</td></tr>
@@ -2743,10 +2801,10 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
             </>
           )}
 
-          <div className={styles.card}>
+          <div className={`${styles.card} ${styles.compactAdminCard}`}>
             <h2>Recent inquiries</h2>
-            <div className={styles.tableWrap}>
-              <table className={styles.dataTable}>
+            <div className={`${styles.tableWrap} ${styles.compactTableWrap}`}>
+              <table className={`${styles.dataTable} ${styles.compactDataTable}`}>
                 <thead><tr><th>Submitted</th><th>Company</th><th>Instructor</th><th>Event</th><th>Booking</th><th>Completion</th></tr></thead>
                 <tbody>{inquiries.slice(0, 30).map((inquiry) => (
                   <tr key={inquiry.id}>
@@ -2762,7 +2820,7 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
             </div>
           </div>
 
-          <div className={styles.card}>
+          <div className={`${styles.card} ${styles.compactAdminCard}`}>
             <h2>Recent instructor feedback</h2>
             {!followupResponses.length ? <p className={styles.notice}>No instructor follow-up responses yet.</p> : (
               <div className={styles.list}>{followupResponses.slice(0, 20).map((response) => {
@@ -2777,56 +2835,165 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
               })}</div>
             )}
           </div>
-        </>
+        </div>
       ) : null}
 
       {!loading && tab === "profiles" ? (
-        <>
-          <div className={styles.card}>
-            <h2>Profiles awaiting review</h2>
-            <p className={styles.muted}>Review the profile copy and all uploaded media before approval. Approval publishes profiles with lifetime access. For standard instructors, approval starts the saved Stripe membership automatically and publishes the profile after Stripe confirms it.</p>
+        <div className={styles.compactAdminStack}>
+          <section className={`${styles.card} ${styles.compactAdminCard} ${styles.profileReviewIntro}`}>
+            <div className={styles.compactSectionHeader}>
+              <div>
+                <h2>Profiles awaiting review</h2>
+                <p className={styles.muted}>Review the public preview, every submitted field, and all media before making a decision.</p>
+              </div>
+              <span className={styles.recordCount}>{pending.length} waiting</span>
+            </div>
             {!pending.length ? <p className={styles.notice}>No profiles are waiting for review.</p> : null}
-            <div className={styles.list}>
+          </section>
+
+          <div className={styles.profileReviewList}>
               {pending.map((profile) => {
                 const profileMedia = media.filter((item) => item.instructor_profile_id === profile.id);
+                const readyMedia = profileMedia.filter((item) => item.status === "ready");
+                const headshot = readyMedia.find((item) => item.media_type === "headshot");
+                const galleryMedia = readyMedia.filter((item) => item.media_type !== "headshot");
+                const privateSettings = paymentSetups.find((item) => item.instructor_profile_id === profile.id);
+                const firstName = profile.display_name.trim().split(/\s+/)[0] || profile.display_name;
+                const location = [profile.city, profile.region].filter(Boolean).join(", ") || "Location not provided";
+                const eventLabels = profile.event_types.map((value) => eventTypes.find((item) => item.slug === value)?.label ?? statusLabel(value));
                 return (
-                  <article className={styles.listItem} key={profile.id}>
-                    <div className={styles.buttonRow}><h3>{profile.display_name}</h3><span className={styles.status}>{profile.status.replace("_", " ")}</span></div>
-                    <p>{[profile.business_name, profile.city, profile.region].filter(Boolean).join(" · ")}</p>
-                    <p>{profile.bio || "No bio provided."}</p>
-                    <p>Events: {profile.event_types.length ? profile.event_types.join(", ") : "None selected"}</p>
-                    {!profileMedia.length ? <p className={styles.error}>No profile media has been uploaded.</p> : (
-                      <div className={styles.mediaGrid}>{profileMedia.map((item) => (
-                        <div className={styles.mediaItem} key={item.id}>
-                          {item.media_type === "video" || item.media_type === "welcome_video" ? (
-                            <video className={styles.mediaPreview} src={mediaUrl(item)} controls preload="metadata" />
-                          ) : (
+                  <article
+                    className={`${styles.card} ${styles.compactAdminCard} ${styles.profileReviewCard} ${focusedProfileId === profile.id ? styles.focusedItem : ""}`}
+                    id={`profile-review-${profile.id}`}
+                    key={profile.id}
+                  >
+                    <header className={styles.profileReviewHeader}>
+                      <div>
+                        <div className={styles.buttonRow}><h3>{profile.display_name}</h3><span className={styles.status}>{statusLabel(profile.status)}</span></div>
+                        <p className={styles.muted}>{[profile.business_name, location].filter(Boolean).join(" · ")}</p>
+                      </div>
+                      <span className={styles.recordCount}>Submitted profile</span>
+                    </header>
+
+                    <section className={styles.productionPreview} aria-label={`Public profile preview for ${profile.display_name}`}>
+                      <div className={styles.productionPreviewHero}>
+                        <div className={styles.reviewHeadshot}>
+                          {headshot ? (
                             // Uploaded user content has a runtime URL that Next Image cannot optimize during static export.
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img className={styles.mediaPreview} src={mediaUrl(item)} alt={item.caption || item.media_type} />
-                          )}
-                          <span className={styles.status}>{item.media_type.replace("_", " ")}</span>
+                            <img src={mediaUrl(headshot)} alt={headshot.alt_text || `${profile.display_name}, line dance instructor`} />
+                          ) : <span>No headshot</span>}
                         </div>
-                      ))}</div>
-                    )}
-                    <div className={styles.grid}>
+                        <div>
+                          <p className={styles.previewLabel}>Public profile preview</p>
+                          <h4>{profile.display_name}</h4>
+                          <p className={profile.headline ? styles.previewHeadline : styles.missingPreviewCopy}>{profile.headline || "No headline provided"}</p>
+                          <div className={styles.previewFacts}>
+                            <span>{location}</span>
+                            <span>{profile.max_group_size ? `Groups up to ${profile.max_group_size}` : "Group size not provided"}</span>
+                            <span>{profile.years_teaching !== null ? `${profile.years_teaching} years teaching` : "Teaching experience not provided"}</span>
+                          </div>
+                          <span className={styles.previewContactButton}>Contact {firstName}</span>
+                        </div>
+                      </div>
+
+                      <div className={styles.productionPreviewBody}>
+                        <section>
+                          <p className={styles.previewLabel}>About the instructor</p>
+                          <h4>Meet {profile.display_name}</h4>
+                          <p className={profile.bio ? undefined : styles.missingPreviewCopy}>{profile.bio || "No bio provided"}</p>
+                        </section>
+                        <section>
+                          <p className={styles.previewLabel}>Services and fit</p>
+                          <h4>What {profile.display_name} offers</h4>
+                          <div className={styles.previewServiceGrid}>
+                            <div><strong>Events and programs</strong><p>{eventLabels.length ? eventLabels.join(", ") : "None selected"}</p></div>
+                            <div><strong>Dance styles</strong><p>{profile.styles.length ? profile.styles.join(", ") : "None selected"}</p></div>
+                            <div><strong>Age groups</strong><p>{profile.age_groups.length ? profile.age_groups.map(statusLabel).join(", ") : "None selected"}</p></div>
+                            <div><strong>Languages</strong><p>{profile.languages.length ? profile.languages.join(", ") : "None selected"}</p></div>
+                          </div>
+                        </section>
+                        <aside className={styles.previewBookingPanel}>
+                          <p className={styles.previewLabel}>Booking details</p>
+                          <h4>Plan your line dance experience</h4>
+                          <p>Preferred response window: about {profile.preferred_response_hours} hours</p>
+                          <p>Speakers: {profile.provides_speakers ? "Instructor can provide" : "Confirm with instructor"}</p>
+                          <p>Microphone: {profile.provides_microphone ? "Instructor can provide" : "Confirm with instructor"}</p>
+                          <p>Music playback: {profile.provides_music_playback ? "Instructor can provide" : "Confirm with instructor"}</p>
+                        </aside>
+                      </div>
+
+                      {galleryMedia.length ? (
+                        <div className={styles.reviewMediaGrid}>{galleryMedia.map((item) => (
+                          <figure className={styles.reviewMediaItem} key={item.id}>
+                            {item.media_type === "video" || item.media_type === "welcome_video" ? (
+                              <video className={styles.mediaPreview} src={mediaUrl(item)} controls preload="metadata" />
+                            ) : (
+                              // Uploaded user content has a runtime URL that Next Image cannot optimize during static export.
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img className={styles.mediaPreview} src={mediaUrl(item)} alt={item.alt_text || item.caption || `${profile.display_name} teaching line dancing`} />
+                            )}
+                            <figcaption>{item.caption || statusLabel(item.media_type)}</figcaption>
+                          </figure>
+                        ))}</div>
+                      ) : null}
+                    </section>
+
+                    <section className={styles.submittedFields} aria-labelledby={`submitted-fields-${profile.id}`}>
+                      <div className={styles.compactSectionHeader}>
+                        <div><h4 id={`submitted-fields-${profile.id}`}>Every submitted field</h4><p className={styles.muted}>Missing values are called out instead of being hidden.</p></div>
+                      </div>
+                      <dl className={styles.profileFieldGrid}>
+                        <ProfileReviewField label="Public name" value={profile.display_name} />
+                        <ProfileReviewField label="Business name" value={profile.business_name} />
+                        <ProfileReviewField label="Headline" value={profile.headline} />
+                        <ProfileReviewField label="Bio" value={profile.bio} />
+                        <ProfileReviewField label="City or metro" value={profile.city} />
+                        <ProfileReviewField label="State or region" value={profile.region} />
+                        <ProfileReviewField label="ZIP code (private)" value={profile.postal_code} />
+                        <ProfileReviewField label="Travel radius" value={profile.travel_radius_miles === null ? null : `${profile.travel_radius_miles} miles`} />
+                        <ProfileReviewField label="Years teaching" value={profile.years_teaching} />
+                        <ProfileReviewField label="Maximum group size" value={profile.max_group_size} />
+                        <ProfileReviewField label="Dance styles" value={profileListValue(profile.styles)} />
+                        <ProfileReviewField label="Events accepted" value={eventLabels.join(", ") || null} />
+                        <ProfileReviewField label="Age groups" value={profileListValue(profile.age_groups)} />
+                        <ProfileReviewField label="Languages" value={profileListValue(profile.languages)} />
+                        <ProfileReviewField label="Favorite song" value={profile.favorite_song_name} />
+                        <ProfileReviewField label="Spotify track" value={profile.favorite_song_spotify_url} />
+                        <ProfileReviewField label="Provides speakers" value={profile.provides_speakers === null ? null : profile.provides_speakers ? "Yes" : "No"} />
+                        <ProfileReviewField label="Provides microphone" value={profile.provides_microphone === null ? null : profile.provides_microphone ? "Yes" : "No"} />
+                        <ProfileReviewField label="Provides music playback" value={profile.provides_music_playback === null ? null : profile.provides_music_playback ? "Yes" : "No"} />
+                        <ProfileReviewField label="Liability insurance" value={statusLabel(profile.liability_insurance_status)} />
+                        <ProfileReviewField label="Response commitment" value={`${profile.preferred_response_hours} hours`} />
+                        <ProfileReviewField label="Inquiry email (private)" value={privateSettings?.inquiry_email} />
+                        <ProfileReviewField label="Typical minimum rate (private)" value={privateSettings?.minimum_rate_cents == null ? null : money(privateSettings.minimum_rate_cents)} />
+                        <ProfileReviewField label="Minimum booking (private)" value={privateSettings?.minimum_hours == null ? null : `${privateSettings.minimum_hours} hours`} />
+                        <ProfileReviewField label="Payment setup" value={privateSettings?.payment_setup_completed_at ? "Complete" : "Not complete"} />
+                        <ProfileReviewField label="Uploaded media" value={profileMedia.length ? `${profileMedia.length} file${profileMedia.length === 1 ? "" : "s"}` : null} />
+                      </dl>
+                    </section>
+
+                    {!headshot ? <p className={styles.error}>A ready headshot is required before approval.</p> : null}
+                    <div className={`${styles.grid} ${styles.reviewControls}`}>
                       <label className={styles.field}><span>Public profile slug</span><input value={slugs[profile.id] ?? ""} onChange={(event) => setSlugs((current) => ({ ...current, [profile.id]: event.target.value }))} /></label>
                       <label className={styles.field}><span>Review note</span><input value={notes[profile.id] ?? ""} onChange={(event) => setNotes((current) => ({ ...current, [profile.id]: event.target.value }))} /></label>
                     </div>
-                    <div className={styles.buttonRow}>
-                      <button className={styles.button} disabled={busyId === profile.id} type="button" onClick={() => void review(profile.id, "approve")}>Approve profile</button>
-                      <button className={styles.dangerButton} disabled={busyId === profile.id} type="button" onClick={() => void review(profile.id, "return_to_draft")}>Request changes</button>
+                    <div className={`${styles.buttonRow} ${styles.reviewActionBar}`}>
+                      <button className={`${styles.button} ${styles.compactButton}`} disabled={busyId === profile.id || !headshot} type="button" onClick={() => void review(profile.id, "approve")}>
+                        {busyId === profile.id ? "Approving and starting membership..." : "Approve profile"}
+                      </button>
+                      <button className={`${styles.dangerButton} ${styles.compactButton}`} disabled={busyId === profile.id} type="button" onClick={() => void review(profile.id, "return_to_draft")}>Request changes</button>
+                      {busyId === profile.id ? <span className={styles.muted} role="status">Verifying Stripe and publishing the profile. Keep this page open.</span> : null}
                     </div>
                   </article>
                 );
               })}
-            </div>
           </div>
 
-          <div className={styles.card}>
-            <h2>All instructor profiles</h2>
-            <div className={styles.tableWrap}>
-              <table className={styles.dataTable}>
+          <section className={`${styles.card} ${styles.compactAdminCard}`}>
+            <div className={styles.compactSectionHeader}><h2>All instructor profiles</h2><span className={styles.recordCount}>{profiles.length} total</span></div>
+            <div className={`${styles.tableWrap} ${styles.compactTableWrap}`}>
+              <table className={`${styles.dataTable} ${styles.compactDataTable}`}>
                 <thead><tr><th>Instructor</th><th>Location</th><th>Status</th><th>Action</th></tr></thead>
                 <tbody>{profiles.map((profile) => {
                   const paymentSetup = paymentSetups.find((setup) => setup.instructor_profile_id === profile.id);
@@ -2856,8 +3023,8 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
                 })}</tbody>
               </table>
             </div>
-          </div>
-        </>
+          </section>
+        </div>
       ) : null}
 
       {!loading && tab === "memberships" ? <MembershipGuaranteeAdmin isOwner={isOwner} /> : null}
