@@ -15,10 +15,10 @@ The migrations and Edge Function source are in this repository. Creating or chan
 7. Stripe saves a card for future off-session billing. It does not start a subscription or charge the card. A verified setup completion submits the profile for review and atomically reserves the founding offer for each of the first 100 completed setups. A private invitation can provide the same two-month benefit after the first 100 spots are filled, but offers never stack.
 8. An administrator reviews the profile. Approval automatically creates the fixed $14.99 monthly membership with the saved card. An eligible membership receives its first two monthly billing cycles free. A profile that is not approved has no subscription and no charge.
 9. Every membership first activated on or after August 7, 2026 receives a request-based 90-day booking guarantee beginning with the first invoice that collects a positive membership payment. For a membership with two free months, that invoice occurs after the free period. A request can be submitted after day 90 and within the following 30 days.
-10. A signature-verified Stripe webhook confirms payment setup, synchronizes memberships, publishes profiles with active or trialing memberships, and unpublishes profiles when a membership ends. Profile content is preserved.
+10. A signature-verified Stripe webhook confirms payment setup, synchronizes memberships, publishes profiles with active or trialing memberships, and starts failed-payment recovery. An instructor with a prior positive membership payment receives 14 days to recover while the profile remains public. A first-payment failure pauses publication immediately.
 11. Signed-in instructors open Stripe Customer Portal to cancel, update payment methods, or review invoices.
 12. Organizers can browse without signing in. They must sign in and finish organizer onboarding before the authenticated `submit_inquiry` database function accepts an inquiry.
-13. Each inquiry creates a durable email job. The internal notification worker claims jobs safely, sends them, and records provider acceptance or retry state. SMS jobs are not created while SMS is paused.
+13. Inquiries, profile submissions, profile approvals, and billing failures create durable email jobs. The internal notification worker claims jobs safely, enforces expired billing grace periods, sends messages, and records provider acceptance or retry state. SMS jobs are not created while SMS is paused.
 14. Organizers and instructors communicate by email. New-inquiry email uses the organizer as `Reply-To`. Booking and completion follow-ups use `SUPPORT_EMAIL` as `Reply-To`.
 
 Anonymous application inserts, anonymous inquiry inserts, anonymous media uploads, and Stripe Payment Links are not part of this architecture.
@@ -53,8 +53,11 @@ The relevant migrations are:
 - `202608070001_instructor_invitation_claim_lifecycle.sql`
 - `202608070002_offer_billing_and_90_day_guarantee.sql`
 - `202608080001_pre_review_payment_setup.sql`
+- `202608100001_admin_profile_reviews_and_notifications.sql`
+- `202608100002_instructor_approval_and_billing_recovery.sql`
+- `202608100003_fix_billing_recovery_notification_type.sql`
 
-Do not recreate the old `instructor_applications` or minimal `inquiries` tables by hand. Migration `202608020010` establishes the marketplace schema and upgrades an older inquiry table if one exists. Migration `202608020011` adds the original approve-then-pay membership state, webhook idempotency, and notification worker functions. Migration `202608040002` pauses SMS delivery, adds the legacy founding-guarantee records, adds claim and refund audit records, and provides owner-only claim operations plus service-only Stripe refund recording. Existing grants created under that legacy 12-month policy remain valid. Migration `202608050002` adds instructor invitations and permanent lifetime access that is stored separately from Stripe billing state. Migration `202608060002` lets an approved or published instructor edit profile content and media without another review while keeping review state changes restricted to administrators. Migration `202608060003` hardens the public directory boundary, fixes function search paths, closes internal trigger helpers, and grants each browser or worker RPC only to the roles that need it. Migration `202608060004` removes API execution from Supabase's automatic RLS event-trigger helper when that platform helper is present. Migration `202608070001` adds the explicit invitation claim and timed profile-submission lifecycle. Migration `202608070002` applies the earned offer at billing, starts the current guarantee from the first positive paid invoice, and preserves actual legacy guarantees. Migration `202608080001` adds auditable pre-review payment setup, the locked first-100 entitlement allocation, automatic approval-time subscription activation, and compatibility with private and lifetime invitations.
+Do not recreate the old `instructor_applications` or minimal `inquiries` tables by hand. Migration `202608020010` establishes the marketplace schema and upgrades an older inquiry table if one exists. Migration `202608020011` adds the original approve-then-pay membership state, webhook idempotency, and notification worker functions. Migration `202608040002` pauses SMS delivery, adds the legacy founding-guarantee records, adds claim and refund audit records, and provides owner-only claim operations plus service-only Stripe refund recording. Existing grants created under that legacy 12-month policy remain valid. Migration `202608050002` adds instructor invitations and permanent lifetime access that is stored separately from Stripe billing state. Migration `202608060002` lets an approved or published instructor edit profile content and media without another review while keeping review state changes restricted to administrators. Migration `202608060003` hardens the public directory boundary, fixes function search paths, closes internal trigger helpers, and grants each browser or worker RPC only to the roles that need it. Migration `202608060004` removes API execution from Supabase's automatic RLS event-trigger helper when that platform helper is present. Migration `202608070001` adds the explicit invitation claim and timed profile-submission lifecycle. Migration `202608070002` applies the earned offer at billing, starts the current guarantee from the first positive paid invoice, and preserves actual legacy guarantees. Migration `202608080001` adds auditable pre-review payment setup, the locked first-100 entitlement allocation, automatic approval-time subscription activation, and compatibility with private and lifetime invitations. Migration `202608100001` adds durable administrator profile-submission alerts and the full profile review workspace. Migration `202608100002` adds approval emails and auditable failed-payment recovery with an exact 14-day grace period for established paying instructors.
 
 Confirm the production migration history before each release. Do not deploy a frontend that depends on a migration until that migration is present in the linked project.
 
@@ -172,7 +175,7 @@ draft -> pending_review -> approved -> published
 - `published`: Stripe reports an active or trialing membership, so the directory can show the profile. Later instructor edits remain published immediately.
 - `suspended`: an administrator has disabled the profile. Stripe events do not republish it automatically.
 
-When a membership becomes inactive, unpaid, paused, or canceled, a published profile returns to `approved`. The profile row and uploaded media are not deleted. A `past_due` event leaves visibility unchanged until a billing grace policy is chosen. Reapproving a profile publishes it immediately when its canonical membership remains active or trialing. Profiles with lifetime access publish after approval without a Stripe membership. Later Stripe events are recorded and ignored for those profiles, so cancellation or refund events cannot remove lifetime access or unpublish the profile.
+When a recurring payment fails, the webhook checks the durable positive-payment ledger. A previously paying instructor receives an exact 14-day grace period and remains published while Stripe retries. An instructor whose first positive membership payment has not succeeded is paused immediately. The worker removes an established instructor from the public directory when the grace deadline passes, but it preserves the profile and media. Updating the card opens Stripe Customer Portal, synchronizes the new customer payment method to the subscription, and explicitly retries the overdue invoice. A successful paid webhook closes recovery and republishes the profile automatically. Profiles with lifetime access publish after approval without a Stripe membership. Later Stripe events are recorded and ignored for those profiles, so cancellation or refund events cannot remove lifetime access or unpublish the profile.
 
 Administrators can send instructor invitations from the admin dashboard and optionally include lifetime access. The `send-instructor-invitation` function sends a private, expiring signup link through Resend. A campaign offer is personal to its recipient and remains claimable for 14 days after issue. Claiming must be a deliberate action. The recipient then has 7 days to create the invited account and complete the required submission step. For a regular membership, that step is verified Stripe payment setup. Later administrative approval does not invalidate an offer earned on time. Invitation acceptance requires an authenticated account whose normalized email matches the invited email. Lifetime grants live in `instructor_lifetime_access`, which instructors cannot insert or edit through RLS or profile settings, and a lifetime instructor can submit without visiting Stripe.
 
@@ -222,7 +225,9 @@ Account `acct_1U17IgPoYzwtbFuT` has charges and payouts enabled. Stripe reports 
 
 The generic Stripe Checkout refund display is disabled. Every membership first activated on or after August 7, 2026 instead receives the request-based 90-day booking guarantee described and linked from the account activation flow, Terms of Use, and Refund Policy. The guarantee begins with the first invoice that collects a positive membership payment. Requests can be made after day 90 and within the following 30 days. Existing 12-month founding guarantees remain governed by the terms already granted.
 
-The public Customer Portal login page is disabled and is not required. Signed-in instructors use the app's **Manage membership** action, which creates a short-lived authenticated Portal Session through `create-billing-portal` and returns the instructor to the account page.
+The public Customer Portal login page is disabled and is not required. Signed-in instructors use the app's **Manage membership** action, which creates a short-lived authenticated Portal Session through `create-billing-portal` and returns the instructor to the account page. An open billing recovery uses the Portal payment-method-update flow and returns to `reconcile-instructor-billing-recovery`, which verifies ownership and exact Stripe objects before retrying the overdue invoice.
+
+Live Stripe Smart Retries are configured for up to eight attempts over two weeks. After all retries fail, Stripe leaves both the subscription and invoice past due so the instructor can still recover the same membership later. The application owns the exact profile grace deadline and enforces it through the once-per-minute worker.
 
 The production webhook is active. Its unsigned rejection smoke test and signed synthetic event smoke test passed. The live Stripe secret key, Product, Price, dedicated Portal configuration, expected mode, terms-consent setting, and webhook signing secret are installed in Supabase.
 
@@ -286,7 +291,7 @@ where status = 'open';
 
 Reset or migrate sandbox billing fields only after deciding how to preserve offer, legacy founding, and guarantee history. Expire each returned open Session with the sandbox Stripe key, mark the matching attempt `expired`, and confirm that the second query returns no rows.
 
-The account UI includes a **Manage membership** button for published instructors and memberships with status `trialing`, `active`, `past_due`, `unpaid`, or `paused`. It invokes `create-billing-portal` and redirects the browser to the returned `url`.
+The account UI includes a **Manage membership** button for published instructors and memberships with status `trialing`, `active`, `past_due`, `unpaid`, or `paused`. It invokes `create-billing-portal` and redirects the browser to the returned `url`. During recovery the action becomes **Update payment method**, opens Stripe directly in payment-method update, and reconciles the overdue invoice after the instructor returns.
 
 ### Current guarantee, legacy guarantees, and refund operations
 
@@ -351,6 +356,7 @@ Keep that environment file outside Git. Hosted Edge Functions receive Supabase U
 - `create-instructor-checkout`: `verify_jwt = true`
 - `create-instructor-payment-setup`: `verify_jwt = true`
 - `create-billing-portal`: `verify_jwt = true`
+- `reconcile-instructor-billing-recovery`: `verify_jwt = true`
 - `reconcile-instructor-checkout`: `verify_jwt = true`
 - `reconcile-instructor-payment-setup`: `verify_jwt = true`
 - `review-instructor-profile`: `verify_jwt = true`
@@ -367,6 +373,7 @@ supabase functions deploy create-instructor-payment-setup
 supabase functions deploy review-instructor-profile
 supabase functions deploy reconcile-instructor-checkout
 supabase functions deploy create-billing-portal
+supabase functions deploy reconcile-instructor-billing-recovery
 supabase functions deploy create-instructor-checkout
 supabase functions deploy verify-instructor-refund
 supabase functions deploy send-instructor-invitation
@@ -374,7 +381,7 @@ supabase functions deploy stripe-webhook
 supabase functions deploy process-inquiry-notifications
 ```
 
-`process-inquiry-notifications` is the only notification worker. Do not deploy the removed `dispatch-inquiry-notifications` prototype.
+`process-inquiry-notifications` is the only notification worker. It sends profile approval and payment recovery emails in addition to inquiry and review messages. Do not deploy the removed `dispatch-inquiry-notifications` prototype.
 
 ## 10. Configure inquiry delivery
 
@@ -408,21 +415,25 @@ Before launch, verify:
 12. Stripe test events update setup and membership state once, including duplicate webhook delivery.
 13. An active test subscription publishes the profile.
 14. A canceled test subscription returns the profile to `approved` without deleting its content.
-15. An authenticated organizer can submit an inquiry to a published or static launch profile.
-16. New-inquiry email uses the organizer as `Reply-To`, while booking and completion follow-ups use `SUPPORT_EMAIL`.
-17. A submitted inquiry creates one email job and no SMS job. Any preexisting queued SMS job is canceled or rejected without a Twilio request.
-18. Temporary provider failures reschedule a job and terminal failures stop after six attempts.
-19. Only listed administrators can open `/admin/` or query marketplace analytics.
-20. Daily, weekly, monthly, annual, and custom admin reporting totals match raw inquiry records.
-21. A booking follow-up is sent seven days after an unanswered inquiry, exactly once.
-22. A completion follow-up is sent two days after the confirmed date of a booked event, exactly once.
-23. Instructor feedback comments are visible to the instructor and administrators, but not to the organizer.
-24. A private offer cannot be claimed more than 14 days after issue, and claiming requires an explicit recipient action.
-25. A timely claim gives the recipient 7 days to create the invited account and complete payment setup. Later administrative approval preserves the timely offer.
-26. The first invoice that collects a positive membership payment starts the versioned 90-day guarantee. A claim is rejected before day 90 and after the following 30-day request window.
-27. Only the marketplace owner can log and review a guarantee claim or invoke refund verification from the admin workflow. Approval does not issue money.
-28. A manually issued Stripe test refund for the exact membership Price can be verified and recorded once. Verification does not issue money or change subscription status.
-29. Any instructor who already received a 12-month founding guarantee keeps the original founding number, coverage dates, claim deadline, and eligibility terms.
+15. A successful approval queues exactly one approval email only after membership activation and any offer redemption succeed.
+16. A failed first payment leaves the profile unpublished, queues the no-grace payment email, and requires new payment setup before resubmission.
+17. A failed renewal after a positive paid invoice keeps the profile public for exactly 14 days, sends the recovery deadline, and removes it after the deadline if payment remains overdue.
+18. Updating the payment method through the recovery link retries the overdue invoice and republishes a recovered profile after Stripe confirms payment.
+19. An authenticated organizer can submit an inquiry to a published or static launch profile.
+20. New-inquiry email uses the organizer as `Reply-To`, while booking and completion follow-ups use `SUPPORT_EMAIL`.
+21. A submitted inquiry creates one email job and no SMS job. Any preexisting queued SMS job is canceled or rejected without a Twilio request.
+22. Temporary provider failures reschedule a job and terminal failures stop after six attempts.
+23. Only listed administrators can open `/admin/` or query marketplace analytics.
+24. Daily, weekly, monthly, annual, and custom admin reporting totals match raw inquiry records.
+25. A booking follow-up is sent seven days after an unanswered inquiry, exactly once.
+26. A completion follow-up is sent two days after the confirmed date of a booked event, exactly once.
+27. Instructor feedback comments are visible to the instructor and administrators, but not to the organizer.
+28. A private offer cannot be claimed more than 14 days after issue, and claiming requires an explicit recipient action.
+29. A timely claim gives the recipient 7 days to create the invited account and complete payment setup. Later administrative approval preserves the timely offer.
+30. The first invoice that collects a positive membership payment starts the versioned 90-day guarantee. A claim is rejected before day 90 and after the following 30-day request window.
+31. Only the marketplace owner can log and review a guarantee claim or invoke refund verification from the admin workflow. Approval does not issue money.
+32. A manually issued Stripe test refund for the exact membership Price can be verified and recorded once. Verification does not issue money or change subscription status.
+33. Any instructor who already received a 12-month founding guarantee keeps the original founding number, coverage dates, claim deadline, and eligibility terms.
 
 Run a production build after setting browser environment values:
 

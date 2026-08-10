@@ -846,6 +846,72 @@ export default {
         return new Response("Subscription sync failed", { status: 500 });
       }
 
+      let billingRecoveryResult: unknown = null;
+      if (
+        event.type === "invoice.payment_failed" && instructorProfileId &&
+        membershipItem && syncResult !== "lifetime_access_ignored" &&
+        syncResult !== "stale_subscription"
+      ) {
+        const failedInvoice = event.data.object as Stripe.Invoice;
+        const failedInvoiceSubscriptionId = stripeInvoiceSubscriptionId(
+          failedInvoice,
+        );
+        const failedInvoiceCustomerId = stripeObjectId(failedInvoice.customer);
+        if (
+          failedInvoiceSubscriptionId !== subscription.id ||
+          failedInvoiceCustomerId !== customerId ||
+          failedInvoice.currency.toLowerCase() !== "usd" ||
+          failedInvoice.amount_due <= 0 ||
+          !["subscription_create", "subscription_cycle"].includes(
+            failedInvoice.billing_reason ?? "",
+          )
+        ) {
+          throw new Error(
+            "Failed invoice does not match the instructor membership",
+          );
+        }
+
+        const { data, error } = await ctx.supabaseAdmin.rpc(
+          "begin_instructor_billing_recovery",
+          {
+            p_event_id: event.id,
+            p_instructor_profile_id: instructorProfileId,
+            p_stripe_customer_id: customerId,
+            p_stripe_subscription_id: subscription.id,
+            p_stripe_invoice_id: failedInvoice.id,
+            p_failed_at: new Date(event.created * 1000).toISOString(),
+          },
+        );
+        if (error) {
+          throw new Error(
+            `Unable to start instructor billing recovery: ${error.code}`,
+          );
+        }
+        billingRecoveryResult = data;
+      } else if (
+        event.type !== "invoice.payment_failed" && instructorProfileId &&
+        ["inactive", "paused", "canceled", "refunded"].includes(
+          membershipStatus,
+        ) && syncResult !== "lifetime_access_ignored" &&
+        syncResult !== "stale_subscription"
+      ) {
+        const { data, error } = await ctx.supabaseAdmin.rpc(
+          "close_instructor_billing_recovery",
+          {
+            p_instructor_profile_id: instructorProfileId,
+            p_stripe_subscription_id: subscription.id,
+            p_reason: `subscription_${membershipStatus}`,
+            p_closed_at: observedAt,
+          },
+        );
+        if (error) {
+          throw new Error(
+            `Unable to close instructor billing recovery: ${error.code}`,
+          );
+        }
+        billingRecoveryResult = data;
+      }
+
       let offerResult: string | null = null;
       if (
         membershipItem && setupActivation?.entitlement &&
@@ -896,6 +962,7 @@ export default {
         | "stale_subscription_ignored"
         | "zero_amount_ignored"
         | null = null;
+      const billingRecoveryResolutions: string[] = [];
       let staleSubscriptionIsGuaranteeSource = false;
       if (
         event.type === "invoice.paid" &&
@@ -982,6 +1049,23 @@ export default {
               );
             }
             results.push(data);
+
+            const { data: recoveryResolution, error: recoveryError } = await ctx
+              .supabaseAdmin.rpc(
+                "resolve_instructor_billing_recovery",
+                {
+                  p_instructor_profile_id: instructorProfileId,
+                  p_stripe_subscription_id: subscription.id,
+                  p_stripe_invoice_id: paidInvoice.invoiceId,
+                  p_recovered_at: paidInvoice.paidAt,
+                },
+              );
+            if (recoveryError) {
+              throw new Error(
+                `Unable to resolve instructor billing recovery: ${recoveryError.code}`,
+              );
+            }
+            billingRecoveryResolutions.push(String(recoveryResolution));
           }
           paidInvoiceResult = results;
         } else {
@@ -995,6 +1079,8 @@ export default {
         result: syncResult,
         offerResult,
         paidInvoiceResult,
+        billingRecoveryResult,
+        billingRecoveryResolutions,
       });
     } catch (error) {
       const message = error instanceof Error

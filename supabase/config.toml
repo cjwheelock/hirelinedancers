@@ -13,6 +13,9 @@ verify_jwt = true
 [functions.reconcile-instructor-payment-setup]
 verify_jwt = true
 
+[functions.reconcile-instructor-billing-recovery]
+verify_jwt = true
+
 [functions.review-instructor-profile]
 verify_jwt = true
 

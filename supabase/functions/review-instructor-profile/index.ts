@@ -673,6 +673,24 @@ export default {
             console.error("Payment failure reset returned unexpected facts");
             throw error;
           }
+          const { data: notificationResult, error: notificationError } =
+            await ctx.supabaseAdmin.rpc(
+              "enqueue_instructor_activation_payment_failure",
+              {
+                p_instructor_profile_id: instructorProfileId,
+                p_failed_activation_id: approvalActivationId,
+              },
+            );
+          if (
+            notificationError ||
+            !["queued", "duplicate"].includes(String(notificationResult))
+          ) {
+            console.error(
+              "Unable to queue instructor payment failure email",
+              notificationError?.code ?? "unexpected_queue_result",
+              notificationError?.message ?? String(notificationResult),
+            );
+          }
           return json({
             error:
               "The saved card could not start the membership. The instructor must save another payment method before review.",

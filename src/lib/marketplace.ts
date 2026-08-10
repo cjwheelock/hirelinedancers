@@ -73,6 +73,18 @@ export type InstructorPrivateSettings = {
   response_reminders_enabled: boolean;
 };
 
+export type InstructorBillingRecovery = {
+  id: string;
+  instructor_profile_id: string;
+  status: "grace_period" | "access_paused" | "recovered" | "closed";
+  has_prior_successful_payment: boolean;
+  first_failed_at: string;
+  last_failed_at: string;
+  grace_ends_at: string | null;
+  access_paused_at: string | null;
+  recovered_at: string | null;
+};
+
 export type MarketplaceInquiry = {
   id: string;
   created_at: string;

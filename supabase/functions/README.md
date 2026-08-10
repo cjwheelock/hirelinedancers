@@ -69,11 +69,15 @@ const { data, error } = await supabase.functions.invoke(
 if (!error && data?.url) window.location.assign(data.url);
 ```
 
-This keeps cancellation, payment-method changes, and invoice history in Stripe instead of rebuilding billing screens in the application.
+This keeps cancellation, payment-method changes, and invoice history in Stripe instead of rebuilding billing screens in the application. When an open billing recovery exists, the function creates a Portal deep link directly to payment-method update and returns the instructor to the account recovery callback.
 
 In production, `STRIPE_BILLING_PORTAL_CONFIGURATION_ID` is required. The live value is `bpc_1U1CG4PoYzwtbFuToKoH8q3u`. The function retrieves that configuration before creating a Session and verifies that it is active, is in live mode, enables payment-method updates and invoice history, cancels at the end of the billing period, and does not allow plan changes. The public Customer Portal login page is optional and currently disabled because the app creates authenticated Portal Sessions for signed-in instructors.
 
 Both Stripe endpoints reject instructors who have lifetime access. Lifetime access is stored separately from subscription status, and the database performs a final locked access check before a newly created Checkout Session can be returned.
+
+### `reconcile-instructor-billing-recovery`
+
+Authenticated recovery endpoint used after the instructor updates a payment method in Customer Portal. It verifies profile ownership, the open recovery, the exact live Stripe Customer, Subscription, Product, Price, overdue Invoice, and updated customer payment method. It copies the updated payment method to the subscription because a subscription-specific default takes priority over the customer invoice default, then explicitly retries the overdue invoice off session. The signed Stripe webhook remains authoritative for recording payment, closing recovery, and republishing the profile.
 
 ### `reconcile-instructor-checkout`
 
@@ -149,6 +153,10 @@ Internal worker protected by the named Supabase secret key `automations` in the 
 
 When an instructor moves into `pending_review`, the database queues an email to `cjwheelock1@gmail.com`. The message includes the instructor name, business, location, submission time, and a private one-click Supabase magic link for `cj.wheelock1@gmail.com` that opens the exact profile in Admin Profiles. Resubmitting after requested changes creates a new notification. The worker also backfills any profiles already waiting when migration `202608100001` is applied.
 
+After a profile is approved, the database queues one instructor approval email only after the profile is published, the membership is active or trialing, and any offer entitlement is redeemed. A deterministic activation-time payment failure instead returns the profile to draft and queues a no-grace email asking the instructor to save a new card and resubmit.
+
+For later positive invoice failures, the webhook starts a durable recovery. An instructor with a prior positive paid invoice remains published for exactly 14 days and receives the deadline in the email. A membership without a prior positive paid invoice is paused immediately and receives no grace. Recovery links use a secure Supabase magic link, open Stripe payment-method update, and retry the exact overdue invoice. The worker enforces expired grace periods every minute before claiming email work.
+
 New-inquiry email is sent through Resend with the organizer address in `Reply-To`. The worker also queues two email follow-ups through the same durable job system. Follow-up messages use `SUPPORT_EMAIL` in `Reply-To`, with `hello@hirelinedancers.com` as the fallback:
 
 - Seven days after an unanswered inquiry, the instructor is asked whether it was booked: Yes, No, or In progress.
@@ -204,6 +212,7 @@ Do not put any secret listed here into `NEXT_PUBLIC_*` variables or browser code
 - `create-instructor-checkout`: keep JWT verification enabled. The function also uses `auth: "user"`.
 - `create-instructor-payment-setup`: keep JWT verification enabled. The function uses `auth: "user"` and creates only setup-mode Checkout Sessions.
 - `create-billing-portal`: keep JWT verification enabled. The function also uses `auth: "user"`.
+- `reconcile-instructor-billing-recovery`: keep JWT verification enabled. The function uses `auth: "user"` and verifies ownership plus the exact Stripe recovery objects.
 - `reconcile-instructor-checkout`: keep JWT verification enabled. The function uses `auth: "user"` and verifies Session ownership against Stripe and Supabase.
 - `reconcile-instructor-payment-setup`: keep JWT verification enabled. The function uses `auth: "user"` and verifies Session ownership plus the successful SetupIntent and attached card.
 - `review-instructor-profile`: keep JWT verification enabled. The function uses `auth: "user"`, enforces marketplace administrator access, and performs approval-time subscription creation.
@@ -223,6 +232,7 @@ supabase functions deploy create-instructor-payment-setup
 supabase functions deploy review-instructor-profile
 supabase functions deploy reconcile-instructor-checkout
 supabase functions deploy create-billing-portal
+supabase functions deploy reconcile-instructor-billing-recovery
 supabase functions deploy create-instructor-checkout
 supabase functions deploy verify-instructor-refund
 supabase functions deploy send-instructor-invitation

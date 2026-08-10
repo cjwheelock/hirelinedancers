@@ -25,6 +25,14 @@ export default {
     const accountId = ctx.userClaims?.id;
     if (!accountId) return json({ error: "Authentication required" }, 401);
 
+    let body: { billingRecovery?: unknown } = {};
+    try {
+      body = await req.json() as { billingRecovery?: unknown };
+    } catch {
+      body = {};
+    }
+    const billingRecoveryRequested = body.billingRecovery === true;
+
     let stripeConfig: ReturnType<typeof hldStripeConfig>;
     try {
       stripeConfig = hldStripeConfig();
@@ -86,16 +94,55 @@ export default {
       }, 409);
     }
 
+    let recoveryId: string | null = null;
+    if (billingRecoveryRequested) {
+      const { data: recovery, error: recoveryError } = await ctx.supabaseAdmin
+        .from("instructor_billing_recoveries")
+        .select("id")
+        .eq("instructor_profile_id", profile.id)
+        .in("status", ["grace_period", "access_paused"])
+        .maybeSingle();
+      if (recoveryError) {
+        console.error(
+          "Unable to read instructor billing recovery",
+          recoveryError.code,
+        );
+        return json({ error: "Unable to load billing recovery" }, 500);
+      }
+      if (!recovery) {
+        return json({
+          error: "No unresolved membership payment is available",
+          code: "billing_recovery_not_required",
+        }, 409);
+      }
+      recoveryId = recovery.id;
+    }
+
     try {
       await verifiedMembershipPrice(stripe, stripeConfig);
       const configuration = await verifiedPortalConfigurationId(stripe, stripeConfig);
 
       const returnUrl = new URL("/account/", stripeConfig.appUrl);
-      returnUrl.searchParams.set("billing", "returned");
+      returnUrl.searchParams.set(
+        "billing",
+        billingRecoveryRequested ? "recovery-returned" : "returned",
+      );
+      returnUrl.searchParams.set("tab", "membership");
       const session = await stripe.billingPortal.sessions.create({
         customer: membership.stripe_customer_id,
         return_url: returnUrl.toString(),
         ...(configuration ? { configuration } : {}),
+        ...(billingRecoveryRequested
+          ? {
+            flow_data: {
+              type: "payment_method_update" as const,
+              after_completion: {
+                type: "redirect" as const,
+                redirect: { return_url: returnUrl.toString() },
+              },
+            },
+          }
+          : {}),
       });
 
       const { data: finalLifetimeAccess, error: finalLifetimeAccessError } = await ctx.supabaseAdmin
@@ -115,7 +162,7 @@ export default {
         }, 409);
       }
 
-      return json({ url: session.url });
+      return json({ url: session.url, recoveryId });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown Stripe error";
       console.error("Billing Portal Session creation failed", message);

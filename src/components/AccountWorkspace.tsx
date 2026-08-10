@@ -14,6 +14,7 @@ import {
   readableError,
   type AccountIntent,
   type AccountRole,
+  type InstructorBillingRecovery,
   type InstructorInvitationLifecycle,
   type InstructorPrivateSettings,
   type InstructorProfile,
@@ -535,6 +536,7 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
   const [focusFollowup, setFocusFollowup] = useState<"booking" | "completion" | null>(null);
   const [profile, setProfile] = useState<InstructorProfile | null>(null);
   const [settings, setSettings] = useState<InstructorPrivateSettings | null>(null);
+  const [billingRecovery, setBillingRecovery] = useState<InstructorBillingRecovery | null>(null);
   const [hasLifetimeAccess, setHasLifetimeAccess] = useState<boolean | null>(null);
   const [invitationOffer, setInvitationOffer] = useState<InstructorInvitationOfferStatus | null>(null);
   const [inquiries, setInquiries] = useState<MarketplaceInquiry[]>([]);
@@ -562,6 +564,7 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
       .maybeSingle();
     if (profileError) {
       setError(profileError.message);
+      setBillingRecovery(null);
       setHasLifetimeAccess(null);
       setLoading(false);
       return;
@@ -570,13 +573,20 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
     const loadedProfile = profileData as InstructorProfile | null;
     setProfile(loadedProfile);
     if (loadedProfile) {
-      const [privateResult, inquiryResult, lifetimeAccessResult, invitationOfferResult] = await Promise.all([
+      const [privateResult, inquiryResult, lifetimeAccessResult, invitationOfferResult, billingRecoveryResult] = await Promise.all([
         client.from("instructor_private_settings").select("*").eq("instructor_profile_id", loadedProfile.id).maybeSingle(),
         client.from("inquiries").select("*").eq("instructor_profile_id", loadedProfile.id).order("created_at", { ascending: false }),
         client.rpc("current_instructor_lifetime_access"),
-        client.rpc("current_instructor_invitation_offer")
+        client.rpc("current_instructor_invitation_offer"),
+        client.from("instructor_billing_recoveries")
+          .select("id,instructor_profile_id,status,has_prior_successful_payment,first_failed_at,last_failed_at,grace_ends_at,access_paused_at,recovered_at")
+          .eq("instructor_profile_id", loadedProfile.id)
+          .in("status", ["grace_period", "access_paused"])
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle()
       ]);
-      const loadError = privateResult.error ?? inquiryResult.error ?? lifetimeAccessResult.error ?? invitationOfferResult.error;
+      const loadError = privateResult.error ?? inquiryResult.error ?? lifetimeAccessResult.error ?? invitationOfferResult.error ?? billingRecoveryResult.error;
       if (loadError) setError(loadError.message);
       setSettings(privateResult.data as InstructorPrivateSettings | null);
       setInquiries((inquiryResult.data as MarketplaceInquiry[] | null) ?? []);
@@ -584,11 +594,15 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
       setInvitationOffer(invitationOfferResult.error
         ? null
         : (invitationOfferResult.data as InstructorInvitationOfferStatus | null));
+      setBillingRecovery(billingRecoveryResult.error
+        ? null
+        : (billingRecoveryResult.data as InstructorBillingRecovery | null));
     } else {
       setSettings(null);
       setInquiries([]);
       setHasLifetimeAccess(null);
       setInvitationOffer(null);
+      setBillingRecovery(null);
     }
     setLoading(false);
   }
@@ -643,6 +657,28 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
       return;
     }
 
+    if (params.get("billing") === "recovery") {
+      setTab("membership");
+      setMembershipNotice({
+        tone: "notice",
+        message: "Update your payment method below. Stripe will then retry the overdue membership payment."
+      });
+      return;
+    }
+
+    if (params.get("billing") === "activation-failed") {
+      setTab("profile");
+      setProfileNotice({
+        tone: "notice",
+        message: "Your saved payment method could not start the membership, so your profile remains a draft. Save a new payment method and resubmit your profile."
+      });
+      const url = new URL(window.location.href);
+      url.searchParams.delete("billing");
+      url.searchParams.set("tab", "profile");
+      window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+      return;
+    }
+
     const requestedTab = params.get("tab");
     const requestedInquiry = params.get("inquiry");
     const requestedFollowup = params.get("followup");
@@ -669,6 +705,50 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
     if (["profile", "inquiries", "membership"].includes(requestedTab ?? "")) {
       setTab(requestedTab as InstructorTab);
     }
+  }, [account.id]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("billing") !== "recovery-returned") return;
+
+    setTab("membership");
+    setMembershipNotice({
+      tone: "notice",
+      message: "Stripe saved your updated payment method. We are checking the overdue payment now."
+    });
+    let stopped = false;
+
+    async function reconcileBillingRecovery() {
+      const client = getMarketplaceClient();
+      if (!client) return;
+      const { data, error: reconciliationError } = await client.functions.invoke(
+        "reconcile-instructor-billing-recovery",
+        { body: {} }
+      );
+      if (stopped) return;
+
+      if (reconciliationError) {
+        setError(await edgeFunctionError(reconciliationError));
+        setMembershipNotice(null);
+      } else {
+        setMembershipNotice({
+          tone: data?.recovered ? "success" : "notice",
+          message: typeof data?.message === "string"
+            ? data.message
+            : "Stripe is checking the overdue membership payment."
+        });
+      }
+      await load(true);
+      if (stopped) return;
+
+      const url = new URL(window.location.href);
+      url.searchParams.delete("billing");
+      url.searchParams.set("tab", "membership");
+      window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+    }
+
+    void reconcileBillingRecovery();
+    return () => { stopped = true; };
   }, [account.id]);
 
   useEffect(() => {
@@ -956,6 +1036,7 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
           checkoutPending={checkoutPending}
           checkoutRecoveryError={checkoutRecoveryError}
           membershipNotice={membershipNotice}
+          billingRecovery={billingRecovery}
           hasLifetimeAccess={hasLifetimeAccess}
           onRetryCheckout={() => setCheckoutRetryVersion((current) => current + 1)}
         />
@@ -1496,6 +1577,7 @@ function MembershipCard({
   checkoutPending,
   checkoutRecoveryError,
   membershipNotice,
+  billingRecovery,
   hasLifetimeAccess,
   onRetryCheckout,
 }: {
@@ -1504,6 +1586,7 @@ function MembershipCard({
   checkoutPending: boolean;
   checkoutRecoveryError: string | null;
   membershipNotice: { tone: "notice" | "success"; message: string } | null;
+  billingRecovery: InstructorBillingRecovery | null;
   hasLifetimeAccess: boolean;
   onRetryCheckout: () => void;
 }) {
@@ -1539,7 +1622,7 @@ function MembershipCard({
     setBusy("portal");
     setError(null);
     const { data, error: portalError } = await client.functions.invoke("create-billing-portal", {
-      body: {}
+      body: { billingRecovery: Boolean(billingRecovery) }
     });
     setBusy(null);
     if (portalError) {
@@ -1581,6 +1664,16 @@ function MembershipCard({
       <h2>$14.99 USD per month</h2>
       <p>New instructors save a payment method before profile review. Stripe does not start a subscription or charge the saved card before approval. If the profile is approved, membership begins automatically. The first 100 instructors who complete payment setup receive their first two months free, then membership renews at $14.99 USD per month until canceled. Every new paid membership includes the 90-day booking guarantee, which begins with the first membership payment.</p>
       <p><span className={styles.status}>{membershipStatusLabel}</span></p>
+      {billingRecovery?.status === "grace_period" && billingRecovery.grace_ends_at ? (
+        <p className={styles.notice} role="alert">
+          We could not process your latest membership payment. Your profile remains live through {new Date(billingRecovery.grace_ends_at).toLocaleDateString("en-US", { dateStyle: "long" })}. Update your payment method before then to avoid removal from the directory.
+        </p>
+      ) : null}
+      {billingRecovery?.status === "access_paused" ? (
+        <p className={styles.error} role="alert">
+          We could not process the overdue membership payment. Your profile is not currently public. Update your payment method and complete the payment to restore it automatically.
+        </p>
+      ) : null}
       {membershipNotice ? <p className={styles[membershipNotice.tone]} role="status">{membershipNotice.message}</p> : null}
       {checkoutRecoveryError ? (
         <div className={styles.stack}>
@@ -1609,7 +1702,11 @@ function MembershipCard({
       {profile.status === "published" ? <p className={styles.success}>Your profile is live in the directory.</p> : null}
       {canManage ? (
         <button className={styles.secondaryButton} type="button" disabled={busy !== null} onClick={() => void manageMembership()}>
-          {busy === "portal" ? "Opening membership settings..." : "Manage membership"}
+          {busy === "portal"
+            ? "Opening secure billing..."
+            : billingRecovery
+            ? "Update payment method"
+            : "Manage membership"}
         </button>
       ) : null}
       {error ? <p className={styles.error}>{error}</p> : null}
