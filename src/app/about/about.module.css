@@ -1,6 +1,6 @@
 .heroHeading.heroHeading {
   max-width: none;
-  font-size: clamp(38px, 5vw, 64px);
+  font-size: clamp(36px, 4.4vw, 56px);
   line-height: 1;
   letter-spacing: -0.025em;
 }
@@ -11,7 +11,7 @@
   margin: clamp(20px, 3vw, 30px) auto 0;
   color: var(--ink);
   font-family: var(--font-display);
-  font-size: clamp(27px, 3.4vw, 44px);
+  font-size: clamp(25px, 3vw, 38px);
   line-height: 1.02;
   letter-spacing: -0.02em;
   text-transform: uppercase;
@@ -24,12 +24,12 @@
 
 .sectionHeading.sectionHeading {
   max-width: 16ch;
-  font-size: clamp(32px, 4vw, 50px);
+  font-size: clamp(30px, 3.5vw, 44px);
   line-height: 1;
 }
 
 .marketplaceHeading.marketplaceHeading {
-  font-size: clamp(32px, 4.2vw, 52px);
+  font-size: clamp(30px, 3.7vw, 46px);
   line-height: 1;
 }
 
@@ -41,10 +41,10 @@
 
 @media (max-width: 540px) {
   .heroHeading.heroHeading {
-    font-size: clamp(38px, 11vw, 52px);
+    font-size: clamp(34px, 10vw, 46px);
   }
 
   .heroSubheading {
-    font-size: clamp(25px, 8vw, 36px);
+    font-size: clamp(23px, 7vw, 32px);
   }
 }
