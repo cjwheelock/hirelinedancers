@@ -75,6 +75,37 @@ test("the exact two-month coupon passes every requirement", () => {
   );
 });
 
+test("an account-scoped coupon passes only with the exact server-verified Product binding", () => {
+  const serverBoundCoupon = {
+    ...validCoupon(),
+    applies_to: { products: [] },
+    metadata: {
+      managed_by: "hire_line_dancers",
+      intended_product_id: "prod_membership",
+      restriction_mode: "server_verified_single_product"
+    }
+  };
+
+  assert.deepEqual(
+    offerValidation.instructorOfferCouponMismatches(serverBoundCoupon, offerExpectation),
+    []
+  );
+  assert.deepEqual(
+    offerValidation.instructorOfferCouponMismatches({
+      ...serverBoundCoupon,
+      metadata: { ...serverBoundCoupon.metadata, intended_product_id: "prod_other" }
+    }, offerExpectation),
+    ["wrong_product_restriction"]
+  );
+  assert.deepEqual(
+    offerValidation.instructorOfferCouponMismatches({
+      ...serverBoundCoupon,
+      applies_to: { products: ["prod_other"] }
+    }, offerExpectation),
+    ["wrong_product_restriction"]
+  );
+});
+
 test("each unsafe coupon difference is named for production diagnostics", () => {
   const cases = [
     [{ valid: false }, "coupon_not_valid"],

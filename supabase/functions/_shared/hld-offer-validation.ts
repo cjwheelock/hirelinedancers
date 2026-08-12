@@ -8,6 +8,7 @@ export type InstructorOfferCouponShape = {
   max_redemptions: number | null;
   redeem_by: number | null;
   applies_to?: { products?: string[] } | null;
+  metadata?: Record<string, string> | null;
 };
 
 export type InstructorOfferExpectation = {
@@ -16,11 +17,28 @@ export type InstructorOfferExpectation = {
   months: number;
 };
 
+export const HLD_COUPON_MANAGED_BY = "hire_line_dancers";
+export const HLD_COUPON_RESTRICTION_MODE = "server_verified_single_product";
+
+export function couponHasSafeProductBinding(
+  coupon: InstructorOfferCouponShape,
+  productId: string,
+): boolean {
+  const appliedProducts = coupon.applies_to?.products ?? [];
+  if (appliedProducts.length === 1 && appliedProducts[0] === productId) {
+    return true;
+  }
+
+  return appliedProducts.length === 0 &&
+    coupon.metadata?.managed_by === HLD_COUPON_MANAGED_BY &&
+    coupon.metadata?.intended_product_id === productId &&
+    coupon.metadata?.restriction_mode === HLD_COUPON_RESTRICTION_MODE;
+}
+
 export function instructorOfferCouponMismatches(
   coupon: InstructorOfferCouponShape,
   expectation: InstructorOfferExpectation
 ): string[] {
-  const appliedProducts = coupon.applies_to?.products ?? [];
   const mismatches: string[] = [];
 
   if (!coupon.valid) mismatches.push("coupon_not_valid");
@@ -31,7 +49,7 @@ export function instructorOfferCouponMismatches(
   if (coupon.duration_in_months !== expectation.months) mismatches.push("wrong_duration_months");
   if (coupon.max_redemptions !== null) mismatches.push("max_redemptions_present");
   if (coupon.redeem_by !== null) mismatches.push("redeem_by_present");
-  if (appliedProducts.length !== 1 || appliedProducts[0] !== expectation.productId) {
+  if (!couponHasSafeProductBinding(coupon, expectation.productId)) {
     mismatches.push("wrong_product_restriction");
   }
 
