@@ -824,7 +824,8 @@
 
 .approvalResult,
 .approvalProgress,
-.approvalFailure {
+.approvalFailure,
+.approvalReadiness {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: 11px;
@@ -848,9 +849,48 @@
   color: #7e2e1c;
 }
 
+.approvalReadiness {
+  border-color: #397057;
+  background: #f4fbf6;
+  color: #24513d;
+}
+
+.approvalReadinessBlocked {
+  border-color: #b5472b;
+  background: #fff0eb;
+  color: #7e2e1c;
+}
+
+.approvalReadinessChecks {
+  display: grid;
+  gap: 5px;
+  margin: 9px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.approvalReadinessChecks li {
+  display: grid;
+  grid-template-columns: minmax(110px, auto) minmax(0, 1fr);
+  gap: 8px;
+  color: inherit;
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.approvalReadinessChecks span {
+  font-family: "IBM Plex Mono", monospace;
+  font-weight: 800;
+}
+
+.approvalReadiness .compactButton {
+  margin-top: 10px;
+}
+
 .approvalResult strong,
 .approvalProgress strong,
-.approvalFailure strong {
+.approvalFailure strong,
+.approvalReadiness strong {
   display: block;
   font-size: 0.9rem;
   line-height: 1.3;
@@ -858,7 +898,8 @@
 
 .approvalResult p,
 .approvalProgress p,
-.approvalFailure p {
+.approvalFailure p,
+.approvalReadiness p {
   margin: 3px 0 0;
   font-size: 0.82rem;
   line-height: 1.45;
@@ -1335,6 +1376,162 @@
   background: #e8ebf2;
 }
 
+.cropBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  overflow-y: auto;
+  background: rgb(15 24 42 / 82%);
+}
+
+.cropDialog {
+  width: min(680px, 100%);
+  max-height: calc(100dvh - 40px);
+  padding: clamp(18px, 4vw, 30px);
+  overflow-y: auto;
+  border: 2px solid #1c2a44;
+  background: #fbfaf5;
+  box-shadow: 12px 12px 0 rgb(0 0 0 / 24%);
+}
+
+.cropHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+
+.cropHeader h2 {
+  font-size: clamp(1.7rem, 4vw, 2.35rem);
+}
+
+.cropEyebrow {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  margin: 0 0 7px;
+  color: #b5472b;
+  font: 700 0.72rem/1.2 "IBM Plex Mono", monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.cropCloseButton,
+.cropResetButton {
+  min-height: 40px;
+  padding: 8px 11px;
+  border: 1.5px solid #1c2a44;
+  background: #fff;
+  color: #1c2a44;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.cropCloseButton:disabled,
+.cropResetButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.cropViewport {
+  position: relative;
+  max-width: 560px;
+  margin: 0 auto;
+  overflow: hidden;
+  border: 3px solid #e7a33c;
+  background: #1c2a44;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.cropViewport:active {
+  cursor: grabbing;
+}
+
+.cropViewport:focus-visible {
+  outline: 3px solid #b5472b;
+  outline-offset: 3px;
+}
+
+.cropImage {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  max-width: none;
+  pointer-events: none;
+  user-select: none;
+  will-change: transform, width, height;
+}
+
+.cropGrid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(to right, transparent 33.1%, rgb(255 255 255 / 55%) 33.1%, rgb(255 255 255 / 55%) 33.45%, transparent 33.45%, transparent 66.55%, rgb(255 255 255 / 55%) 66.55%, rgb(255 255 255 / 55%) 66.9%, transparent 66.9%),
+    linear-gradient(to bottom, transparent 33.1%, rgb(255 255 255 / 55%) 33.1%, rgb(255 255 255 / 55%) 33.45%, transparent 33.45%, transparent 66.55%, rgb(255 255 255 / 55%) 66.55%, rgb(255 255 255 / 55%) 66.9%, transparent 66.9%);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 45%);
+}
+
+.cropLoading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-weight: 800;
+}
+
+.cropHelp {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  align-items: center;
+  margin: 14px 0 0;
+  color: #57607a;
+  font-size: 0.86rem;
+}
+
+.cropControls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  margin-top: 18px;
+}
+
+.cropZoom {
+  display: grid;
+  grid-template-columns: auto auto minmax(100px, 1fr);
+  gap: 9px;
+  align-items: center;
+  color: #1c2a44;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.cropZoom input {
+  width: 100%;
+  accent-color: #b5472b;
+}
+
+.cropResetButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cropActions {
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
 .muted {
   color: #6d7488;
 }
@@ -1424,6 +1621,28 @@
   .membershipToolbar,
   .invitationForm {
     grid-template-columns: 1fr;
+  }
+
+  .cropBackdrop {
+    align-items: end;
+    padding: 0;
+  }
+
+  .cropDialog {
+    width: 100%;
+    max-height: 94dvh;
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    box-shadow: none;
+  }
+
+  .cropControls {
+    grid-template-columns: 1fr;
+  }
+
+  .cropResetButton {
+    width: fit-content;
   }
 
   .membershipToolbar .compactButton,

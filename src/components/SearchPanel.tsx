@@ -131,6 +131,17 @@ function exampleMarketMatches(instructor: Instructor, citySlug?: string) {
   return Boolean(market?.serviceCities.includes(instructor.city));
 }
 
+function preferenceScore(
+  supportedEvents: string[],
+  maxGroupSize: number | null,
+  eventSlug?: string,
+  groupSize = 0
+) {
+  const eventScore = eventSlug && supportedEvents.includes(eventSlug) ? 2 : 0;
+  const groupScore = groupSize && maxGroupSize !== null && maxGroupSize >= groupSize ? 1 : 0;
+  return eventScore + groupScore;
+}
+
 function PublicProfileCard({ profile, compact = false }: { profile: PublicProfile; compact?: boolean }) {
   const identifier = profile.slug || profile.id;
   const profileHref = `/profile/?${new URLSearchParams({ instructor: identifier }).toString()}`;
@@ -317,26 +328,32 @@ export function PublicInstructorResults({
       const cityMatch = marketMatches(profile, citySlug);
       const eventMatch = !eventSlug || profile.event_types.includes(eventSlug);
       const groupMatch = !groupSize || (profile.max_group_size ?? 0) >= groupSize;
-      return cityMatch && eventMatch && groupMatch;
+
+      // Once a market is selected, keep every published local instructor visible.
+      // Event type and group size become ranking preferences instead of exclusion rules.
+      return cityMatch && (citySlug ? true : eventMatch && groupMatch);
     })
-    .sort((a, b) => (b.years_teaching ?? 0) - (a.years_teaching ?? 0) || a.display_name.localeCompare(b.display_name)), [citySlug, eventSlug, groupSize, profiles]);
+    .sort((a, b) => (
+      preferenceScore(b.event_types, b.max_group_size, eventSlug, groupSize)
+      - preferenceScore(a.event_types, a.max_group_size, eventSlug, groupSize)
+    ) || (b.years_teaching ?? 0) - (a.years_teaching ?? 0) || a.display_name.localeCompare(b.display_name)), [citySlug, eventSlug, groupSize, profiles]);
 
   const exampleResults = useMemo(() => instructors
     .filter((instructor) => {
       const cityMatch = exampleMarketMatches(instructor, citySlug);
       const eventMatch = !eventSlug || instructor.events.includes(eventSlug);
       const groupMatch = !groupSize || instructor.groupSize >= groupSize;
-      return cityMatch && eventMatch && groupMatch;
+      return cityMatch && (citySlug ? true : eventMatch && groupMatch);
     })
-    .sort((a, b) => Number(b.featured) - Number(a.featured) || b.years - a.years), [citySlug, eventSlug, groupSize]);
+    .sort((a, b) => (
+      Number(Boolean(a.demoEverywhere)) - Number(Boolean(b.demoEverywhere))
+    ) || (
+      preferenceScore(b.events, b.groupSize, eventSlug, groupSize)
+      - preferenceScore(a.events, a.groupSize, eventSlug, groupSize)
+    ) || Number(b.featured) - Number(a.featured) || b.years - a.years), [citySlug, eventSlug, groupSize]);
 
   const demoResults = useMemo(() => instructors
-    .filter((instructor) => instructor.demoEverywhere)
-    .filter((instructor) => {
-      const eventMatch = !eventSlug || instructor.events.includes(eventSlug);
-      const groupMatch = !groupSize || instructor.groupSize >= groupSize;
-      return eventMatch && groupMatch;
-    }), [eventSlug, groupSize]);
+    .filter((instructor) => instructor.demoEverywhere), []);
 
   const visibleCount = marketplaceConfigured
     ? results.length + demoResults.length
@@ -352,7 +369,7 @@ export function PublicInstructorResults({
     return (
       <div className={stateClass} role="status">
         <h3>Loading published instructors</h3>
-        <p>We are checking the directory for profiles that fit your event.</p>
+        <p>We are checking the directory for published profiles.</p>
       </div>
     );
   }
@@ -479,7 +496,7 @@ export function InstructorDirectoryBrowser() {
         </label>
         <button className="button primary" type="submit" disabled={resultCount === null}>
           <Search size={18} aria-hidden="true" />
-          {resultCount === null ? "Loading instructors" : `${resultCount} matching profile${resultCount === 1 ? "" : "s"}`}
+          {resultCount === null ? "Loading instructors" : `${resultCount} instructor profile${resultCount === 1 ? "" : "s"}`}
         </button>
       </form>
       <div className="results-list" aria-live="polite">
@@ -506,7 +523,7 @@ export function SearchPanel() {
     <section className="search-section" id="find">
       <div className="section-heading">
         <h2>Find your match</h2>
-        <p>Pick your city, the kind of event or program, and roughly how many guests. We&rsquo;ll show you published instructors whose experience fits the request.</p>
+        <p>Pick your city, the kind of event or program, and roughly how many guests. We&rsquo;ll show every published instructor in that market, with the strongest fits first.</p>
       </div>
       <div className="search-grid">
         <form className="search-form" onSubmit={(submitEvent) => submitEvent.preventDefault()}>
@@ -533,7 +550,7 @@ export function SearchPanel() {
           </label>
           <button className="button primary" type="submit" disabled={resultCount === null}>
             <Search size={18} aria-hidden="true" />
-            {resultCount === null ? "Loading instructors" : `Show ${resultCount} matching profile${resultCount === 1 ? "" : "s"}`}
+            {resultCount === null ? "Loading instructors" : `Show ${resultCount} instructor profile${resultCount === 1 ? "" : "s"}`}
           </button>
         </form>
         <div className="results-list" aria-live="polite">
@@ -544,10 +561,10 @@ export function SearchPanel() {
             compact
             darkBackground
             showExamplesWhenUnconfigured
-            emptyTitle="No instructor has listed this fit just yet."
+            emptyTitle="No published instructor is based in this city yet."
             emptyBody={selectedEvent
-              ? `We do not have a ${selectedEvent.label.toLowerCase()} match in this city yet. Try another filter or check back as instructors join.`
-              : "We do not have a match for this group size in this city yet. Try another filter or check back as instructors join."}
+              ? `Check back as instructors join. Your ${selectedEvent.label.toLowerCase()} and group-size selections will rank local profiles.`
+              : "Check back as instructors join. Your group-size selection will rank local profiles."}
             onCountChange={setResultCount}
           />
         </div>

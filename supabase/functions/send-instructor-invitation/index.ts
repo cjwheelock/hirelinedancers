@@ -1,4 +1,12 @@
 import { withSupabase } from "npm:@supabase/server@^1";
+import {
+  GUARANTEE_COVERAGE_DAYS,
+  INSTRUCTOR_OFFER_FREE_CYCLES_LABEL,
+  INSTRUCTOR_OFFER_FREE_PERIOD_LABEL,
+  INSTRUCTOR_OUTREACH_OFFER_CODE,
+  INVITATION_CLAIM_DAYS,
+  PROFILE_SUBMISSION_DAYS,
+} from "../_shared/hld-commercial-terms.ts";
 
 type InvitationRequest = {
   email?: unknown;
@@ -310,13 +318,13 @@ export default {
 
     const accessText = invitation.grants_lifetime_access
       ? "This invitation includes complimentary lifetime instructor access, so you will not be asked for payment details to create or activate your profile."
-      : invitation.offer_code === "outreach_two_months_90_day_v1"
-        ? "Submit a complete profile within the seven-day window to earn your first two monthly billing cycles free. Every new paid membership also includes the request-based 90-day booking guarantee, subject to the terms shown during activation."
+      : invitation.offer_code === INSTRUCTOR_OUTREACH_OFFER_CODE
+        ? `Submit a complete profile within the ${PROFILE_SUBMISSION_DAYS}-day window to earn your first ${INSTRUCTOR_OFFER_FREE_CYCLES_LABEL}. Every new paid membership also includes the request-based ${GUARANTEE_COVERAGE_DAYS}-day booking guarantee, subject to the terms shown during activation.`
         : "After your profile is approved, your account will show the available membership activation options.";
     const timingText = [
-      "Open the private link and select Claim invitation within 14 days. Claiming starts a seven-day window to sign in with this email, create your instructor account, and submit a complete profile.",
-      invitation.offer_code === "outreach_two_months_90_day_v1"
-        ? "Review may happen later and will not affect the two-month offer earned through timely submission."
+      `Open the private link and select Claim invitation within ${INVITATION_CLAIM_DAYS} days. Claiming starts a ${PROFILE_SUBMISSION_DAYS}-day window to sign in with this email, create your instructor account, and submit a complete profile.`,
+      invitation.offer_code === INSTRUCTOR_OUTREACH_OFFER_CODE
+        ? `Review may happen later and will not affect the ${INSTRUCTOR_OFFER_FREE_PERIOD_LABEL} offer earned through timely submission.`
         : invitation.grants_lifetime_access
           ? "Lifetime access is granted when the invitation is accepted. Later profile review will not affect that access."
           : "Profile review may happen after the submission window."

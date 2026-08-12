@@ -4,6 +4,12 @@ import test from "node:test";
 import ts from "typescript";
 
 const repositoryRoot = new URL("../", import.meta.url);
+const commercialTerms = JSON.parse(readFileSync(new URL("config/commercial-terms.json", repositoryRoot), "utf8"));
+
+const numberWords = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
+const commercialTermsModule = {
+  freePeriod: `${numberWords[commercialTerms.offer.freeBillingCycles] ?? commercialTerms.offer.freeBillingCycles} ${commercialTerms.offer.freeBillingCycles === 1 ? "month" : "months"}`
+};
 
 function loadTypeScriptModule(relativePath) {
   const fileUrl = new URL(relativePath, repositoryRoot);
@@ -22,8 +28,9 @@ function loadTypeScriptModule(relativePath) {
 
   const commonJsModule = { exports: {} };
   const evaluate = new Function("exports", "module", "require", transpiled.outputText);
-  evaluate(commonJsModule.exports, commonJsModule, () => {
-    throw new Error(`Unexpected runtime import in ${relativePath}`);
+  evaluate(commonJsModule.exports, commonJsModule, (specifier) => {
+    if (specifier === "@/lib/commercialTerms") return commercialTermsModule;
+    throw new Error(`Unexpected runtime import ${specifier} in ${relativePath}`);
   });
   return commonJsModule.exports;
 }
@@ -55,7 +62,7 @@ function validCoupon() {
     percent_off: 100,
     amount_off: null,
     duration: "repeating",
-    duration_in_months: 2,
+    duration_in_months: commercialTerms.offer.freeBillingCycles,
     max_redemptions: null,
     redeem_by: null,
     applies_to: { products: ["prod_membership"] }
@@ -65,7 +72,7 @@ function validCoupon() {
 const offerExpectation = {
   expectedLivemode: true,
   productId: "prod_membership",
-  months: 2
+  months: commercialTerms.offer.freeBillingCycles
 };
 
 test("the exact two-month coupon passes every requirement", () => {
@@ -204,18 +211,65 @@ test("the known Stripe configuration failure tells the admin that nothing change
   assert.match(copy, /no approval email was sent/);
 });
 
+test("approval readiness requires every server dependency to agree", () => {
+  const ready = approval.parseInstructorApprovalReadiness({
+    ready: true,
+    instructorProfileId: "10000000-0000-4000-8000-000000000001",
+    lifetimeAccess: false,
+    hasOffer: true,
+    checkedAt: "2026-08-12T18:00:00.000Z",
+    contractVersion: commercialTerms.contractVersion,
+    terms: {
+      currency: commercialTerms.currency,
+      monthlyPriceCents: commercialTerms.membership.monthlyPriceCents,
+      freeBillingCycles: commercialTerms.offer.freeBillingCycles,
+      guaranteeCoverageDays: commercialTerms.guarantee.coverageDays
+    },
+    checks: [
+      { key: "membership", label: "Membership", status: "ready", detail: "Verified." },
+      { key: "offer", label: "Instructor offer", status: "ready", detail: "Verified." },
+      { key: "approval_email", label: "Approval email", status: "ready", detail: "Configured." }
+    ]
+  });
+  assert.equal(ready.ready, true);
+  assert.equal(ready.contractVersion, commercialTerms.contractVersion);
+
+  assert.throws(() => approval.parseInstructorApprovalReadiness({
+    ...ready,
+    ready: true,
+    checks: ready.checks.map((check) => check.key === "offer" ? { ...check, status: "blocked" } : check)
+  }), /inconsistent/);
+  assert.throws(() => approval.parseInstructorApprovalReadiness({
+    ...ready,
+    checks: ready.checks.slice(0, 2)
+  }), /every approval dependency/);
+});
+
 test("the review page integrates inline accessible states and service email visibility", () => {
   const workspace = readFileSync(new URL("src/components/AccountWorkspace.tsx", repositoryRoot), "utf8");
   assert.match(workspace, /Approved and live/);
   assert.match(workspace, /Approval didn’t complete/);
   assert.match(workspace, /className=\{styles\.approvalFailure\} role="alert"/);
+  assert.match(workspace, /action: "readiness"/);
+  assert.match(workspace, /Approval systems ready/);
+  assert.match(workspace, /readinessState\?\.phase !== "ready"/);
   assert.match(workspace, /instructor_service_notification_jobs/);
   assert.doesNotMatch(workspace, /window\.alert\(|window\.confirm\(/);
 });
 
 test("the Stripe validator and approval Edge Function have valid TypeScript syntax", () => {
   assertTypeScriptSyntax("supabase/functions/_shared/hld-stripe.ts");
+  assertTypeScriptSyntax("supabase/functions/_shared/hld-commercial-terms.ts");
+  assertTypeScriptSyntax("supabase/functions/_shared/hld-payment-setup.ts");
   assertTypeScriptSyntax("supabase/functions/review-instructor-profile/index.ts");
+});
+
+test("the approval function checks email configuration before durable approval", () => {
+  const reviewFunction = readFileSync(new URL("supabase/functions/review-instructor-profile/index.ts", repositoryRoot), "utf8");
+  const emailCheck = reviewFunction.indexOf("if (emailConfigurationError)");
+  const approvalRpc = reviewFunction.indexOf('"admin_approve_instructor_after_payment_setup"');
+  assert.ok(emailCheck > 0, "approval email configuration check is missing");
+  assert.ok(approvalRpc > emailCheck, "durable approval can run before approval email configuration is checked");
 });
 
 test("new approval copy follows the repository punctuation rule", () => {

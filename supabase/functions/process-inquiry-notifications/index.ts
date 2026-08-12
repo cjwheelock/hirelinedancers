@@ -1,5 +1,6 @@
 import { withSupabase } from "npm:@supabase/server@^1";
 import type { SupabaseClient } from "npm:@supabase/supabase-js@^2";
+import { BILLING_RECOVERY_GRACE_DAYS } from "../_shared/hld-commercial-terms.ts";
 
 type AdminClient = SupabaseClient;
 
@@ -537,7 +538,7 @@ function billingRecoveryEmailText(
       "",
       "We had trouble processing your Hire Line Dancers membership payment. This can happen when a card expires, is replaced, or is declined by the card issuer.",
       "",
-      `Because you have already completed a successful membership payment, we will keep your instructor profile live through ${deadline}. This gives you 14 days to update your payment method and resolve the overdue payment.`,
+      `Because you have already completed a successful membership payment, we will keep your instructor profile live through ${deadline}. This gives you ${BILLING_RECOVERY_GRACE_DAYS} days to update your payment method and resolve the overdue payment.`,
       "",
       `Update your payment method: ${recoveryUrl}`,
       "",
@@ -555,7 +556,7 @@ function billingRecoveryEmailText(
     "",
     "We could not process your first paid Hire Line Dancers membership charge. This can happen when a card expires, is replaced, or is declined by the card issuer.",
     "",
-    "Because this membership has not completed its first successful payment, the instructor profile has been paused immediately. A 14-day grace period does not apply to the first successful payment.",
+    `Because this membership has not completed its first successful payment, the instructor profile has been paused immediately. A ${BILLING_RECOVERY_GRACE_DAYS}-day grace period does not apply to the first successful payment.`,
     "",
     `Update your payment method: ${recoveryUrl}`,
     "",
@@ -575,7 +576,7 @@ function activationPaymentFailureEmailText(
   return [
     `Hi ${job.display_name},`,
     "",
-    "We could not start your Hire Line Dancers membership with the payment method you saved. Your profile has not been published, and no 14-day grace period applies before the first successful payment.",
+    `We could not start your Hire Line Dancers membership with the payment method you saved. Your profile has not been published, and no ${BILLING_RECOVERY_GRACE_DAYS}-day grace period applies before the first successful payment.`,
     "",
     `Save a new payment method and resubmit your profile: ${accountUrl}`,
     "",
@@ -600,7 +601,7 @@ function activationPaymentFailureEmailHtml(
           <p style="margin:0 0 18px">Hi ${escapeHtml(job.display_name)},</p>
           <h1 style="margin:0 0 16px;font-size:28px;line-height:1.15">We could not start your membership</h1>
           <p style="margin:0 0 16px">We could not start your Hire Line Dancers membership with the payment method you saved.</p>
-          <p style="margin:0 0 24px">Your profile has not been published, and no 14-day grace period applies before the first successful payment.</p>
+          <p style="margin:0 0 24px">Your profile has not been published, and no ${BILLING_RECOVERY_GRACE_DAYS}-day grace period applies before the first successful payment.</p>
           <a href="${escapeHtml(accountUrl)}" style="display:inline-block;padding:14px 20px;background:#e7a33c;border:2px solid #1c2a44;color:#1c2a44;font-weight:700;text-decoration:none">Save a new payment method</a>
           <p style="margin:24px 0 0">Once your payment method works and your profile is approved, we will publish it and send your approval email.</p>
           <p style="margin:16px 0 0">If you need help, reply to this email.</p>
@@ -621,8 +622,8 @@ function billingRecoveryEmailHtml(
     ? recoveryDeadline(job.grace_ends_at)
     : null;
   const statusCopy = hasGrace
-    ? `Because you have already completed a successful membership payment, we will keep your instructor profile live through <strong>${escapeHtml(deadline)}</strong>. This gives you 14 days to update your payment method and resolve the overdue payment.`
-    : "Because this membership has not completed its first successful payment, the instructor profile has been paused immediately. A 14-day grace period does not apply to the first successful payment.";
+    ? `Because you have already completed a successful membership payment, we will keep your instructor profile live through <strong>${escapeHtml(deadline)}</strong>. This gives you ${BILLING_RECOVERY_GRACE_DAYS} days to update your payment method and resolve the overdue payment.`
+    : `Because this membership has not completed its first successful payment, the instructor profile has been paused immediately. A ${BILLING_RECOVERY_GRACE_DAYS}-day grace period does not apply to the first successful payment.`;
   const closingCopy = hasGrace
     ? "Stripe may retry the payment automatically. If the payment is not resolved by the deadline, your profile will be removed from the public directory until payment succeeds."
     : "We will republish the profile automatically after Stripe confirms the overdue payment.";

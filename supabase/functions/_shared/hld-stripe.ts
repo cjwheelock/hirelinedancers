@@ -1,14 +1,19 @@
 import Stripe from "npm:stripe@^22";
 import { instructorOfferCouponMismatches } from "./hld-offer-validation.ts";
-
-const MONTHLY_PRICE_CENTS = 1499;
-export const INSTRUCTOR_OUTREACH_OFFER_CODE =
-  "outreach_two_months_90_day_v1";
-export const INSTRUCTOR_OUTREACH_OFFER_MONTHS = 2;
-export const MEMBERSHIP_CHECKOUT_TERMS_VERSION =
-  "2026-08-07-membership-v2";
-export const MEMBERSHIP_GUARANTEE_TERMS_VERSION =
-  "2026-08-07-90-day-paid-invoice-v1";
+import {
+  INSTRUCTOR_OFFER_FREE_PERIOD_LABEL,
+  INSTRUCTOR_OUTREACH_OFFER_CODE,
+  INSTRUCTOR_OUTREACH_OFFER_MONTHS,
+  MEMBERSHIP_CHECKOUT_TERMS_VERSION,
+  MEMBERSHIP_GUARANTEE_TERMS_VERSION,
+  MONTHLY_PRICE_CENTS,
+} from "./hld-commercial-terms.ts";
+export {
+  INSTRUCTOR_OUTREACH_OFFER_CODE,
+  INSTRUCTOR_OUTREACH_OFFER_MONTHS,
+  MEMBERSHIP_CHECKOUT_TERMS_VERSION,
+  MEMBERSHIP_GUARANTEE_TERMS_VERSION,
+} from "./hld-commercial-terms.ts";
 const PRODUCTION_HOSTS = new Set([
   "hirelinedancers.com",
   "www.hirelinedancers.com",
@@ -144,7 +149,7 @@ export async function verifiedInstructorOfferCoupon(
   });
   if (mismatches.length) {
     throw new Error(
-      `Configured Stripe Coupon is not the exact two-month instructor outreach offer; mismatches: ${mismatches.join(",")}`,
+      `Configured Stripe Coupon is not the exact ${INSTRUCTOR_OFFER_FREE_PERIOD_LABEL} instructor outreach offer; mismatches: ${mismatches.join(",")}`,
     );
   }
 

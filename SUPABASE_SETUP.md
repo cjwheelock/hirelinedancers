@@ -23,6 +23,21 @@ The migrations and Edge Function source are in this repository. Creating or chan
 
 Anonymous application inserts, anonymous inquiry inserts, anonymous media uploads, and Stripe Payment Links are not part of this architecture.
 
+## Commercial terms change control
+
+The active prospective policy is defined in `config/commercial-terms.json`. Edge Functions consume the generated `supabase/functions/_shared/hld-commercial-terms.ts` module, and browser copy consumes `src/lib/commercialTerms.ts`.
+
+For any price, free-period, founding-limit, invitation-window, guarantee, claim-window, or billing-recovery change:
+
+1. Decide the effective cohort and preserve previously accepted terms by default.
+2. Create new neutral terms or offer version identifiers.
+3. Update the contract and run `npm run terms:sync`.
+4. Add a new migration. Never edit an applied migration.
+5. Update Stripe, product copy, legal copy, email copy, and tests.
+6. Run `npm run terms:audit` before deployment.
+7. Deploy compatible functions and migrations before publishing the new prospective copy.
+8. Confirm the authenticated approval readiness status before approving an instructor.
+
 ## 1. Connect the Supabase project
 
 Install the Supabase CLI, sign in, and link this repository to the intended project:

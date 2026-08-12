@@ -22,6 +22,19 @@ and party planners find line dance instructors near them.
 
 The browser UI, database migrations, and Edge Function source are in the repository. Real accounts, payments, and email require the external services and secrets described in `SUPABASE_SETUP.md`. SMS notifications are currently paused. The Twilio implementation remains in the notification worker for a possible future launch, but the current product does not create or send SMS jobs.
 
+## Commercial terms contract
+
+`config/commercial-terms.json` is the active prospective contract for membership price, free billing cycles, founding allocation, invitation timing, guarantee coverage, claim timing, and billing recovery. Accepted historical terms remain stored on their original database and Stripe records. Do not rewrite an applied migration or an accepted cohort when changing the active contract.
+
+After editing the contract, generate and audit its server representation:
+
+```bash
+npm run terms:sync
+npm run terms:audit
+```
+
+The deployment workflow runs the audit before lint, tests, and build. A policy change also requires a new additive migration and updated migration pointers in the contract.
+
 ## Strategy documents
 
 - `CONTENT_SEO_GEO_STRATEGY.md`: authority-first SEO, AI discovery, evidence standards, and the decision not to bulk publish city posts

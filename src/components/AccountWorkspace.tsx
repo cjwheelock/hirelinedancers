@@ -9,10 +9,24 @@ import {
   approvalEmailStatusCopy,
   approvalFailureCopy,
   normalizeApprovalEmailStatus,
+  parseInstructorApprovalReadiness,
   parseInstructorApprovalReceipt,
+  type ApprovalReadinessViewState,
   type ProfileApprovalViewState
 } from "@/lib/adminApproval";
+import {
+  billingCycles,
+  capitalizePolicyText,
+  commercialTerms,
+  currentGuaranteeTermsVersion,
+  foundingOfferLabel,
+  freePeriod,
+  guaranteeCoverage,
+  monthlyPriceWithCurrency,
+  profileSubmissionWindow
+} from "@/lib/commercialTerms";
 import { useMarketplaceSession } from "@/hooks/useMarketplaceSession";
+import { ImageCropDialog } from "./ImageCropDialog";
 import {
   cleanAccountIntent,
   cleanInstructorInvitationToken,
@@ -316,12 +330,12 @@ export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean })
           <p className={styles.eyebrow}>Instructor invitation</p>
           <h1 className={styles.title}>Create your instructor account</h1>
           <p className={styles.subtitle}>
-            Use the email address that received this invitation. Create the account and submit a complete profile{invitationLifecycle.grantsLifetimeAccess ? "" : " with payment setup"}{deadline ? ` by ${deadline}` : " within the seven-day window"}.
+            Use the email address that received this invitation. Create the account and submit a complete profile{invitationLifecycle.grantsLifetimeAccess ? "" : " with payment setup"}{deadline ? ` by ${deadline}` : ` within the ${profileSubmissionWindow} window`}.
           </p>
           {invitationLifecycle.grantsLifetimeAccess ? (
             <p className={styles.notice}>This invitation includes complimentary lifetime instructor access.</p>
-          ) : invitationLifecycle.offerCode === "outreach_two_months_90_day_v1" ? (
-            <p className={styles.notice}>Complete payment setup and submit your profile on time to earn your first two monthly billing cycles free. If approved, your membership will start automatically with the offer applied. Every new paid membership also includes the request-based 90-day booking guarantee.</p>
+          ) : invitationLifecycle.offerCode === commercialTerms.offer.outreachOfferCode ? (
+            <p className={styles.notice}>Complete payment setup and submit your profile on time to earn your first {billingCycles} free. If approved, your membership will start automatically with the offer applied. Every new paid membership also includes the request-based {guaranteeCoverage} booking guarantee.</p>
           ) : null}
           <OnboardingForm
             email={session.user.email ?? ""}
@@ -814,10 +828,10 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
         const pricingMessage = !membershipTiming
           ? "This confirmation did not start a new membership. Contact support if you have questions about the suspension."
           : data.entitlementSource === "founding_first_100"
-          ? `Your two-month founding instructor offer is reserved. ${membershipTiming} with two free months. It will then renew at $14.99 USD per month until canceled.`
+          ? `Your ${freePeriod} founding instructor offer is reserved. ${membershipTiming} with ${freePeriod} free. It will then renew at ${monthlyPriceWithCurrency} per month until canceled.`
           : data.entitlementSource === "private_invitation"
-            ? `Your two-month private instructor offer is reserved. ${membershipTiming} with two free months. It will then renew at $14.99 USD per month until canceled.`
-            : `${membershipTiming} at $14.99 USD per month until canceled.`;
+            ? `Your ${freePeriod} private instructor offer is reserved. ${membershipTiming} with ${freePeriod} free. It will then renew at ${monthlyPriceWithCurrency} per month until canceled.`
+            : `${membershipTiming} at ${monthlyPriceWithCurrency} per month until canceled.`;
         setPaymentSetupPending(false);
         setPaymentSetupRecoveryError(null);
         setProfileNotice({
@@ -963,36 +977,36 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
 
   return (
     <>
-      {invitationOffer?.offerCode === "outreach_two_months_90_day_v1" ? (
+      {invitationOffer?.offerCode === commercialTerms.offer.outreachOfferCode ? (
         <div className={styles.card}>
           <p className={styles.eyebrow}>Private outreach offer</p>
           {invitationOffer.offerStatus === "redeemed" ? (
             <>
-              <h2>Two months free applied</h2>
-              <p className={styles.success}>Your earned private offer was applied when your membership started automatically after approval, so your first two monthly billing cycles are free.</p>
+              <h2>{capitalizePolicyText(freePeriod)} free applied</h2>
+              <p className={styles.success}>Your earned private offer was applied when your membership started automatically after approval, so your first {billingCycles} are free.</p>
               {invitationOffer.offerRedeemedAt ? <p className={styles.help}>Applied {new Date(invitationOffer.offerRedeemedAt).toLocaleString()}.</p> : null}
             </>
           ) : invitationOffer.offerStatus === "earned" || invitationOffer.offerEligible ? (
             <>
-              <h2>Two months free earned</h2>
-              <p className={styles.success}>Your profile and payment setup were completed on time. If approved, your membership will start automatically with the first two monthly billing cycles free. Later review timing will not affect this earned offer.</p>
-              <p className={styles.help}>Every new paid membership also includes the request-based 90-day booking guarantee, subject to its terms.</p>
+              <h2>{capitalizePolicyText(freePeriod)} free earned</h2>
+              <p className={styles.success}>Your profile and payment setup were completed on time. If approved, your membership will start automatically with the first {billingCycles} free. Later review timing will not affect this earned offer.</p>
+              <p className={styles.help}>Every new paid membership also includes the request-based {guaranteeCoverage} booking guarantee, subject to its terms.</p>
             </>
           ) : invitationOffer.status === "claim_expired" ? (
             <>
               <h2>Private offer window ended</h2>
-              <p className={styles.notice}>You can still finish and submit your instructor profile, but the private two-month offer is no longer available.</p>
+              <p className={styles.notice}>You can still finish and submit your instructor profile, but the private {freePeriod} offer is no longer available.</p>
             </>
           ) : invitationOffer.profileSubmittedAt ? (
             <>
               <h2>Private offer not available</h2>
-              <p className={styles.notice}>Your profile was submitted, but this account is not eligible for the new-instructor two-month offer.</p>
+              <p className={styles.notice}>Your profile was submitted, but this account is not eligible for the new-instructor {freePeriod} offer.</p>
             </>
           ) : (
             <>
               <h2>Complete your profile and payment setup on time</h2>
               <p className={styles.notice}>
-                Choose Continue to save your payment method and submit a complete profile{invitationOffer.profileSubmissionDeadlineAt ? ` by ${new Date(invitationOffer.profileSubmissionDeadlineAt).toLocaleString()}` : " within your invitation window"} to earn your first two monthly billing cycles free.
+                Choose Continue to save your payment method and submit a complete profile{invitationOffer.profileSubmissionDeadlineAt ? ` by ${new Date(invitationOffer.profileSubmissionDeadlineAt).toLocaleString()}` : " within your invitation window"} to earn your first {billingCycles} free.
               </p>
               <p className={styles.help}>Required details include your public name, bio, location, at least one event type, a valid inquiry email, and a ready headshot.</p>
             </>
@@ -1362,7 +1376,7 @@ function InstructorProfileForm({
         <div className={styles.checkGrid}>
           <label className={styles.check}><input type="checkbox" checked={form.provides_speakers} onChange={(e) => setValue("provides_speakers", e.target.checked)} /><span>Speakers</span></label>
           <label className={styles.check}><input type="checkbox" checked={form.provides_microphone} onChange={(e) => setValue("provides_microphone", e.target.checked)} /><span>Microphone</span></label>
-          <label className={styles.check}><input type="checkbox" checked={form.provides_music_playback} onChange={(e) => setValue("provides_music_playback", e.target.checked)} /><span>Music playback device</span></label>
+          <label className={styles.check}><input type="checkbox" checked={form.provides_music_playback} onChange={(e) => setValue("provides_music_playback", e.target.checked)} /><span>Music playback setup (iPhone, laptop, etc.)</span></label>
         </div>
       </fieldset>
 
@@ -1376,7 +1390,7 @@ function InstructorProfileForm({
           </select>
         </label>
         <label className={styles.field}>
-          <span>Response commitment</span>
+          <span>Typical response time</span>
           <select disabled={!canEdit} value={form.preferred_response_hours} onChange={(e) => setValue("preferred_response_hours", e.target.value)}>
             <option value="24">Within 24 hours</option>
             <option value="48">Within 48 hours</option>
@@ -1411,7 +1425,7 @@ function InstructorProfileForm({
             <p className={styles.help}>Your payment method is already saved securely. Choose Continue to resubmit your updated profile without entering your card again. No subscription will start and your card will not be charged while your profile is under review. If approved, your membership starts automatically.</p>
           ) : (
             <>
-              <p className={styles.help}>Stripe will save your card securely. No subscription will start and your card will not be charged before your profile is approved. If approved, your membership starts automatically. The first 100 instructors who complete payment setup receive two months free, then the membership renews at $14.99 USD per month until canceled. The 90-day money-back guarantee begins when Stripe collects your first membership payment.</p>
+              <p className={styles.help}>Stripe will save your card securely. No subscription will start and your card will not be charged before your profile is approved. If approved, your membership starts automatically. The {foundingOfferLabel} who complete payment setup receive {freePeriod} free, then the membership renews at {monthlyPriceWithCurrency} per month until canceled. The {guaranteeCoverage} money-back guarantee begins when Stripe collects your first membership payment.</p>
               <p className={styles.muted}>By continuing, you agree to the <a href="/legal/terms/">Terms of Service</a>, acknowledge the <a href="/legal/privacy/">Privacy Policy</a> and <a href="/legal/refund-policy/">Refund Policy</a>, and authorize Hire Line Dancers to start your membership automatically only if your profile is approved.</p>
             </>
           )}
@@ -1437,8 +1451,10 @@ function InstructorProfileForm({
 function ProfileMediaManager({ profile }: { profile: InstructorProfile }) {
   const [media, setMedia] = useState<ProfileMedia[]>([]);
   const [uploadType, setUploadType] = useState<ProfileMedia["media_type"]>("headshot");
+  const [pendingCrop, setPendingCrop] = useState<{ file: File; mediaType: "headshot" | "image" } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function load() {
     const client = getMarketplaceClient();
@@ -1456,22 +1472,9 @@ function ProfileMediaManager({ profile }: { profile: InstructorProfile }) {
     void load();
   }, [profile.id]);
 
-  async function upload(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
+  async function uploadFile(file: File, mediaType: ProfileMedia["media_type"]) {
     const client = getMarketplaceClient();
-    if (!file || !client) return;
-    const isVideo = uploadType === "video" || uploadType === "welcome_video";
-    const maximumBytes = isVideo ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
-    if (file.size > maximumBytes) {
-      setError(isVideo ? "Videos must be 50 MB or smaller." : "Images must be 10 MB or smaller.");
-      event.target.value = "";
-      return;
-    }
-    if (isVideo !== file.type.startsWith("video/")) {
-      setError(isVideo ? "Choose an MP4 or WebM video." : "Choose a JPG, PNG, or WebP image.");
-      event.target.value = "";
-      return;
-    }
+    if (!client) return "Uploads are unavailable right now.";
 
     setBusy(true);
     setError(null);
@@ -1485,12 +1488,12 @@ function ProfileMediaManager({ profile }: { profile: InstructorProfile }) {
     if (uploadError) {
       setError(uploadError.message);
       setBusy(false);
-      return;
+      return uploadError.message;
     }
 
     const { error: metadataError } = await client.from("profile_media").insert({
       instructor_profile_id: profile.id,
-      media_type: uploadType,
+      media_type: mediaType,
       storage_path: path,
       mime_type: file.type,
       status: "ready",
@@ -1499,10 +1502,54 @@ function ProfileMediaManager({ profile }: { profile: InstructorProfile }) {
     if (metadataError) {
       await client.storage.from("instructor-media").remove([path]);
       setError(metadataError.message);
+      setBusy(false);
+      return metadataError.message;
     }
     setBusy(false);
-    event.target.value = "";
     await load();
+    return null;
+  }
+
+  async function chooseFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const isVideo = uploadType === "video" || uploadType === "welcome_video";
+    const allowedTypes = isVideo ? ["video/mp4", "video/webm"] : ["image/jpeg", "image/png", "image/webp"];
+    const maximumBytes = isVideo ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
+    if (file.size > maximumBytes) {
+      setError(isVideo ? "Videos must be 50 MB or smaller." : "Images must be 10 MB or smaller.");
+      event.target.value = "";
+      return;
+    }
+    if (!allowedTypes.includes(file.type)) {
+      setError(isVideo ? "Choose an MP4 or WebM video." : "Choose a JPG, PNG, or WebP image.");
+      event.target.value = "";
+      return;
+    }
+
+    setError(null);
+    if (!isVideo) {
+      setPendingCrop({ file, mediaType: uploadType });
+      return;
+    }
+
+    event.target.value = "";
+    await uploadFile(file, uploadType);
+  }
+
+  function cancelCrop() {
+    setPendingCrop(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    requestAnimationFrame(() => fileInputRef.current?.focus());
+  }
+
+  async function uploadCrop(file: File) {
+    if (!pendingCrop) return;
+    const uploadError = await uploadFile(file, pendingCrop.mediaType);
+    if (uploadError) throw new Error(uploadError);
+    setPendingCrop(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    requestAnimationFrame(() => fileInputRef.current?.focus());
   }
 
   async function remove(item: ProfileMedia) {
@@ -1550,11 +1597,13 @@ function ProfileMediaManager({ profile }: { profile: InstructorProfile }) {
         <label className={styles.field}>
           <span>{busy ? "Uploading..." : "Choose a file"}</span>
           <input
+            ref={fileInputRef}
             type="file"
             disabled={busy || !["draft", "approved", "published"].includes(profile.status)}
             accept={uploadType === "video" || uploadType === "welcome_video" ? "video/mp4,video/webm" : "image/jpeg,image/png,image/webp"}
-            onChange={(event) => void upload(event)}
+            onChange={(event) => void chooseFile(event)}
           />
+          <small>{uploadType === "headshot" ? "You will crop this to a square before uploading." : uploadType === "image" ? "You will crop this to a 4:3 frame before uploading." : "MP4 or WebM, up to 50 MB."}</small>
         </label>
       </div>
       {profile.status === "pending_review" ? <p className={styles.notice}>Media is locked while your profile is in review.</p> : null}
@@ -1576,6 +1625,16 @@ function ProfileMediaManager({ profile }: { profile: InstructorProfile }) {
           </article>
         ))}
       </div>
+      {pendingCrop ? (
+        <ImageCropDialog
+          file={pendingCrop.file}
+          aspectRatio={pendingCrop.mediaType === "headshot" ? 1 : 4 / 3}
+          title={pendingCrop.mediaType === "headshot" ? "Crop your headshot" : "Crop your teaching photo"}
+          outputWidth={pendingCrop.mediaType === "headshot" ? 1200 : 1600}
+          onCancel={cancelCrop}
+          onConfirm={uploadCrop}
+        />
+      ) : null}
     </section>
   );
 }
@@ -1670,8 +1729,8 @@ function MembershipCard({
   return (
     <div className={styles.card}>
       <p className={styles.eyebrow}>Instructor membership</p>
-      <h2>$14.99 USD per month</h2>
-      <p>New instructors save a payment method before profile review. Stripe does not start a subscription or charge the saved card before approval. If the profile is approved, membership begins automatically. The first 100 instructors who complete payment setup receive their first two months free, then membership renews at $14.99 USD per month until canceled. Every new paid membership includes the 90-day booking guarantee, which begins with the first membership payment.</p>
+      <h2>{monthlyPriceWithCurrency} per month</h2>
+      <p>New instructors save a payment method before profile review. Stripe does not start a subscription or charge the saved card before approval. If the profile is approved, membership begins automatically. The {foundingOfferLabel} who complete payment setup receive their first {freePeriod} free, then membership renews at {monthlyPriceWithCurrency} per month until canceled. Every new paid membership includes the {guaranteeCoverage} booking guarantee, which begins with the first membership payment.</p>
       <p><span className={styles.status}>{membershipStatusLabel}</span></p>
       {billingRecovery?.status === "grace_period" && billingRecovery.grace_ends_at ? (
         <p className={styles.notice} role="alert">
@@ -1700,7 +1759,7 @@ function MembershipCard({
               <button className={styles.button} type="button" disabled={busy !== null} onClick={() => void activateMembership()}>
                 {busy === "checkout" ? "Opening secure checkout..." : hasPriorSubscription ? "Restart membership" : "Activate membership"}
               </button>
-              <p className={styles.muted}>By selecting this button, you agree to the <a href="/legal/terms/">Terms of Use</a>, acknowledge the <a href="/legal/privacy/">Privacy Policy</a> and <a href="/legal/refund-policy/">Refund Policy</a>, and authorize a recurring $14.99 USD monthly charge after any free period shown in Checkout until you cancel.</p>
+              <p className={styles.muted}>By selecting this button, you agree to the <a href="/legal/terms/">Terms of Use</a>, acknowledge the <a href="/legal/privacy/">Privacy Policy</a> and <a href="/legal/refund-policy/">Refund Policy</a>, and authorize a recurring {monthlyPriceWithCurrency} monthly charge after any free period shown in Checkout until you cancel.</p>
             </>
           )}
         </>
@@ -2367,7 +2426,7 @@ function MembershipGuaranteeAdmin({ isOwner }: { isOwner: boolean }) {
                     <td><span className={styles.status}>{statusLabel(row.profile_status)}</span></td>
                     <td><span className={styles.status}>{statusLabel(row.subscription_status)}</span></td>
                     <td>{row.founding_member_number ? `#${row.founding_member_number} ` : ""}{statusLabel(row.founding_status)}</td>
-                    <td>{statusLabel(row.guarantee_status)}<small>{row.guarantee_terms_version === "2026-08-07-90-day-paid-invoice-v1" ? "Current 90-day terms" : row.guarantee_terms_version ? "Legacy terms" : "Not started"}</small></td>
+                    <td>{statusLabel(row.guarantee_status)}<small>{row.guarantee_terms_version === currentGuaranteeTermsVersion ? `Current ${guaranteeCoverage} terms` : row.guarantee_terms_version ? "Legacy terms" : "Not started"}</small></td>
                     <td>{row.qualifying_booking_count}</td>
                     <td>{row.claim_status ? statusLabel(row.claim_status) : "None"}</td>
                     <td>{row.refunded ? <span className={styles.verifiedBadge}>Verified</span> : money(row.verified_refund_cents)}</td>
@@ -2396,7 +2455,7 @@ function MembershipGuaranteeAdmin({ isOwner }: { isOwner: boolean }) {
               <div><span>Membership</span><strong>{statusLabel(selected.subscription_status)}</strong></div>
               <div><span>Legacy founding</span><strong>{selected.founding_member_number ? `#${selected.founding_member_number}, ${statusLabel(selected.founding_status)}` : statusLabel(selected.founding_status)}</strong></div>
               <div><span>Guarantee</span><strong>{statusLabel(selected.guarantee_status)}</strong></div>
-              <div><span>Terms</span><strong>{selected.guarantee_terms_version === "2026-08-07-90-day-paid-invoice-v1" ? "Current 90-day" : selected.guarantee_terms_version ? "Legacy" : "Not started"}</strong></div>
+              <div><span>Terms</span><strong>{selected.guarantee_terms_version === currentGuaranteeTermsVersion ? `Current ${guaranteeCoverage}` : selected.guarantee_terms_version ? "Legacy" : "Not started"}</strong></div>
               <div><span>Bookings</span><strong>{selected.qualifying_booking_count}</strong></div>
               <div><span>Verified refunds</span><strong>{money(selected.verified_refund_cents)}</strong></div>
             </div>
@@ -2405,7 +2464,7 @@ function MembershipGuaranteeAdmin({ isOwner }: { isOwner: boolean }) {
               <div><dt>Inquiry email</dt><dd>{selected.inquiry_email || "Not set"}</dd></div>
               <div><dt>Guarantee period</dt><dd>{adminDate(selected.guarantee_started_at)} to {adminDate(selected.guarantee_ends_at)}</dd></div>
               <div><dt>Claim deadline</dt><dd>{adminDate(selected.claim_deadline_at)}</dd></div>
-              <div><dt>Maximum eligible refund</dt><dd>{selected.guarantee_terms_version === "2026-08-07-90-day-paid-invoice-v1" ? money(selected.eligible_paid_amount_cents ?? 0) : "Legacy terms apply"}</dd></div>
+              <div><dt>Maximum eligible refund</dt><dd>{selected.guarantee_terms_version === currentGuaranteeTermsVersion ? money(selected.eligible_paid_amount_cents ?? 0) : "Legacy terms apply"}</dd></div>
             </dl>
             {selected.refunded ? (
               <p className={styles.verifiedRefund} role="status">
@@ -2528,6 +2587,7 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
   const [slugs, setSlugs] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [profileApprovalStates, setProfileApprovalStates] = useState<Record<string, ProfileApprovalViewState>>({});
+  const [profileApprovalReadiness, setProfileApprovalReadiness] = useState<Record<string, ApprovalReadinessViewState>>({});
   const [rangePreset, setRangePreset] = useState<AdminRangePreset>("30d");
   const [customStart, setCustomStart] = useState(() => {
     const date = new Date();
@@ -2553,6 +2613,44 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "");
+  }
+
+  async function loadApprovalReadiness(profileIds: string[]) {
+    const client = getMarketplaceClient();
+    if (!client || !profileIds.length) return;
+    setProfileApprovalReadiness((current) => ({
+      ...current,
+      ...Object.fromEntries(profileIds.map((profileId) => [profileId, { phase: "checking" } as const]))
+    }));
+    await Promise.all(profileIds.map(async (profileId) => {
+      try {
+        const { data, error: readinessError } = await client.functions.invoke("review-instructor-profile", {
+          body: { action: "readiness", instructorProfileId: profileId }
+        });
+        if (readinessError) {
+          const failure = await edgeFunctionFailure(readinessError);
+          throw new Error(failure.message);
+        }
+        const receipt = parseInstructorApprovalReadiness(data);
+        if (receipt.instructorProfileId !== profileId) {
+          throw new Error("Approval readiness was returned for a different instructor.");
+        }
+        setProfileApprovalReadiness((current) => ({
+          ...current,
+          [profileId]: receipt.ready
+            ? { phase: "ready", receipt }
+            : { phase: "blocked", receipt }
+        }));
+      } catch (readinessError) {
+        setProfileApprovalReadiness((current) => ({
+          ...current,
+          [profileId]: {
+            phase: "error",
+            message: `Approval systems could not be verified. ${readableError(readinessError)}`
+          }
+        }));
+      }
+    }));
   }
 
   async function loadOperations(silent = false) {
@@ -2590,6 +2688,7 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
     setActivationMemberships((membershipResult.data as AdminInstructorActivationMembership[] | null) ?? []);
     setInvitations((invitationResult.data as AdminInstructorInvitation[] | null) ?? []);
     setSlugs((current) => Object.fromEntries(loadedProfiles.map((profile) => [profile.id, current[profile.id] ?? profile.slug ?? suggestedSlug(profile)])));
+    void loadApprovalReadiness(loadedProfiles.filter((profile) => profile.status === "pending_review").map((profile) => profile.id));
     if (!silent) setLoading(false);
   }
 
@@ -2659,6 +2758,16 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
       && !targetHasLifetimeAccess;
     const usesVerifiedApproval = decision === "approve"
       && (targetProfile?.status === "pending_review" || retriesMembershipActivation);
+    if (usesVerifiedApproval && targetProfile?.status === "pending_review" && profileApprovalReadiness[profileId]?.phase !== "ready") {
+      setProfileApprovalStates((current) => ({
+        ...current,
+        [profileId]: {
+          phase: "error",
+          message: "Approval systems must be verified before this instructor can be approved. Check the readiness status below."
+        }
+      }));
+      return;
+    }
     setBusyId(profileId);
     setError(null);
     setMessage(null);
@@ -3029,6 +3138,10 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
                 const galleryMedia = readyMedia.filter((item) => item.media_type !== "headshot");
                 const privateSettings = paymentSetups.find((item) => item.instructor_profile_id === profile.id);
                 const approvalState = profileApprovalStates[profile.id];
+                const readinessState = profileApprovalReadiness[profile.id];
+                const readinessReceipt = readinessState?.phase === "ready" || readinessState?.phase === "blocked"
+                  ? readinessState.receipt
+                  : null;
                 const approvalJob = latestApprovalEmailJob(profile.id);
                 const approvalEmailStatus = approvalState?.phase === "approved"
                   ? normalizeApprovalEmailStatus(approvalJob?.status ?? approvalState.receipt.emailStatus)
@@ -3141,7 +3254,7 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
                         <ProfileReviewField label="Provides microphone" value={profile.provides_microphone === null ? null : profile.provides_microphone ? "Yes" : "No"} />
                         <ProfileReviewField label="Provides music playback" value={profile.provides_music_playback === null ? null : profile.provides_music_playback ? "Yes" : "No"} />
                         <ProfileReviewField label="Liability insurance" value={statusLabel(profile.liability_insurance_status)} />
-                        <ProfileReviewField label="Response commitment" value={`${profile.preferred_response_hours} hours`} />
+                        <ProfileReviewField label="Typical response time" value={`${profile.preferred_response_hours} hours`} />
                         <ProfileReviewField label="Inquiry email (private)" value={privateSettings?.inquiry_email} />
                         <ProfileReviewField label="Typical minimum rate (private)" value={privateSettings?.minimum_rate_cents == null ? null : money(privateSettings.minimum_rate_cents)} />
                         <ProfileReviewField label="Minimum booking (private)" value={privateSettings?.minimum_hours == null ? null : `${privateSettings.minimum_hours} hours`} />
@@ -3169,13 +3282,43 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
                       </div>
                     ) : (
                       <>
+                        {!readinessState || readinessState.phase === "checking" ? (
+                          <div className={styles.approvalReadiness} role="status" aria-live="polite">
+                            <LoaderCircle className={styles.spinner} size={20} aria-hidden="true" />
+                            <div><strong>Checking approval systems</strong><p>Verifying Stripe billing, the applicable offer, and approval email configuration.</p></div>
+                          </div>
+                        ) : readinessState.phase === "ready" ? (
+                          <div className={styles.approvalReadiness} role="status" aria-live="polite">
+                            <CheckCircle2 size={20} aria-hidden="true" />
+                            <div>
+                              <strong>Approval systems ready</strong>
+                              <p>{readinessReceipt?.lifetimeAccess ? "Lifetime access" : `${(readinessReceipt!.terms.monthlyPriceCents / 100).toFixed(2)} ${readinessReceipt!.terms.currency.toUpperCase()} per month${readinessReceipt?.hasOffer ? `, ${readinessReceipt.terms.freeBillingCycles} free billing cycles` : ""}`}, {readinessReceipt?.terms.guaranteeCoverageDays}-day guarantee, approval email configured.</p>
+                              <ul className={styles.approvalReadinessChecks}>{readinessReceipt?.checks.map((check) => <li key={check.key}><span>{check.label}</span>{check.detail}</li>)}</ul>
+                            </div>
+                          </div>
+                        ) : readinessState.phase === "blocked" ? (
+                          <div className={`${styles.approvalReadiness} ${styles.approvalReadinessBlocked}`} role="alert">
+                            <AlertCircle size={20} aria-hidden="true" />
+                            <div>
+                              <strong>Approval is paused</strong>
+                              <p>Nothing will change until every required system is ready.</p>
+                              <ul className={styles.approvalReadinessChecks}>{readinessReceipt?.checks.map((check) => <li key={check.key}><span>{check.label}</span>{check.detail}</li>)}</ul>
+                              <button className={`${styles.secondaryButton} ${styles.compactButton}`} disabled={busyId === profile.id} type="button" onClick={() => void loadApprovalReadiness([profile.id])}>Check again</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className={`${styles.approvalReadiness} ${styles.approvalReadinessBlocked}`} role="alert">
+                            <AlertCircle size={20} aria-hidden="true" />
+                            <div><strong>Approval readiness could not be checked</strong><p>{readinessState.message}</p><button className={`${styles.secondaryButton} ${styles.compactButton}`} disabled={busyId === profile.id} type="button" onClick={() => void loadApprovalReadiness([profile.id])}>Check again</button></div>
+                          </div>
+                        )}
                         {!headshot ? <p className={styles.error}>A ready headshot is required before approval.</p> : null}
                         <div className={`${styles.grid} ${styles.reviewControls}`}>
                           <label className={styles.field}><span>Public profile slug</span><input value={slugs[profile.id] ?? ""} onChange={(event) => setSlugs((current) => ({ ...current, [profile.id]: event.target.value }))} /></label>
                           <label className={styles.field}><span>Review note</span><input value={notes[profile.id] ?? ""} onChange={(event) => setNotes((current) => ({ ...current, [profile.id]: event.target.value }))} /></label>
                         </div>
                         <div className={`${styles.buttonRow} ${styles.reviewActionBar}`}>
-                          <button className={`${styles.button} ${styles.compactButton}`} disabled={busyId === profile.id || !headshot} type="button" onClick={() => void review(profile.id, "approve")}>
+                          <button className={`${styles.button} ${styles.compactButton}`} disabled={busyId === profile.id || !headshot || readinessState?.phase !== "ready"} type="button" onClick={() => void review(profile.id, "approve")}>
                             {approvalState?.phase === "approving" ? (
                               <><LoaderCircle className={styles.spinner} size={17} aria-hidden="true" />Approving and starting membership...</>
                             ) : approvalState?.phase === "error" ? (
@@ -3252,7 +3395,7 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
         <div className={styles.compactAdminStack}>
           <section className={`${styles.card} ${styles.compactAdminCard}`}>
             <div className={styles.compactSectionHeader}>
-              <div><h2>Invite instructor</h2><p className={styles.muted}>Standard invitations give eligible new instructors their first two monthly billing cycles free. Choose lifetime access instead only when that separate benefit is intended.</p></div>
+              <div><h2>Invite instructor</h2><p className={styles.muted}>Standard invitations give eligible new instructors their first {billingCycles} free. Choose lifetime access instead only when that separate benefit is intended.</p></div>
             </div>
             <form className={styles.invitationForm} onSubmit={sendInstructorInvitation}>
               <label className={styles.field}>
@@ -3320,7 +3463,7 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
                       </td>
                       <td>{invitation.grants_lifetime_access
                         ? <span className={styles.status}>Lifetime</span>
-                        : invitation.offer_code === "outreach_two_months_90_day_v1"
+                        : invitation.offer_code === commercialTerms.offer.outreachOfferCode
                           ? <span className={styles.status}>2 billing cycles</span>
                           : "Standard"}</td>
                       <td><span className={styles.status}>{invitation.invitation_status.replaceAll("_", " ")}</span></td>

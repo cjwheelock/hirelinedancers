@@ -15,8 +15,15 @@ import {
   verifiedInstructorOfferCoupon,
   verifiedMembershipPrice,
 } from "../_shared/hld-stripe.ts";
+import {
+  GUARANTEE_COVERAGE_DAYS,
+  HLD_COMMERCIAL_TERMS,
+  INSTRUCTOR_OFFER_FREE_PERIOD_LABEL,
+  MONTHLY_PRICE_CENTS,
+} from "../_shared/hld-commercial-terms.ts";
 
 type ReviewRequest = {
+  action?: unknown;
   instructorProfileId?: unknown;
   decision?: unknown;
   slug?: unknown;
@@ -73,6 +80,13 @@ type ApprovalReceipt = {
   profileStatus: unknown;
   slug: string | null;
   emailStatus: ApprovalEmailStatus;
+};
+
+type ApprovalReadinessCheck = {
+  key: "membership" | "offer" | "approval_email";
+  label: string;
+  status: "ready" | "blocked" | "not_required";
+  detail: string;
 };
 
 const DEFINITIVE_PAYMENT_FAILURE_CODES = new Set([
@@ -140,6 +154,40 @@ function normalizedStatus(status: Stripe.Subscription.Status): string {
     default:
       return "inactive";
   }
+}
+
+function approvalEmailConfigurationError(): string | null {
+  const apiKey = Deno.env.get("RESEND_API_KEY")?.trim() ?? "";
+  const sender = Deno.env.get("RESEND_FROM_EMAIL")?.trim() ?? "";
+  const senderAddress = sender.match(/<([^<>]+)>$/)?.[1] ?? sender;
+  if (!/^re_[A-Za-z0-9_-]+$/.test(apiKey)) return "resend_api_key_missing";
+  if (!/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(senderAddress)) {
+    return "resend_sender_invalid";
+  }
+  return null;
+}
+
+function readinessResponse(
+  instructorProfileId: string,
+  lifetimeAccess: boolean,
+  hasOffer: boolean,
+  checks: ApprovalReadinessCheck[],
+): Response {
+  return json({
+    ready: checks.every((check) => check.status !== "blocked"),
+    instructorProfileId,
+    lifetimeAccess,
+    hasOffer,
+    checkedAt: new Date().toISOString(),
+    contractVersion: HLD_COMMERCIAL_TERMS.contractVersion,
+    terms: {
+      currency: HLD_COMMERCIAL_TERMS.currency,
+      monthlyPriceCents: MONTHLY_PRICE_CENTS,
+      freeBillingCycles: HLD_COMMERCIAL_TERMS.offer.freeBillingCycles,
+      guaranteeCoverageDays: GUARANTEE_COVERAGE_DAYS,
+    },
+    checks,
+  });
 }
 
 function subscriptionMatches(
@@ -276,6 +324,10 @@ export default {
     } catch {
       return json({ error: "A valid JSON request is required" }, 400);
     }
+    const action = body.action;
+    if (action !== undefined && action !== "readiness") {
+      return json({ error: "Unsupported review action" }, 400);
+    }
     const instructorProfileId = validUuid(
       body.instructorProfileId ?? body.p_instructor_profile_id,
     );
@@ -285,7 +337,7 @@ export default {
     if (!instructorProfileId) {
       return json({ error: "A valid instructor profile is required" }, 400);
     }
-    if (decision !== "approve") {
+    if (action !== "readiness" && decision !== "approve") {
       return json({
         error:
           "Only approval uses this endpoint. Return-to-draft and suspension remain available through the standard review action",
@@ -293,15 +345,16 @@ export default {
       }, 400);
     }
     if (
-      slug === undefined || !slug ||
-      !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)
+      action !== "readiness" &&
+      (slug === undefined || !slug ||
+        !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug))
     ) {
       return json(
         { error: "A valid profile slug is required for approval" },
         400,
       );
     }
-    if (note === undefined) {
+    if (action !== "readiness" && note === undefined) {
       return json({
         error: "The review note must be 4,000 characters or fewer",
       }, 400);
@@ -350,6 +403,122 @@ export default {
       return json({
         error: "This instructor profile is not ready for approval",
       }, 409);
+    }
+
+    const emailConfigurationError = approvalEmailConfigurationError();
+    if (action === "readiness") {
+      const hasLifetimeAccess = Boolean(lifetimeResult.data);
+      const hasOffer = Boolean(entitlementResult.data);
+      const checks: ApprovalReadinessCheck[] = [];
+
+      if (hasLifetimeAccess) {
+        checks.push({
+          key: "membership",
+          label: "Membership",
+          status: "not_required",
+          detail: "Lifetime access does not require Stripe billing.",
+        });
+        checks.push({
+          key: "offer",
+          label: "Instructor offer",
+          status: "not_required",
+          detail: "Lifetime access does not use a billing offer.",
+        });
+      } else {
+        let stripe: Stripe | null = null;
+        let stripeConfig: ReturnType<typeof hldStripeConfig> | null = null;
+        try {
+          stripeConfig = hldStripeConfig();
+          stripe = new Stripe(requiredEnv("STRIPE_SECRET_KEY"));
+          await verifiedMembershipPrice(stripe, stripeConfig);
+          checks.push({
+            key: "membership",
+            label: "Membership",
+            status: "ready",
+            detail: `${(MONTHLY_PRICE_CENTS / 100).toFixed(2)} ${HLD_COMMERCIAL_TERMS.currency.toUpperCase()} per month is verified in Stripe.`,
+          });
+        } catch (error) {
+          console.error(
+            "Instructor approval readiness found invalid billing configuration",
+            error instanceof Error ? error.message : "unknown_configuration_error",
+          );
+          checks.push({
+            key: "membership",
+            label: "Membership",
+            status: "blocked",
+            detail: "The configured Stripe Product and Price need attention.",
+          });
+        }
+
+        if (!hasOffer) {
+          checks.push({
+            key: "offer",
+            label: "Instructor offer",
+            status: "not_required",
+            detail: "This instructor does not have an offer entitlement.",
+          });
+        } else if (!stripe || !stripeConfig) {
+          checks.push({
+            key: "offer",
+            label: "Instructor offer",
+            status: "blocked",
+            detail: "The offer cannot be checked until Stripe billing is healthy.",
+          });
+        } else {
+          try {
+            await verifiedInstructorOfferCoupon(stripe, stripeConfig);
+            checks.push({
+              key: "offer",
+              label: "Instructor offer",
+              status: "ready",
+              detail: `${INSTRUCTOR_OFFER_FREE_PERIOD_LABEL} free is verified in Stripe.`,
+            });
+          } catch (error) {
+            console.error(
+              "Instructor approval readiness found invalid offer configuration",
+              error instanceof Error ? error.message : "unknown_offer_error",
+            );
+            checks.push({
+              key: "offer",
+              label: "Instructor offer",
+              status: "blocked",
+              detail: "The Stripe instructor offer needs attention.",
+            });
+          }
+        }
+      }
+
+      checks.push(emailConfigurationError
+        ? {
+          key: "approval_email",
+          label: "Approval email",
+          status: "blocked",
+          detail: "Resend approval-email configuration needs attention.",
+        }
+        : {
+          key: "approval_email",
+          label: "Approval email",
+          status: "ready",
+          detail: "The approval email sender is configured.",
+        });
+      return readinessResponse(
+        instructorProfileId,
+        hasLifetimeAccess,
+        hasOffer,
+        checks,
+      );
+    }
+
+    if (emailConfigurationError) {
+      console.error(
+        "Instructor approval email configuration is invalid",
+        emailConfigurationError,
+      );
+      return json({
+        error:
+          "Approval email delivery is not configured correctly. No profile or membership changes were made.",
+        code: "approval_email_configuration_invalid",
+      }, 503);
     }
 
     if (lifetimeResult.data) {
@@ -892,7 +1061,7 @@ export default {
         return json(
           {
             error:
-              "The two-month instructor offer is not configured correctly in Stripe. No profile or membership changes were made.",
+              `The ${INSTRUCTOR_OFFER_FREE_PERIOD_LABEL} instructor offer is not configured correctly in Stripe. No profile or membership changes were made.`,
             code: "instructor_offer_configuration_invalid",
           },
           503,

@@ -12,6 +12,11 @@ import {
   stripeObjectId,
   verifiedMembershipPrice,
 } from "../_shared/hld-stripe.ts";
+import {
+  GUARANTEE_COVERAGE_DAYS,
+  INSTRUCTOR_OFFER_FREE_PERIOD_LABEL,
+  MONTHLY_PRICE_CENTS,
+} from "../_shared/hld-commercial-terms.ts";
 
 type RegistrationResult = {
   registered?: boolean;
@@ -327,8 +332,7 @@ export default {
           : {}),
         custom_text: {
           submit: {
-            message:
-              "Your card will not be charged today. If approved, your $14.99 monthly membership will begin. Eligible founding instructors receive their first two months free, plus our 90-day money-back guarantee.",
+            message: `Your card will not be charged today. If approved, your $${(MONTHLY_PRICE_CENTS / 100).toFixed(2)} monthly membership will begin. Eligible founding instructors receive their first ${INSTRUCTOR_OFFER_FREE_PERIOD_LABEL} free, plus our ${GUARANTEE_COVERAGE_DAYS}-day money-back guarantee.`,
           },
         },
         success_url: checkoutSuccessUrl,

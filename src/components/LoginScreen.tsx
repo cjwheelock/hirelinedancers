@@ -14,6 +14,13 @@ import {
   type AccountIntent,
   type InstructorInvitationLifecycle
 } from "@/lib/marketplace";
+import {
+  billingCycles,
+  commercialTerms,
+  guaranteeCoverage,
+  invitationClaimWindow,
+  profileSubmissionWindow
+} from "@/lib/commercialTerms";
 import styles from "./Marketplace.module.css";
 
 function accountEntryPath(intent: AccountIntent | null, returnPath: string, invitationToken: string | null): string {
@@ -191,12 +198,12 @@ export function LoginScreen() {
           <div className={styles.stack}>
             <h2>Claim your invitation</h2>
             <p>
-              Claim by {initialDeadline ?? "the date in your invitation email"}. Claiming starts a seven-day window to sign in with the invited email, create your instructor account, and complete your profile{invitation?.grantsLifetimeAccess ? "." : " and payment setup."}
+              Claim by {initialDeadline ?? "the date in your invitation email"}. Claiming starts a {profileSubmissionWindow} window to sign in with the invited email, create your instructor account, and complete your profile{invitation?.grantsLifetimeAccess ? "." : " and payment setup."}
             </p>
             {invitation?.grantsLifetimeAccess ? (
               <p className={styles.notice}>This invitation includes complimentary lifetime instructor access.</p>
-            ) : invitation?.offerCode === "outreach_two_months_90_day_v1" ? (
-              <p className={styles.notice}>Complete the steps on time to earn your first two monthly billing cycles free. Stripe saves your card during submission, but no subscription starts and no charge is made before approval. Every new paid membership also includes the request-based 90-day booking guarantee.</p>
+            ) : invitation?.offerCode === commercialTerms.offer.outreachOfferCode ? (
+              <p className={styles.notice}>Complete the steps on time to earn your first {billingCycles} free. Stripe saves your card during submission, but no subscription starts and no charge is made before approval. Every new paid membership also includes the request-based {guaranteeCoverage} booking guarantee.</p>
             ) : null}
             <button className={styles.button} type="button" disabled={busy !== null} onClick={() => void claimInvitation()}>
               {busy === "claim" ? "Claiming invitation..." : "Claim invitation"}
@@ -208,9 +215,9 @@ export function LoginScreen() {
             <p className={styles.error}>
               {invitation?.status === "claim_expired"
                 ? invitation?.grantsLifetimeAccess
-                  ? "The seven-day account and profile submission window has ended."
-                  : "The seven-day account, profile, and payment-setup window has ended."
-                : "The 14-day invitation claim window has ended."}
+                  ? `The ${profileSubmissionWindow} account and profile submission window has ended.`
+                  : `The ${profileSubmissionWindow} account, profile, and payment-setup window has ended.`
+                : `The ${invitationClaimWindow} invitation claim window has ended.`}
             </p>
             <Link className={styles.secondaryButton} href="/instructors/join/">View instructor membership options</Link>
           </div>

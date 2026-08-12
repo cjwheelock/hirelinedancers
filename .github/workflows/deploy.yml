@@ -24,6 +24,8 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      - name: Audit commercial terms
+        run: npm run terms:audit
       - name: Lint
         run: npm run lint
       - name: Test instructor approval flow

@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "terms:sync": "node scripts/sync-commercial-terms.mjs",
+    "terms:audit": "node scripts/audit-commercial-terms.mjs",
     "audit:static": "node scripts/audit-static-site.mjs",
     "test:approval": "node --test scripts/test-approval-flow.mjs"
   },

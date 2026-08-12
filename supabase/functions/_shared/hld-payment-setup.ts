@@ -1,9 +1,8 @@
 import Stripe from "npm:stripe@^22";
 import type { HldStripeConfig } from "./hld-stripe.ts";
 import { stripeObjectId } from "./hld-stripe.ts";
-
-export const INSTRUCTOR_PAYMENT_SETUP_TERMS_VERSION =
-  "2026-08-08-payment-setup-v1";
+import { INSTRUCTOR_PAYMENT_SETUP_TERMS_VERSION } from "./hld-commercial-terms.ts";
+export { INSTRUCTOR_PAYMENT_SETUP_TERMS_VERSION } from "./hld-commercial-terms.ts";
 
 export type InstructorPaymentSetupIdentity = {
   accountId: string;

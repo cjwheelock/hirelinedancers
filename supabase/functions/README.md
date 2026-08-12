@@ -14,7 +14,7 @@ Setup Checkout saves a card but creates no subscription and makes no charge. Its
 
 Authenticated recovery endpoint for the payment-setup success page. It retrieves the Checkout Session, SetupIntent, and attached card directly from Stripe. It verifies the caller, profile, Customer, setup mode, completion status, live or test mode, off-session usage, card attachment, and exact setup-terms metadata before calling the locked database completion function.
 
-Successful completion changes the complete draft profile to `pending_review` and returns the current offer entitlement. The first 100 distinct completed setups receive unique founding positions. A timely private invitation can provide the same two-month billing benefit after the founding allocation is full. One profile can receive only one entitlement. Reconciliation is idempotent and complements the signed webhook.
+Successful completion changes the complete draft profile to `pending_review` and returns the current offer entitlement. The first 100 distinct completed setups receive unique founding positions. A timely private invitation can provide the same two free months of billing after the founding allocation is full. One profile can receive only one entitlement. Reconciliation is idempotent and complements the signed webhook.
 
 ### `review-instructor-profile`
 
