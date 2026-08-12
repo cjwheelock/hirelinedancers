@@ -1,4 +1,5 @@
 import { withSupabase } from "npm:@supabase/server@^1";
+import type { SupabaseClient } from "npm:@supabase/supabase-js@^2";
 import Stripe from "npm:stripe@^22";
 import {
   INSTRUCTOR_PAYMENT_SETUP_TERMS_VERSION,
@@ -58,6 +59,20 @@ type ActivationReset = {
   supersededSetupId?: unknown;
   retainedStripeCustomerId?: unknown;
   entitlementId?: unknown;
+};
+
+type ApprovalEmailStatus =
+  | "pending"
+  | "processing"
+  | "sent"
+  | "failed"
+  | "canceled"
+  | "missing";
+
+type ApprovalReceipt = {
+  profileStatus: unknown;
+  slug: string | null;
+  emailStatus: ApprovalEmailStatus;
 };
 
 const DEFINITIVE_PAYMENT_FAILURE_CODES = new Set([
@@ -164,6 +179,60 @@ function subscriptionMatches(
     subscription.metadata.guarantee_terms_version ===
       MEMBERSHIP_GUARANTEE_TERMS_VERSION &&
     subscriptionHasExactCoupon(subscription, expected.couponId);
+}
+
+async function loadApprovalReceipt(
+  admin: SupabaseClient,
+  instructorProfileId: string,
+  fallbackProfileStatus: unknown,
+): Promise<ApprovalReceipt> {
+  const [profileResult, notificationResult] = await Promise.all([
+    admin
+      .from("instructor_profiles")
+      .select("status,slug")
+      .eq("id", instructorProfileId)
+      .maybeSingle(),
+    admin
+      .from("instructor_service_notification_jobs")
+      .select("status")
+      .eq("instructor_profile_id", instructorProfileId)
+      .eq("notification_type", "profile_approved")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+
+  if (profileResult.error) {
+    console.error(
+      "Unable to load final instructor profile receipt",
+      profileResult.error.code,
+    );
+  }
+  if (notificationResult.error) {
+    console.error(
+      "Unable to load approval email receipt",
+      notificationResult.error.code,
+    );
+  }
+
+  const notificationStatus = notificationResult.data?.status;
+  const emailStatus: ApprovalEmailStatus = [
+      "pending",
+      "processing",
+      "sent",
+      "failed",
+      "canceled",
+    ].includes(notificationStatus)
+    ? notificationStatus
+    : "missing";
+
+  return {
+    profileStatus: profileResult.data?.status ?? fallbackProfileStatus,
+    slug: typeof profileResult.data?.slug === "string"
+      ? profileResult.data.slug
+      : null,
+    emailStatus,
+  };
 }
 
 export default {
@@ -309,10 +378,18 @@ export default {
           409,
         );
       }
+      const receipt = await loadApprovalReceipt(
+        ctx.supabaseAdmin,
+        instructorProfileId,
+        approval.profileStatus,
+      );
       return json({
         approved: true,
         lifetimeAccess: true,
-        profileStatus: approval.profileStatus,
+        membershipStatus: null,
+        profileStatus: receipt.profileStatus,
+        slug: receipt.slug,
+        emailStatus: receipt.emailStatus,
         approvedAt: approval.approvedAt,
         approvedBy: approval.approvedBy,
       });
@@ -786,14 +863,17 @@ export default {
         offerResult = "duplicate";
       }
 
-      const { data: finalProfile } = await ctx.supabaseAdmin
-        .from("instructor_profiles")
-        .select("status")
-        .eq("id", instructorProfileId)
-        .single();
+      const receipt = await loadApprovalReceipt(
+        ctx.supabaseAdmin,
+        instructorProfileId,
+        approval?.profileStatus,
+      );
       return json({
         approved: true,
-        profileStatus: finalProfile?.status ?? approval?.profileStatus,
+        lifetimeAccess: false,
+        profileStatus: receipt.profileStatus,
+        slug: receipt.slug,
+        emailStatus: receipt.emailStatus,
         membershipStatus,
         subscriptionId: subscription.id,
         offerApplied: Boolean(offerEntitlement),

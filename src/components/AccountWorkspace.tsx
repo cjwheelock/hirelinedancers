@@ -2,7 +2,16 @@
 
 import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { AlertCircle, CheckCircle2, LoaderCircle, Mail, MailCheck, RotateCcw } from "lucide-react";
 import { cities, eventTypes } from "@/data/site";
+import {
+  approvalEmailNeedsAttention,
+  approvalEmailStatusCopy,
+  approvalFailureCopy,
+  normalizeApprovalEmailStatus,
+  parseInstructorApprovalReceipt,
+  type ProfileApprovalViewState
+} from "@/lib/adminApproval";
 import { useMarketplaceSession } from "@/hooks/useMarketplaceSession";
 import {
   cleanAccountIntent,
@@ -1724,6 +1733,17 @@ type AdminNotificationJob = {
   created_at: string;
 };
 
+type AdminInstructorServiceNotificationJob = {
+  id: number;
+  instructor_profile_id: string;
+  notification_type: "profile_approved" | "activation_payment_failed" | "billing_grace_started" | "billing_access_paused";
+  status: string;
+  attempts: number;
+  last_error: string | null;
+  created_at: string;
+  sent_at: string | null;
+};
+
 type AdminAccess = {
   account_id: string;
   email: string | null;
@@ -2006,15 +2026,24 @@ function stripeCustomerUrl(customerId: string, livemode: boolean | null) {
   return `https://dashboard.stripe.com${mode}/customers/${encodeURIComponent(customerId)}`;
 }
 
-async function edgeFunctionError(error: unknown) {
+async function edgeFunctionFailure(error: unknown): Promise<{ message: string; code: string | null }> {
   if (error && typeof error === "object" && "context" in error) {
     const context = (error as { context?: unknown }).context;
     if (context instanceof Response) {
-      const payload = await context.clone().json().catch(() => null) as { error?: unknown } | null;
-      if (typeof payload?.error === "string") return payload.error;
+      const payload = await context.clone().json().catch(() => null) as { error?: unknown; code?: unknown } | null;
+      if (typeof payload?.error === "string") {
+        return {
+          message: payload.error,
+          code: typeof payload.code === "string" ? payload.code : null
+        };
+      }
     }
   }
-  return readableError(error);
+  return { message: readableError(error), code: null };
+}
+
+async function edgeFunctionError(error: unknown) {
+  return (await edgeFunctionFailure(error)).message;
 }
 
 function MembershipGuaranteeAdmin({ isOwner }: { isOwner: boolean }) {
@@ -2486,6 +2515,7 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
   const [profiles, setProfiles] = useState<InstructorProfile[]>([]);
   const [inquiries, setInquiries] = useState<MarketplaceInquiry[]>([]);
   const [jobs, setJobs] = useState<AdminNotificationJob[]>([]);
+  const [serviceJobs, setServiceJobs] = useState<AdminInstructorServiceNotificationJob[]>([]);
   const [media, setMedia] = useState<ProfileMedia[]>([]);
   const [admins, setAdmins] = useState<AdminAccess[]>([]);
   const [lifetimeAccess, setLifetimeAccess] = useState<AdminInstructorLifetimeAccess[]>([]);
@@ -2497,6 +2527,7 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
   const [analytics, setAnalytics] = useState<AdminAnalytics>(emptyAdminAnalytics);
   const [slugs, setSlugs] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState<Record<string, string>>({});
+  const [profileApprovalStates, setProfileApprovalStates] = useState<Record<string, ProfileApprovalViewState>>({});
   const [rangePreset, setRangePreset] = useState<AdminRangePreset>("30d");
   const [customStart, setCustomStart] = useState(() => {
     const date = new Date();
@@ -2524,15 +2555,16 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
       .replace(/^-|-$/g, "");
   }
 
-  async function loadOperations() {
+  async function loadOperations(silent = false) {
     const client = getMarketplaceClient();
     if (!client) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     setError(null);
-    const [profileResult, inquiryResult, jobResult, mediaResult, adminResult, feedbackResult, lifetimeResult, paymentSetupResult, entitlementResult, membershipResult, invitationResult] = await Promise.all([
+    const [profileResult, inquiryResult, jobResult, serviceJobResult, mediaResult, adminResult, feedbackResult, lifetimeResult, paymentSetupResult, entitlementResult, membershipResult, invitationResult] = await Promise.all([
       client.from("instructor_profiles").select("*").order("updated_at", { ascending: false }),
       client.from("inquiries").select("*").order("created_at", { ascending: false }).limit(100),
       client.from("inquiry_notification_jobs").select("id,channel,notification_type,status,attempts,last_error,created_at").order("created_at", { ascending: false }).limit(100),
+      client.from("instructor_service_notification_jobs").select("id,instructor_profile_id,notification_type,status,attempts,last_error,created_at,sent_at").order("created_at", { ascending: false }).limit(100),
       client.from("profile_media").select("*").order("sort_order"),
       client.rpc("list_marketplace_admins"),
       client.from("inquiry_followup_responses").select("id,inquiry_id,stage,response,confirmed_event_date,private_comment,submitted_at").order("submitted_at", { ascending: false }).limit(100),
@@ -2542,12 +2574,13 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
       client.from("instructor_memberships").select("instructor_profile_id,stripe_customer_id,stripe_subscription_id,latest_checkout_session_id,status"),
       client.rpc("admin_list_instructor_invitations")
     ]);
-    const loadError = profileResult.error ?? inquiryResult.error ?? jobResult.error ?? mediaResult.error ?? adminResult.error ?? feedbackResult.error ?? lifetimeResult.error ?? paymentSetupResult.error ?? entitlementResult.error ?? membershipResult.error ?? invitationResult.error;
+    const loadError = profileResult.error ?? inquiryResult.error ?? jobResult.error ?? serviceJobResult.error ?? mediaResult.error ?? adminResult.error ?? feedbackResult.error ?? lifetimeResult.error ?? paymentSetupResult.error ?? entitlementResult.error ?? membershipResult.error ?? invitationResult.error;
     if (loadError) setError(loadError.message);
     const loadedProfiles = (profileResult.data as InstructorProfile[] | null) ?? [];
     setProfiles(loadedProfiles);
     setInquiries((inquiryResult.data as MarketplaceInquiry[] | null) ?? []);
     setJobs((jobResult.data as AdminNotificationJob[] | null) ?? []);
+    setServiceJobs((serviceJobResult.data as AdminInstructorServiceNotificationJob[] | null) ?? []);
     setMedia((mediaResult.data as ProfileMedia[] | null) ?? []);
     setAdmins((adminResult.data as AdminAccess[] | null) ?? []);
     setFollowupResponses((feedbackResult.data as AdminFollowupResponse[] | null) ?? []);
@@ -2557,7 +2590,7 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
     setActivationMemberships((membershipResult.data as AdminInstructorActivationMembership[] | null) ?? []);
     setInvitations((invitationResult.data as AdminInstructorInvitation[] | null) ?? []);
     setSlugs((current) => Object.fromEntries(loadedProfiles.map((profile) => [profile.id, current[profile.id] ?? profile.slug ?? suggestedSlug(profile)])));
-    setLoading(false);
+    if (!silent) setLoading(false);
   }
 
   async function loadAnalytics() {
@@ -2629,10 +2662,17 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
     setBusyId(profileId);
     setError(null);
     setMessage(null);
+    if (usesVerifiedApproval) {
+      setProfileApprovalStates((current) => ({
+        ...current,
+        [profileId]: { phase: "approving" }
+      }));
+    }
     let reviewError: string | null = null;
+    let approvalData: unknown = null;
     try {
       if (usesVerifiedApproval) {
-        const { error: approvalError } = await client.functions.invoke("review-instructor-profile", {
+        const { data, error: approvalError } = await client.functions.invoke("review-instructor-profile", {
           body: {
             instructorProfileId: profileId,
             decision,
@@ -2640,7 +2680,11 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
             note: notes[profileId] || null
           }
         });
-        if (approvalError) reviewError = await edgeFunctionError(approvalError);
+        approvalData = data;
+        if (approvalError) {
+          const failure = await edgeFunctionFailure(approvalError);
+          reviewError = approvalFailureCopy(failure.message, failure.code);
+        }
       } else {
         const { error: decisionError } = await client.rpc("review_instructor_profile", {
           p_instructor_profile_id: profileId,
@@ -2656,20 +2700,39 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
       setBusyId(null);
     }
     if (reviewError) {
-      setError(reviewError);
-      await loadOperations();
-    } else {
-      setMessage(usesVerifiedApproval
-        ? retriesMembershipActivation
-          ? "Stripe confirmed the automatically started membership, and the profile was published."
-          : targetHasLifetimeAccess
-          ? "Instructor approved. Lifetime access published the profile automatically."
-          : "Instructor approved. Stripe confirmed the automatically started membership, and the profile was published."
-        : decision === "approve"
-          ? "Instructor reactivated. An active membership or lifetime access publishes the profile automatically."
-          : "Instructor profile updated.");
-      await loadOperations();
+      if (usesVerifiedApproval) {
+        setProfileApprovalStates((current) => ({
+          ...current,
+          [profileId]: { phase: "error", message: reviewError }
+        }));
+      } else {
+        setError(reviewError);
+      }
+      await loadOperations(true);
+      return;
     }
+
+    if (usesVerifiedApproval) {
+      try {
+        const receipt = parseInstructorApprovalReceipt(approvalData, slugs[profileId] || "");
+        setProfileApprovalStates((current) => ({
+          ...current,
+          [profileId]: { phase: "approved", receipt }
+        }));
+      } catch (receiptError) {
+        setProfileApprovalStates((current) => ({
+          ...current,
+          [profileId]: { phase: "error", message: readableError(receiptError) }
+        }));
+      }
+      await loadOperations(true);
+      return;
+    }
+
+    setMessage(decision === "approve"
+      ? "Instructor reactivated. An active membership or lifetime access publishes the profile automatically."
+      : "Instructor profile updated.");
+    await loadOperations();
   }
 
   async function grantAdmin(event: FormEvent<HTMLFormElement>) {
@@ -2774,7 +2837,17 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
   }
 
   const pending = profiles.filter((profile) => profile.status === "pending_review");
-  const deliveryFailures = jobs.filter((job) => job.status === "failed");
+  const reviewProfiles = profiles.filter((profile) =>
+    profile.status === "pending_review" || Boolean(profileApprovalStates[profile.id])
+  );
+  const failedDeliveryCount = jobs.filter((job) => job.status === "failed").length
+    + serviceJobs.filter((job) => job.status === "failed").length;
+
+  function latestApprovalEmailJob(profileId: string) {
+    return serviceJobs.find((job) =>
+      job.instructor_profile_id === profileId && job.notification_type === "profile_approved"
+    );
+  }
 
   const summary = analytics.summary;
 
@@ -2949,12 +3022,17 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
           </section>
 
           <div className={styles.profileReviewList}>
-              {pending.map((profile) => {
+              {reviewProfiles.map((profile) => {
                 const profileMedia = media.filter((item) => item.instructor_profile_id === profile.id);
                 const readyMedia = profileMedia.filter((item) => item.status === "ready");
                 const headshot = readyMedia.find((item) => item.media_type === "headshot");
                 const galleryMedia = readyMedia.filter((item) => item.media_type !== "headshot");
                 const privateSettings = paymentSetups.find((item) => item.instructor_profile_id === profile.id);
+                const approvalState = profileApprovalStates[profile.id];
+                const approvalJob = latestApprovalEmailJob(profile.id);
+                const approvalEmailStatus = approvalState?.phase === "approved"
+                  ? normalizeApprovalEmailStatus(approvalJob?.status ?? approvalState.receipt.emailStatus)
+                  : null;
                 const firstName = profile.display_name.trim().split(/\s+/)[0] || profile.display_name;
                 const location = [profile.city, profile.region].filter(Boolean).join(", ") || "Location not provided";
                 const eventLabels = profile.event_types.map((value) => eventTypes.find((item) => item.slug === value)?.label ?? statusLabel(value));
@@ -2969,7 +3047,9 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
                         <div className={styles.buttonRow}><h3>{profile.display_name}</h3><span className={styles.status}>{statusLabel(profile.status)}</span></div>
                         <p className={styles.muted}>{[profile.business_name, location].filter(Boolean).join(" · ")}</p>
                       </div>
-                      <span className={styles.recordCount}>Submitted profile</span>
+                      {approvalState?.phase === "approved" ? (
+                        <span className={styles.approvedBadge}><CheckCircle2 size={15} aria-hidden="true" />Approved and live</span>
+                      ) : <span className={styles.recordCount}>Submitted profile</span>}
                     </header>
 
                     <section className={styles.productionPreview} aria-label={`Public profile preview for ${profile.display_name}`}>
@@ -3070,18 +3150,56 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
                       </dl>
                     </section>
 
-                    {!headshot ? <p className={styles.error}>A ready headshot is required before approval.</p> : null}
-                    <div className={`${styles.grid} ${styles.reviewControls}`}>
-                      <label className={styles.field}><span>Public profile slug</span><input value={slugs[profile.id] ?? ""} onChange={(event) => setSlugs((current) => ({ ...current, [profile.id]: event.target.value }))} /></label>
-                      <label className={styles.field}><span>Review note</span><input value={notes[profile.id] ?? ""} onChange={(event) => setNotes((current) => ({ ...current, [profile.id]: event.target.value }))} /></label>
-                    </div>
-                    <div className={`${styles.buttonRow} ${styles.reviewActionBar}`}>
-                      <button className={`${styles.button} ${styles.compactButton}`} disabled={busyId === profile.id || !headshot} type="button" onClick={() => void review(profile.id, "approve")}>
-                        {busyId === profile.id ? "Approving and starting membership..." : "Approve profile"}
-                      </button>
-                      <button className={`${styles.dangerButton} ${styles.compactButton}`} disabled={busyId === profile.id} type="button" onClick={() => void review(profile.id, "return_to_draft")}>Request changes</button>
-                      {busyId === profile.id ? <span className={styles.muted} role="status">Verifying Stripe and publishing the profile. Keep this page open.</span> : null}
-                    </div>
+                    {approvalState?.phase === "approved" && approvalEmailStatus ? (
+                      <div className={styles.approvalResult} role="status" aria-live="polite">
+                        <CheckCircle2 className={styles.approvalResultIcon} size={26} aria-hidden="true" />
+                        <div>
+                          <strong>Approved and live</strong>
+                          <p>{approvalState.receipt.lifetimeAccess ? "Lifetime access confirmed." : "Membership active."}</p>
+                          <p className={approvalEmailNeedsAttention(approvalEmailStatus) ? styles.approvalEmailAttention : styles.approvalEmailStatus}>
+                            {approvalEmailNeedsAttention(approvalEmailStatus)
+                              ? <AlertCircle size={16} aria-hidden="true" />
+                              : approvalEmailStatus === "sent" || approvalEmailStatus === "delivered"
+                                ? <MailCheck size={16} aria-hidden="true" />
+                                : <Mail size={16} aria-hidden="true" />}
+                            {approvalEmailStatusCopy(approvalEmailStatus)}
+                          </p>
+                          <Link className={styles.approvalProfileLink} href={`/profile/?${new URLSearchParams({ instructor: approvalState.receipt.slug }).toString()}`}>View live profile</Link>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        {!headshot ? <p className={styles.error}>A ready headshot is required before approval.</p> : null}
+                        <div className={`${styles.grid} ${styles.reviewControls}`}>
+                          <label className={styles.field}><span>Public profile slug</span><input value={slugs[profile.id] ?? ""} onChange={(event) => setSlugs((current) => ({ ...current, [profile.id]: event.target.value }))} /></label>
+                          <label className={styles.field}><span>Review note</span><input value={notes[profile.id] ?? ""} onChange={(event) => setNotes((current) => ({ ...current, [profile.id]: event.target.value }))} /></label>
+                        </div>
+                        <div className={`${styles.buttonRow} ${styles.reviewActionBar}`}>
+                          <button className={`${styles.button} ${styles.compactButton}`} disabled={busyId === profile.id || !headshot} type="button" onClick={() => void review(profile.id, "approve")}>
+                            {approvalState?.phase === "approving" ? (
+                              <><LoaderCircle className={styles.spinner} size={17} aria-hidden="true" />Approving and starting membership...</>
+                            ) : approvalState?.phase === "error" ? (
+                              <><RotateCcw size={16} aria-hidden="true" />Try approval again</>
+                            ) : (
+                              <><CheckCircle2 size={16} aria-hidden="true" />Approve profile</>
+                            )}
+                          </button>
+                          <button className={`${styles.dangerButton} ${styles.compactButton}`} disabled={busyId === profile.id} type="button" onClick={() => void review(profile.id, "return_to_draft")}>Request changes</button>
+                        </div>
+                        {approvalState?.phase === "approving" ? (
+                          <div className={styles.approvalProgress} role="status" aria-live="polite">
+                            <LoaderCircle className={styles.spinner} size={22} aria-hidden="true" />
+                            <div><strong>Approving this instructor</strong><p>Verifying Stripe, starting membership, publishing the profile, and queuing the approval email.</p></div>
+                          </div>
+                        ) : null}
+                        {approvalState?.phase === "error" ? (
+                          <div className={styles.approvalFailure} role="alert">
+                            <AlertCircle size={22} aria-hidden="true" />
+                            <div><strong>Approval didn’t complete</strong><p>{approvalState.message}</p></div>
+                          </div>
+                        ) : null}
+                      </>
+                    )}
                   </article>
                 );
               })}
@@ -3091,9 +3209,10 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
             <div className={styles.compactSectionHeader}><h2>All instructor profiles</h2><span className={styles.recordCount}>{profiles.length} total</span></div>
             <div className={`${styles.tableWrap} ${styles.compactTableWrap}`}>
               <table className={`${styles.dataTable} ${styles.compactDataTable}`}>
-                <thead><tr><th>Instructor</th><th>Location</th><th>Status</th><th>Action</th></tr></thead>
+                <thead><tr><th>Instructor</th><th>Location</th><th>Status</th><th>Approval email</th><th>Action</th></tr></thead>
                 <tbody>{profiles.map((profile) => {
                   const paymentSetup = paymentSetups.find((setup) => setup.instructor_profile_id === profile.id);
+                  const approvalJob = latestApprovalEmailJob(profile.id);
                   const activationIsSynced = activationMemberships.some((membership) =>
                     membership.instructor_profile_id === profile.id
                     && membership.stripe_customer_id === paymentSetup?.stripe_customer_id
@@ -3110,6 +3229,9 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
                   return (
                     <tr key={profile.id}>
                       <td>{profile.display_name}</td><td>{[profile.city, profile.region].filter(Boolean).join(", ")}</td><td><span className={styles.status}>{profile.status.replaceAll("_", " ")}</span></td>
+                      <td>{approvalJob
+                        ? <><span className={styles.status}>{approvalJob.status.replaceAll("_", " ")}</span>{approvalJob.sent_at ? <small>{new Date(approvalJob.sent_at).toLocaleString()}</small> : null}</>
+                        : <span className={styles.muted}>Not queued</span>}</td>
                       <td>
                         {activationNeedsRetry ? <button className={styles.button} disabled={busyId === profile.id} type="button" onClick={() => void review(profile.id, "approve")}>{busyId === profile.id ? "Finishing..." : "Finish membership activation"}</button> : null}
                         {!activationNeedsRetry && ["approved", "published"].includes(profile.status) ? <button className={styles.dangerButton} disabled={busyId === profile.id} type="button" onClick={() => void review(profile.id, "suspend")}>Suspend</button> : null}
@@ -3226,8 +3348,15 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
 
       {!loading && tab === "delivery" ? (
         <div className={styles.card}>
-          <div className={styles.buttonRow}><h2>Notification delivery</h2><span className={styles.status}>{deliveryFailures.length} failed</span></div>
+          <div className={styles.buttonRow}><h2>Notification delivery</h2><span className={styles.status}>{failedDeliveryCount} failed</span></div>
           <div className={styles.list}>
+            {serviceJobs.slice(0, 100).map((job) => (
+              <article className={styles.listItem} key={`service-${job.id}`}>
+                <div className={styles.buttonRow}><strong>EMAIL · {job.notification_type.replaceAll("_", " ")}</strong><span className={styles.status}>{job.status}</span></div>
+                <p>{new Date(job.created_at).toLocaleString()} · {job.attempts} attempt{job.attempts === 1 ? "" : "s"}</p>
+                {job.last_error ? <p className={styles.error}>{job.last_error}</p> : null}
+              </article>
+            ))}
             {jobs.slice(0, 100).map((job) => (
               <article className={styles.listItem} key={job.id}>
                 <div className={styles.buttonRow}><strong>{job.channel.toUpperCase()} · {job.notification_type.replaceAll("_", " ")}</strong><span className={styles.status}>{job.status}</span></div>

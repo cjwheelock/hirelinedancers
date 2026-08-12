@@ -1,4 +1,5 @@
 import Stripe from "npm:stripe@^22";
+import { instructorOfferCouponMismatches } from "./hld-offer-validation.ts";
 
 const MONTHLY_PRICE_CENTS = 1499;
 export const INSTRUCTOR_OUTREACH_OFFER_CODE =
@@ -136,21 +137,14 @@ export async function verifiedInstructorOfferCoupon(
   }
 
   const coupon = await stripe.coupons.retrieve(couponId);
-  const appliedProducts = coupon.applies_to?.products ?? [];
-  if (
-    !coupon.valid ||
-    coupon.livemode !== config.expectedLivemode ||
-    coupon.percent_off !== 100 ||
-    coupon.amount_off !== null ||
-    coupon.duration !== "repeating" ||
-    coupon.duration_in_months !== INSTRUCTOR_OUTREACH_OFFER_MONTHS ||
-    coupon.max_redemptions !== null ||
-    coupon.redeem_by !== null ||
-    appliedProducts.length !== 1 ||
-    appliedProducts[0] !== config.productId
-  ) {
+  const mismatches = instructorOfferCouponMismatches(coupon, {
+    expectedLivemode: config.expectedLivemode,
+    productId: config.productId,
+    months: INSTRUCTOR_OUTREACH_OFFER_MONTHS,
+  });
+  if (mismatches.length) {
     throw new Error(
-      "Configured Stripe Coupon is not the exact two-month instructor outreach offer",
+      `Configured Stripe Coupon is not the exact two-month instructor outreach offer; mismatches: ${mismatches.join(",")}`,
     );
   }
 

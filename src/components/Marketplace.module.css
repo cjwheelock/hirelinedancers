@@ -804,6 +804,105 @@
   margin-top: 12px;
 }
 
+.reviewActionBar .compactButton {
+  min-height: 44px;
+}
+
+.approvedBadge {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border: 1px solid #397057;
+  background: #edf8f1;
+  color: #24513d;
+  font: 700 0.7rem/1 "IBM Plex Mono", monospace;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.approvalResult,
+.approvalProgress,
+.approvalFailure {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 11px;
+  align-items: flex-start;
+  margin-top: 14px;
+  padding: 13px 14px;
+  border: 1px solid #397057;
+  background: #edf8f1;
+  color: #24513d;
+}
+
+.approvalProgress {
+  border-color: #8b91a2;
+  background: #e8ebf2;
+  color: #1c2a44;
+}
+
+.approvalFailure {
+  border-color: #b5472b;
+  background: #fff0eb;
+  color: #7e2e1c;
+}
+
+.approvalResult strong,
+.approvalProgress strong,
+.approvalFailure strong {
+  display: block;
+  font-size: 0.9rem;
+  line-height: 1.3;
+}
+
+.approvalResult p,
+.approvalProgress p,
+.approvalFailure p {
+  margin: 3px 0 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.approvalResultIcon {
+  margin-top: 1px;
+}
+
+.approvalEmailStatus,
+.approvalEmailAttention {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.approvalEmailAttention {
+  color: #7e2e1c;
+  font-weight: 700;
+}
+
+.approvalProfileLink {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  margin-top: 7px;
+  color: #24513d;
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-underline-offset: 3px;
+}
+
+.spinner {
+  animation: approval-spin 0.9s linear infinite;
+}
+
+@keyframes approval-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation: none; }
+}
+
 .srOnly {
   position: absolute;
   width: 1px;

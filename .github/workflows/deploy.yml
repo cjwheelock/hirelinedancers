@@ -26,6 +26,8 @@ jobs:
       - run: npm ci
       - name: Lint
         run: npm run lint
+      - name: Test instructor approval flow
+        run: npm run test:approval
       - name: Build static export
         run: npm run build
         env:
