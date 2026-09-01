@@ -90,7 +90,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
         <h2>Planning an event{city ? ` in ${city.city}` : ""}?</h2>
         <p>Find a line dance instructor and give guests a welcoming way to get moving together. No prior dance experience is required.</p>
         <p>
-          <Link className="button primary" href={city ? `/cities/${city.slug}/` : "/#find"}>
+          <Link className="button primary" href={city ? `/cities/${city.slug}/` : "/instructors/"}>
             {city ? `Find instructors in ${city.city}` : "Find an instructor near you"}
           </Link>
         </p>

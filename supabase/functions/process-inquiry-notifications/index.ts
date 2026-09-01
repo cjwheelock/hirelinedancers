@@ -1,8 +1,126 @@
-import { withSupabase } from "npm:@supabase/server@^1";
-import type { SupabaseClient } from "npm:@supabase/supabase-js@^2";
+import {
+  type SupabaseContext,
+  withSupabase,
+} from "npm:@supabase/server@^1";
 import { BILLING_RECOVERY_GRACE_DAYS } from "../_shared/hld-commercial-terms.ts";
+import { supabaseServerOptions } from "../_shared/hld-supabase-admin.ts";
 
-type AdminClient = SupabaseClient;
+type ReadOnlyTable<Row extends Record<string, unknown>> = {
+  Row: Row;
+  Insert: Row;
+  Update: Partial<Row>;
+  Relationships: [];
+};
+
+type CompletionArgs = {
+  p_job_id: number;
+  p_success: boolean;
+  p_provider_message_id: string | null;
+  p_error: string | null;
+  p_retryable: boolean;
+};
+
+type DeferralArgs = {
+  p_job_id: number;
+  p_error: string;
+  p_delay: string;
+};
+
+type ClaimArgs = {
+  p_limit: number;
+  p_lock_timeout: string;
+};
+
+type WorkerDatabase = {
+  public: {
+    Tables: {
+      inquiry_recipients: ReadOnlyTable<{
+        id: string;
+        instructor_profile_id: string | null;
+      }>;
+      instructor_private_settings: ReadOnlyTable<{
+        instructor_profile_id: string;
+        inquiry_phone_e164: string | null;
+        sms_notifications_enabled: boolean;
+        sms_consent_at: string | null;
+        sms_opted_out_at: string | null;
+      }>;
+    };
+    Views: Record<string, never>;
+    Functions: {
+      complete_inquiry_notification_job: {
+        Args: CompletionArgs;
+        Returns: string;
+      };
+      defer_inquiry_notification_job: {
+        Args: DeferralArgs;
+        Returns: string;
+      };
+      complete_inquiry_thread_notification_job: {
+        Args: CompletionArgs;
+        Returns: string;
+      };
+      defer_inquiry_thread_notification_job: {
+        Args: DeferralArgs;
+        Returns: string;
+      };
+      inquiry_thread_notification_job_is_sendable: {
+        Args: { p_job_id: number };
+        Returns: boolean;
+      };
+      cancel_inquiry_thread_notification_job: {
+        Args: { p_job_id: number; p_reason: string };
+        Returns: string;
+      };
+      complete_profile_submission_notification_job: {
+        Args: CompletionArgs;
+        Returns: string;
+      };
+      defer_profile_submission_notification_job: {
+        Args: DeferralArgs;
+        Returns: string;
+      };
+      complete_instructor_service_notification_job: {
+        Args: CompletionArgs;
+        Returns: string;
+      };
+      defer_instructor_service_notification_job: {
+        Args: DeferralArgs;
+        Returns: string;
+      };
+      expire_instructor_billing_grace_periods: {
+        Args: Record<string, never>;
+        Returns: number;
+      };
+      enqueue_due_inquiry_followups: {
+        Args: Record<string, never>;
+        Returns: number;
+      };
+      enqueue_due_inquiry_response_actions: {
+        Args: Record<string, never>;
+        Returns: number;
+      };
+      claim_inquiry_notification_jobs_v3: {
+        Args: ClaimArgs;
+        Returns: NotificationJob[];
+      };
+      claim_inquiry_thread_notification_jobs: {
+        Args: ClaimArgs;
+        Returns: ThreadNotificationJob[];
+      };
+      claim_profile_submission_notification_jobs: {
+        Args: ClaimArgs;
+        Returns: ProfileSubmissionJob[];
+      };
+      claim_instructor_service_notification_jobs: {
+        Args: ClaimArgs;
+        Returns: InstructorServiceJob[];
+      };
+    };
+  };
+};
+
+type AdminClient = SupabaseContext<WorkerDatabase>["supabaseAdmin"];
 
 type NotificationType = "new_inquiry" | "booking_followup" | "completion_followup";
 
@@ -13,6 +131,7 @@ type NotificationJob = {
   attempt_number: number;
   inquiry_recipient_id: string;
   delivered_to_email: string;
+  recipient_login_email: string | null;
   delivered_to_phone_e164: string | null;
   inquiry_id: string;
   instructor_name: string;
@@ -31,6 +150,44 @@ type NotificationJob = {
   venue_has_speakers: boolean | null;
   venue_has_microphone: boolean | null;
   inquiry_message: string | null;
+  thread_id: string | null;
+};
+
+type ThreadNotificationType =
+  | "new_thread"
+  | "new_message"
+  | "response_reminder_24"
+  | "response_reminder_48"
+  | "response_timeout_instructor"
+  | "response_timeout_organizer"
+  | "thread_declined"
+  | "fallback_routed_organizer";
+
+type ThreadNotificationJob = {
+  job_id: number;
+  notification_type: ThreadNotificationType;
+  channel: "email";
+  attempt_number: number;
+  recipient_account_id: string | null;
+  delivered_to_email: string;
+  thread_id: string;
+  inquiry_id: string;
+  assignment_order: number;
+  instructor_name: string;
+  organizer_name: string;
+  company_name: string | null;
+  event_type: string | null;
+  event_date: string | null;
+  event_start_time: string | null;
+  time_zone: string | null;
+  venue_name: string | null;
+  event_location: string | null;
+  guest_count: number | null;
+  message_id: number | null;
+  message_body: string | null;
+  sender_name: string | null;
+  response_due_at: string | null;
+  fallback_consent: boolean;
 };
 
 type ProfileSubmissionJob = {
@@ -158,7 +315,33 @@ function inquiryFeedbackUrl(job: NotificationJob, followup: "booking" | "complet
   return url.toString();
 }
 
-function emailText(job: NotificationJob): string {
+export function inquiryThreadPath(
+  threadId: string,
+  adminRecipient = false,
+): string {
+  const basePath = adminRecipient ? "/admin/" : "/account/";
+  const tab = adminRecipient ? "messages" : "inquiries";
+  return `${basePath}?tab=${tab}&thread=${encodeURIComponent(threadId)}`;
+}
+
+export function inquiryThreadRecipientPath(
+  threadId: string,
+  recipientIdentity: string | null,
+): string {
+  return inquiryThreadPath(threadId, recipientIdentity === null);
+}
+
+function inquiryThreadDirectUrl(
+  threadId: string,
+  recipientIdentity: string | null,
+): string {
+  return new URL(
+    inquiryThreadRecipientPath(threadId, recipientIdentity),
+    configuredAppUrl(),
+  ).toString();
+}
+
+function emailText(job: NotificationJob, actionUrl: string | null = null): string {
   const notificationType = normalizedNotificationType(job);
   if (notificationType === "booking_followup") {
     return [
@@ -189,7 +372,7 @@ function emailText(job: NotificationJob): string {
   return [
     `Hi ${job.instructor_name},`,
     "",
-    `${job.organizer_name} sent you a new inquiry through Hire Line Dancers. Reply to this email to respond directly to the organizer.`,
+    `${job.organizer_name} sent you a new inquiry through Hire Line Dancers. Open the conversation to reply on Hire Line Dancers.`,
     "",
     `Event type: ${eventTypeLabel(job.event_type)}`,
     `Event date: ${display(job.event_date)}`,
@@ -206,13 +389,13 @@ function emailText(job: NotificationJob): string {
     "Message:",
     display(job.inquiry_message),
     "",
-    `Organizer email: ${job.organizer_email}`,
+    actionUrl ? `Open the conversation: ${actionUrl}` : "",
     "",
-    "Please reply within 48 hours, even if you are not available.",
+    "Please reply within 72 hours, even if you are not available.",
   ].join("\n");
 }
 
-function emailHtml(job: NotificationJob): string {
+function emailHtml(job: NotificationJob, actionUrl: string | null = null): string {
   const notificationType = normalizedNotificationType(job);
   if (notificationType !== "new_inquiry") {
     const isBooking = notificationType === "booking_followup";
@@ -267,13 +450,14 @@ function emailHtml(job: NotificationJob): string {
         <div style="border-top:8px solid #e7a33c;background:#ffffff;padding:30px">
           <p style="margin:0 0 18px">Hi ${escapeHtml(job.instructor_name)},</p>
           <h1 style="margin:0 0 16px;font-size:28px;line-height:1.15">You have a new event inquiry</h1>
-          <p style="margin:0 0 22px">${escapeHtml(job.organizer_name)} sent you an inquiry through Hire Line Dancers. Reply to this email to respond directly to the organizer.</p>
+          <p style="margin:0 0 22px">${escapeHtml(job.organizer_name)} sent you an inquiry through Hire Line Dancers. Open the conversation to reply on Hire Line Dancers.</p>
           <table role="presentation" style="width:100%;border-collapse:collapse">${details}</table>
           <div style="margin-top:22px;padding:18px;background:#f1efe8">
             <strong>Organizer message</strong>
             <p style="margin:8px 0 0;white-space:pre-wrap">${escapeHtml(display(job.inquiry_message))}</p>
           </div>
-          <p style="margin:22px 0 0"><strong>Reply within 48 hours</strong>, even if you are not available. Your reply will go to ${escapeHtml(job.organizer_email)}.</p>
+          ${actionUrl ? `<p style="margin:22px 0 0"><a href="${escapeHtml(actionUrl)}" style="display:inline-block;padding:14px 20px;background:#e7a33c;border:2px solid #1c2a44;color:#1c2a44;font-weight:700;text-decoration:none">Open conversation</a></p>` : ""}
+          <p style="margin:22px 0 0"><strong>Reply within 72 hours</strong>, even if you are not available.</p>
         </div>
       </div>
     </body>
@@ -284,6 +468,9 @@ async function sendEmail(job: NotificationJob): Promise<string> {
   const apiKey = requiredEnv("RESEND_API_KEY");
   const from = requiredEnv("RESEND_FROM_EMAIL");
   const supportEmail = Deno.env.get("SUPPORT_EMAIL")?.trim() || "hello@hirelinedancers.com";
+  const actionUrl = normalizedNotificationType(job) === "new_inquiry" && job.thread_id
+    ? inquiryThreadDirectUrl(job.thread_id, job.recipient_login_email)
+    : null;
   let response: Response;
 
   try {
@@ -298,16 +485,14 @@ async function sendEmail(job: NotificationJob): Promise<string> {
       body: JSON.stringify({
         from,
         to: [job.delivered_to_email],
-        reply_to: normalizedNotificationType(job) === "new_inquiry"
-          ? job.organizer_email
-          : supportEmail,
+        reply_to: supportEmail,
         subject: normalizedNotificationType(job) === "booking_followup"
           ? "Did this inquiry turn into a booking?"
           : normalizedNotificationType(job) === "completion_followup"
           ? "How did your line dance event go?"
           : `New ${eventTypeInSentence(job.event_type)} inquiry from ${job.organizer_name}`,
-        text: emailText(job),
-        html: emailHtml(job),
+        text: emailText(job, actionUrl),
+        html: emailHtml(job, actionUrl),
       }),
     });
   } catch (error) {
@@ -331,6 +516,192 @@ function configuredAppUrl(): URL {
     throw new ConfigurationError("APP_URL must use HTTPS outside local development");
   }
   return url;
+}
+
+function threadNotificationSubject(job: ThreadNotificationJob): string {
+  switch (job.notification_type) {
+    case "new_thread":
+      return `New inquiry from ${job.organizer_name}`;
+    case "new_message":
+      return "New message in your Hire Line Dancers inquiry";
+    case "response_reminder_24":
+      return `Reminder: respond to ${job.organizer_name}'s inquiry`;
+    case "response_reminder_48":
+      return `Second reminder: respond to ${job.organizer_name}'s inquiry`;
+    case "response_timeout_instructor":
+      return "Your inquiry response window has ended";
+    case "response_timeout_organizer":
+      return `${job.instructor_name} has not responded`;
+    case "thread_declined":
+      return `${job.instructor_name} is unavailable for this inquiry`;
+    case "fallback_routed_organizer":
+      return `Your inquiry was sent to ${job.instructor_name}`;
+  }
+}
+
+function threadNotificationContent(job: ThreadNotificationJob): {
+  recipientName: string | null;
+  heading: string;
+  description: string;
+  instruction: string | null;
+} {
+  switch (job.notification_type) {
+    case "new_thread":
+      return {
+        recipientName: job.instructor_name,
+        heading: "You have a new event inquiry",
+        description: `${job.organizer_name} sent an inquiry through Hire Line Dancers.`,
+        instruction: "Please reply within 72 hours, even if you are not available.",
+      };
+    case "new_message":
+      return {
+        recipientName: null,
+        heading: "You have a new inquiry message",
+        description: `${job.sender_name || "A conversation participant"} sent a message through Hire Line Dancers.`,
+        instruction: "Open the conversation to read and reply.",
+      };
+    case "response_reminder_24":
+      return {
+        recipientName: job.instructor_name,
+        heading: "An inquiry is waiting for your response",
+        description: `${job.organizer_name}'s inquiry has been waiting for 24 hours.`,
+        instruction: "Open the conversation to reply or mark that you are unavailable.",
+      };
+    case "response_reminder_48":
+      return {
+        recipientName: job.instructor_name,
+        heading: "An inquiry is still waiting for your response",
+        description: `${job.organizer_name}'s inquiry has been waiting for 48 hours.`,
+        instruction: "Open the conversation to reply or mark that you are unavailable.",
+      };
+    case "response_timeout_instructor":
+      return {
+        recipientName: job.instructor_name,
+        heading: "The response window has ended",
+        description: "The 72-hour response window for this inquiry has ended.",
+        instruction: "Open the conversation to review its current status.",
+      };
+    case "response_timeout_organizer":
+      return {
+        recipientName: job.organizer_name,
+        heading: `${job.instructor_name} has not responded`,
+        description: "The instructor has not responded within 72 hours.",
+        instruction: job.fallback_consent
+          ? "Hire Line Dancers has flagged this inquiry for administrator fallback review."
+          : "Open the conversation to review the inquiry status.",
+      };
+    case "thread_declined":
+      return {
+        recipientName: job.organizer_name,
+        heading: `${job.instructor_name} is unavailable`,
+        description: "The instructor marked that they are unavailable for this inquiry.",
+        instruction: job.fallback_consent
+          ? "Hire Line Dancers can review another eligible instructor."
+          : "Open the conversation to review the inquiry status.",
+      };
+    case "fallback_routed_organizer":
+      return {
+        recipientName: job.organizer_name,
+        heading: "Your inquiry was sent to another instructor",
+        description: `Hire Line Dancers sent your event details to ${job.instructor_name}.`,
+        instruction: "Open the conversation to follow the response.",
+      };
+  }
+}
+
+function threadNotificationText(
+  job: ThreadNotificationJob,
+  actionUrl: string,
+): string {
+  const content = threadNotificationContent(job);
+  return [
+    content.recipientName ? `Hi ${content.recipientName},` : "Hello,",
+    "",
+    content.heading,
+    "",
+    content.description,
+    content.instruction || "",
+    "",
+    `Event type: ${eventTypeLabel(job.event_type)}`,
+    `Event date: ${display(job.event_date)}`,
+    `Location: ${display(job.event_location)}`,
+    "",
+    `Open the conversation: ${actionUrl}`,
+  ].filter((line, index, lines) => line !== "" || lines[index - 1] !== "").join("\n");
+}
+
+function threadNotificationHtml(
+  job: ThreadNotificationJob,
+  actionUrl: string,
+): string {
+  const content = threadNotificationContent(job);
+  return `<!doctype html>
+  <html lang="en">
+    <body style="margin:0;background:#fbfaf5;color:#1c2a44;font-family:Arial,sans-serif;line-height:1.55">
+      <div style="max-width:640px;margin:0 auto;padding:32px 20px">
+        <div style="border-top:8px solid #e7a33c;background:#ffffff;padding:30px">
+          <p style="margin:0 0 18px">${escapeHtml(content.recipientName ? `Hi ${content.recipientName},` : "Hello,")}</p>
+          <h1 style="margin:0 0 16px;font-size:28px;line-height:1.15">${escapeHtml(content.heading)}</h1>
+          <p style="margin:0 0 12px">${escapeHtml(content.description)}</p>
+          ${content.instruction ? `<p style="margin:0 0 22px">${escapeHtml(content.instruction)}</p>` : ""}
+          <table role="presentation" style="width:100%;margin:0 0 24px;border-collapse:collapse">
+            <tr><th align="left" style="padding:7px 12px 7px 0;color:#57607a">Event type</th><td style="padding:7px 0">${escapeHtml(eventTypeLabel(job.event_type))}</td></tr>
+            <tr><th align="left" style="padding:7px 12px 7px 0;color:#57607a">Event date</th><td style="padding:7px 0">${escapeHtml(display(job.event_date))}</td></tr>
+            <tr><th align="left" style="padding:7px 12px 7px 0;color:#57607a">Location</th><td style="padding:7px 0">${escapeHtml(display(job.event_location))}</td></tr>
+          </table>
+          <a href="${escapeHtml(actionUrl)}" style="display:inline-block;padding:14px 20px;background:#e7a33c;border:2px solid #1c2a44;color:#1c2a44;font-weight:700;text-decoration:none">Open conversation</a>
+        </div>
+      </div>
+    </body>
+  </html>`;
+}
+
+async function sendThreadNotificationEmail(
+  job: ThreadNotificationJob,
+): Promise<string> {
+  const apiKey = requiredEnv("RESEND_API_KEY");
+  const from = requiredEnv("RESEND_FROM_EMAIL");
+  const supportEmail = Deno.env.get("SUPPORT_EMAIL")?.trim() ||
+    "hello@hirelinedancers.com";
+  const actionUrl = inquiryThreadDirectUrl(job.thread_id, job.recipient_account_id);
+
+  let response: Response;
+  try {
+    response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      signal: AbortSignal.timeout(15_000),
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "Idempotency-Key": `hld-thread-${job.job_id}-email`,
+      },
+      body: JSON.stringify({
+        from,
+        to: [job.delivered_to_email],
+        reply_to: supportEmail,
+        subject: threadNotificationSubject(job),
+        text: threadNotificationText(job, actionUrl),
+        html: threadNotificationHtml(job, actionUrl),
+      }),
+    });
+  } catch (error) {
+    throw new ProviderError(
+      error instanceof Error ? error.message : "Resend request failed",
+      true,
+    );
+  }
+
+  const payload = await response.json().catch(() => ({})) as {
+    id?: string;
+    message?: string;
+  };
+  if (!response.ok || !payload.id) {
+    throw new ProviderError(
+      `Resend returned ${response.status}: ${payload.message || "email was not accepted"}`,
+      retryableStatus(response.status),
+    );
+  }
+  return payload.id;
 }
 
 async function profileReviewMagicLink(
@@ -864,6 +1235,119 @@ async function processJob(admin: AdminClient, job: NotificationJob): Promise<str
   }
 }
 
+async function finishThreadNotificationJob(
+  admin: AdminClient,
+  job: ThreadNotificationJob,
+  result: {
+    success: boolean;
+    providerMessageId?: string;
+    error?: string;
+    retryable?: boolean;
+  },
+): Promise<string> {
+  const { data, error } = await admin.rpc(
+    "complete_inquiry_thread_notification_job",
+    {
+      p_job_id: job.job_id,
+      p_success: result.success,
+      p_provider_message_id: result.providerMessageId ?? null,
+      p_error: result.error?.slice(0, 2000) ?? null,
+      p_retryable: result.retryable ?? false,
+    },
+  );
+  if (error) {
+    throw new Error(
+      `Unable to complete thread notification ${job.job_id}: ${error.message}`,
+    );
+  }
+  return String(data);
+}
+
+async function deferThreadNotificationJob(
+  admin: AdminClient,
+  job: ThreadNotificationJob,
+  error: string,
+): Promise<string> {
+  const { data, error: deferError } = await admin.rpc(
+    "defer_inquiry_thread_notification_job",
+    {
+      p_job_id: job.job_id,
+      p_error: error.slice(0, 2000),
+      p_delay: "15 minutes",
+    },
+  );
+  if (deferError) {
+    throw new Error(
+      `Unable to defer thread notification ${job.job_id}: ${deferError.message}`,
+    );
+  }
+  return String(data);
+}
+
+async function processThreadNotificationJob(
+  admin: AdminClient,
+  job: ThreadNotificationJob,
+): Promise<string> {
+  try {
+    const { data: sendable, error: sendableError } = await admin.rpc(
+      "inquiry_thread_notification_job_is_sendable",
+      { p_job_id: job.job_id },
+    );
+    if (sendableError) {
+      throw new ProviderError(
+        `Unable to recheck thread notification: ${sendableError.message}`,
+        true,
+      );
+    }
+    if (!sendable) {
+      const { data, error } = await admin.rpc(
+        "cancel_inquiry_thread_notification_job",
+        {
+          p_job_id: job.job_id,
+          p_reason: "Notification is no longer needed",
+        },
+      );
+      if (error) {
+        throw new Error(
+          `Unable to cancel thread notification ${job.job_id}: ${error.message}`,
+        );
+      }
+      return String(data);
+    }
+
+    const providerMessageId = await sendThreadNotificationEmail(job);
+    return await finishThreadNotificationJob(admin, job, {
+      success: true,
+      providerMessageId,
+    });
+  } catch (error) {
+    if (error instanceof ConfigurationError) {
+      console.error(
+        "Thread notification provider is not configured",
+        job.job_id,
+        error.message,
+      );
+      return await deferThreadNotificationJob(admin, job, error.message);
+    }
+    const providerError = error instanceof ProviderError
+      ? error
+      : new ProviderError(
+        error instanceof Error ? error.message : "Thread notification failed",
+        true,
+      );
+    console.error(
+      "Thread notification request failed",
+      job.job_id,
+      providerError.message,
+    );
+    return await finishThreadNotificationJob(admin, job, {
+      success: false,
+      error: providerError.message,
+      retryable: providerError.retryable,
+    });
+  }
+}
+
 async function finishProfileSubmissionJob(
   admin: AdminClient,
   job: ProfileSubmissionJob,
@@ -1006,7 +1490,13 @@ async function processInstructorServiceJob(
 }
 
 export default {
-  fetch: withSupabase<any>({ auth: "secret:automations", cors: false }, async (req, ctx) => {
+  fetch: withSupabase<WorkerDatabase>(
+    {
+      auth: "secret:automations",
+      cors: false,
+      supabaseOptions: supabaseServerOptions(),
+    },
+    async (req, ctx) => {
     if (req.method !== "POST") {
       return Response.json({ error: "Method not allowed" }, { status: 405 });
     }
@@ -1043,7 +1533,21 @@ export default {
       return Response.json({ error: "Unable to enqueue inquiry follow-ups" }, { status: 500 });
     }
 
-    const { data, error } = await ctx.supabaseAdmin.rpc("claim_inquiry_notification_jobs_v2", {
+    const { data: timedOutThreads, error: responseActionError } = await ctx
+      .supabaseAdmin.rpc("enqueue_due_inquiry_response_actions");
+    if (responseActionError) {
+      console.error(
+        "Unable to process due inquiry response actions",
+        responseActionError.code,
+        responseActionError.message,
+      );
+      return Response.json(
+        { error: "Unable to process inquiry response reminders" },
+        { status: 500 },
+      );
+    }
+
+    const { data, error } = await ctx.supabaseAdmin.rpc("claim_inquiry_notification_jobs_v3", {
       p_limit: limit,
       p_lock_timeout: "10 minutes",
     });
@@ -1054,6 +1558,22 @@ export default {
     }
 
     const jobs = (data ?? []) as NotificationJob[];
+    const { data: threadData, error: threadError } = await ctx.supabaseAdmin.rpc(
+      "claim_inquiry_thread_notification_jobs",
+      { p_limit: limit, p_lock_timeout: "10 minutes" },
+    );
+    if (threadError) {
+      console.error(
+        "Unable to claim thread notifications",
+        threadError.code,
+        threadError.message,
+      );
+      return Response.json(
+        { error: "Unable to claim thread notifications" },
+        { status: 500 },
+      );
+    }
+    const threadJobs = (threadData ?? []) as ThreadNotificationJob[];
     const { data: profileData, error: profileError } = await ctx.supabaseAdmin.rpc(
       "claim_profile_submission_notification_jobs",
       { p_limit: limit, p_lock_timeout: "10 minutes" },
@@ -1082,27 +1602,43 @@ export default {
     }
 
     const serviceJobs = (serviceData ?? []) as InstructorServiceJob[];
-    const [inquirySettled, profileSettled, serviceSettled] = await Promise.all([
+    const [inquirySettled, threadSettled, profileSettled, serviceSettled] = await Promise.all([
       Promise.allSettled(jobs.map((job) => processJob(ctx.supabaseAdmin, job))),
+      Promise.allSettled(
+        threadJobs.map((job) =>
+          processThreadNotificationJob(ctx.supabaseAdmin, job)
+        ),
+      ),
       Promise.allSettled(profileJobs.map((job) => processProfileSubmissionJob(ctx.supabaseAdmin, job))),
       Promise.allSettled(serviceJobs.map((job) => processInstructorServiceJob(ctx.supabaseAdmin, job))),
     ]);
     const outcomes = inquirySettled.map((result) => result.status === "fulfilled" ? result.value : "worker_error");
+    const threadOutcomes = threadSettled.map((result) =>
+      result.status === "fulfilled" ? result.value : "worker_error"
+    );
     const profileOutcomes = profileSettled.map((result) => result.status === "fulfilled" ? result.value : "worker_error");
     const serviceOutcomes = serviceSettled.map((result) => result.status === "fulfilled" ? result.value : "worker_error");
-    const allOutcomes = [...outcomes, ...profileOutcomes, ...serviceOutcomes];
+    const allOutcomes = [
+      ...outcomes,
+      ...threadOutcomes,
+      ...profileOutcomes,
+      ...serviceOutcomes,
+    ];
 
     return Response.json({
-      claimed: jobs.length + profileJobs.length + serviceJobs.length,
+      claimed: jobs.length + threadJobs.length + profileJobs.length + serviceJobs.length,
       inquiryClaimed: jobs.length,
+      threadClaimed: threadJobs.length,
       profileClaimed: profileJobs.length,
       serviceClaimed: serviceJobs.length,
       expiredGracePeriods: Number(expiredGracePeriods ?? 0),
+      timedOutThreads: Number(timedOutThreads ?? 0),
       sent: allOutcomes.filter((status) => status === "sent").length,
       rescheduled: allOutcomes.filter((status) => status === "pending").length,
       failed: allOutcomes.filter((status) => status === "failed" || status === "worker_error").length,
     }, {
       headers: { "Cache-Control": "no-store" },
     });
-  }),
+    },
+  ),
 };

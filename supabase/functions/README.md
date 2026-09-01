@@ -102,6 +102,7 @@ Public only at the Supabase gateway. It authenticates Stripe by verifying the `S
 Subscribe the Stripe webhook endpoint to:
 
 - `checkout.session.completed`
+- `invoice.finalized`
 - `invoice.paid`
 - `invoice.payment_failed`
 - `customer.subscription.created`
@@ -115,6 +116,12 @@ For a setup-mode `checkout.session.completed` event, the webhook performs the sa
 Only subscriptions containing `STRIPE_PRICE_ID` are processed. This isolates Hire Line Dancers when the Stripe account also contains other product lines.
 
 Each Stripe event ID is inserted transactionally. Duplicate deliveries return `duplicate` without applying the event twice. The handler retrieves the current Subscription from Stripe before syncing, which reduces event ordering problems.
+
+`invoice.finalized` is the primary membership-credit consumption signal.
+`invoice.paid` provides an idempotent fallback. Consumption requires the exact
+stored Stripe Discount ID on the exact monthly membership invoice line. A
+zero-dollar credit invoice remains excluded from the positive-paid-invoice
+ledger and does not start the 90-day guarantee.
 
 An active or trialing membership changes an `approved` profile to `published`. An inactive, unpaid, paused, or canceled membership changes a `published` profile back to `approved`. The profile and media remain stored. An administrator-set `suspended` profile is never republished automatically. Reapproving a suspended or draft profile publishes it immediately when its canonical membership is still active or trialing. `past_due` leaves the current profile visibility unchanged so a separate billing grace policy can be applied later.
 
@@ -147,6 +154,52 @@ const { data, error } = await supabase.functions.invoke(
 
 The Refund ID must begin with `re_`. Rechecking the same matching refund is idempotent. A verified refund does not cancel the instructor subscription or alter its billing state.
 
+### `grant-membership-free-month`
+
+Authenticated marketplace-owner endpoint for issuing a durable one-month
+membership credit. The database records the entitlement before Stripe is
+called. Repeating the same idempotency key returns the original entitlement.
+The endpoint accepts `admin`, `referral`, and `welcome_video` sources so later
+qualification workflows can use the same service-only issuance path.
+
+Request body:
+
+```json
+{
+  "instructorProfileId": "00000000-0000-4000-8000-000000000000",
+  "source": "admin",
+  "sourceReference": "00000000-0000-4000-8000-000000000001",
+  "idempotencyKey": "00000000-0000-4000-8000-000000000001",
+  "adminNote": null
+}
+```
+
+`sourceReference` is an opaque workflow identifier. Do not place a referral
+email address or other personal data in this field. A successful request
+returns `applied`, `deferred`, or `existing`. A deferred result means the
+credit is safely pending and is not an error.
+
+The function applies only the configured monthly Hire Line Dancers Price. It
+does not stack with customer, subscription, or subscription-item discounts.
+It also defers while a renewal invoice or billing recovery is open, while
+cancellation is scheduled, or while the membership is inactive. Canceled
+subscriptions reconcile any exact finalized or paid credit invoice before an
+unconsumed credit is requeued. Late invoice delivery can reverse that requeue
+only when no replacement application exists. Unknown and annual billing
+cadences fail closed.
+
+`STRIPE_MEMBERSHIP_FREE_MONTH_COUPON_ID` must identify a valid, 100 percent
+off, once-only Coupon restricted to `STRIPE_PRODUCT_ID`. It must not have any
+Promotion Code, redemption limit, or expiration. Never set it to the legacy
+`Z00npt3G` Coupon or `FREEMONTH` promotion. The integration never creates a
+Promotion Code.
+
+Use a dedicated restricted Stripe API key in
+`STRIPE_MEMBERSHIP_CREDIT_KEY`. Grant only the reads needed for the configured
+Product, Price, Coupon, Promotion Codes, Customer, Subscription, and Invoice,
+plus Subscription write access. Keep the key in Supabase secrets and never in
+browser code or a committed environment file.
+
 ### `process-inquiry-notifications`
 
 Internal worker protected by the named Supabase secret key `automations` in the `apikey` header. It atomically claims inquiry and administrator profile-submission jobs with `FOR UPDATE SKIP LOCKED`, recovers locks older than 10 minutes, and retries temporary failures with exponential backoff. Six provider attempts are allowed. Missing provider secrets defer work without consuming an attempt.
@@ -157,12 +210,18 @@ After a profile is approved, the database queues one instructor approval email o
 
 For later positive invoice failures, the webhook starts a durable recovery. An instructor with a prior positive paid invoice remains published for exactly 14 days and receives the deadline in the email. A membership without a prior positive paid invoice is paused immediately and receives no grace. Recovery links use a secure Supabase magic link, open Stripe payment-method update, and retry the exact overdue invoice. The worker enforces expired grace periods every minute before claiming email work.
 
-New-inquiry email is sent through Resend with the organizer address in `Reply-To`. The worker also queues two email follow-ups through the same durable job system. Follow-up messages use `SUPPORT_EMAIL` in `Reply-To`, with `hello@hirelinedancers.com` as the fallback:
+New inquiries create a private conversation thread for the organizer and the selected instructor. Resend email links open that exact thread and require the recipient to use their normal Hire Line Dancers sign-in. Inquiry and message email uses `SUPPORT_EMAIL` in `Reply-To`, with `hello@hirelinedancers.com` as the fallback. Participant replies stay inside Hire Line Dancers instead of leaving through email. Static-listing notifications open the exact thread in Admin Messages. An administrator can reply only in those static-support threads, and organizer email identifies that sender as Hire Line Dancers instead of exposing the administrator account name.
+
+After Resend accepts the initial thread email, the database starts a 72-hour response clock. It creates deterministic email jobs for 24-hour and 48-hour instructor reminders, plus 72-hour status notifications for the instructor and organizer. An instructor reply or unavailable action cancels pending response jobs atomically. At 72 hours the database locks and rechecks the thread, marks it timed out, and creates an administrator fallback review event. It never shares the organizer's inquiry with another instructor automatically. An administrator must select an eligible instructor through `admin_route_inquiry`, and the RPC refuses to route unless the organizer recorded fallback consent when submitting the inquiry.
+
+The same worker also queues two later booking and completion follow-ups through the legacy durable job system. Follow-up messages use `SUPPORT_EMAIL` in `Reply-To`:
 
 - Seven days after an unanswered inquiry, the instructor is asked whether it was booked: Yes, No, or In progress.
 - Two days after the confirmed date of a booked event, the instructor is asked whether the event happened: Yes or No.
 
 Follow-up links open the authenticated instructor inquiry page. Private comments are available only to the instructor and marketplace administrators. The email request uses a provider idempotency key. Each provider request has a 15-second timeout. Resend acceptance is recorded as `sent`. The existing `delivered` state is reserved for a future signed delivery webhook.
+
+Thread and message notification jobs use their own durable queue so each participant message can have a unique delivery record. The worker claims both queues with `FOR UPDATE SKIP LOCKED`. The thread queue supports new-thread, new-message, 24-hour reminder, 48-hour reminder, 72-hour instructor status, 72-hour organizer status, and instructor-unavailable email. Before each provider call, the worker rechecks whether the job remains sendable. This suppresses a reminder that was claimed just before an instructor replied.
 
 SMS is temporarily paused. Migration `202608040002_email_only_and_guarantee_refunds.sql` disables SMS preferences, cancels queued SMS work, and creates email-only recipients and jobs. The worker also rejects any SMS job that reaches it while the pause is active. The Twilio sender and consent checks remain in source so a future reviewed implementation can reuse them.
 
@@ -179,6 +238,8 @@ STRIPE_EXPECTED_MODE=live
 STRIPE_PRODUCT_ID=prod_...
 STRIPE_PRICE_ID=price_...
 STRIPE_INSTRUCTOR_OFFER_COUPON_ID=...
+STRIPE_MEMBERSHIP_FREE_MONTH_COUPON_ID=...
+STRIPE_MEMBERSHIP_CREDIT_KEY=rk_live_...
 STRIPE_BILLING_PORTAL_CONFIGURATION_ID=bpc_1U1CG4PoYzwtbFuToKoH8q3u
 STRIPE_REQUIRE_TERMS_CONSENT=true
 STRIPE_WEBHOOK_SIGNING_SECRET=whsec_...
@@ -217,6 +278,7 @@ Do not put any secret listed here into `NEXT_PUBLIC_*` variables or browser code
 - `reconcile-instructor-payment-setup`: keep JWT verification enabled. The function uses `auth: "user"` and verifies Session ownership plus the successful SetupIntent and attached card.
 - `review-instructor-profile`: keep JWT verification enabled. The function uses `auth: "user"`, enforces marketplace administrator access, and performs approval-time subscription creation.
 - `verify-instructor-refund`: keep JWT verification enabled. The function also uses `auth: "user"` and enforces marketplace-owner access.
+- `grant-membership-free-month`: keep JWT verification enabled. The function uses `auth: "user"`, enforces marketplace-owner access, and records each grant before applying a server-only Stripe Coupon.
 - `send-instructor-invitation`: keep JWT verification enabled. The function uses `auth: "user"` and enforces marketplace administrator access.
 - `stripe-webhook`: deploy with JWT verification disabled. The function uses `auth: "none"` and verifies Stripe itself.
 - `process-inquiry-notifications`: deploy with JWT verification disabled. The function uses `auth: "secret:automations"` and requires the named `automations` Supabase secret key in `apikey`.
@@ -235,6 +297,7 @@ supabase functions deploy create-billing-portal
 supabase functions deploy reconcile-instructor-billing-recovery
 supabase functions deploy create-instructor-checkout
 supabase functions deploy verify-instructor-refund
+supabase functions deploy grant-membership-free-month
 supabase functions deploy send-instructor-invitation
 supabase functions deploy stripe-webhook
 supabase functions deploy process-inquiry-notifications
@@ -322,6 +385,8 @@ limit 50;
 
 - Stripe must contain an active Product and recurring Price for exactly $14.99 USD per month. `STRIPE_PRODUCT_ID` and `STRIPE_PRICE_ID` must reference that exact pair, and `STRIPE_EXPECTED_MODE` must match their live or test mode. Setup Checkout saves the required card without creating a subscription or charge. Approval creates the subscription automatically.
 - The two-month offer must be server-controlled. Set `STRIPE_INSTRUCTOR_OFFER_COUPON_ID` to a coupon restricted to the configured Product, with exactly 100 percent off for exactly 2 repeating months and no `redeem_by` date or `max_redemptions` limit. The first 100 verified setup completions receive founding eligibility atomically. A timely private invitation can grant the same benefit after the first 100 spots are filled. Do not create or distribute a customer-facing promotion code, accept eligibility from browser input, or allow offers to stack.
+- Membership credits use a different server-only Coupon. It must be 100 percent off for one invoice, restricted to `STRIPE_PRODUCT_ID`, and have no Promotion Code. Credits are serialized so only one can be applied to an instructor at a time. Do not reuse `FREEMONTH` or the two-month acquisition Coupon.
+- This feature does not enable, disable, or otherwise change `automatic_tax`. If Stripe Tax is enabled separately, confirm that the business has the applicable active registrations before relying on collection.
 - The versioned 90-day guarantee applies to every membership first activated on or after August 7, 2026 and starts with the first invoice that collects a positive membership payment. Reject claims before day 90 and after the following 30-day request window. Preserve every 12-month founding guarantee already granted under the earlier policy.
 - Enable Stripe's **Limit customers to one subscription** setting and retain the server-side existing-subscription check. The public Portal login page is optional because the app creates authenticated Portal Sessions.
 - Configure live Public details with the Terms, Privacy, and support URLs before enabling Stripe's required terms checkbox.

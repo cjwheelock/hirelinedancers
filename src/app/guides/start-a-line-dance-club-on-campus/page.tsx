@@ -242,7 +242,7 @@ export default function CampusLineDanceGuidePage() {
                 <p>Hire a professional for the launch and occasional workshops, then let prepared student leaders run practice sessions between visits.</p>
               </div>
             </div>
-            <p>Use <Link href="/#find">Hire Line Dancers</Link> to explore instructors near your campus. Confirm experience, group size, styles, equipment, vendor paperwork, accessibility, cancellation terms, and payment directly with the instructor.</p>
+            <p>Use <Link href="/instructors/">Hire Line Dancers</Link> to explore instructors near your campus. Confirm experience, group size, styles, equipment, vendor paperwork, accessibility, cancellation terms, and payment directly with the instructor.</p>
           </section>
 
           <section id="launch-plan">
@@ -432,7 +432,7 @@ export default function CampusLineDanceGuidePage() {
             <p>Check the student organization process. Send the interest note to a few people. Ask one potential adviser for a conversation. Then take the next step.</p>
             <p>A line dancing community begins when someone decides there should be a welcoming place for people to try. That person can be you.</p>
             <div className="campus-guide-actions">
-              <Link className="button primary" href="/#find">Find an instructor near campus</Link>
+              <Link className="button primary" href="/instructors/">Find an instructor near campus</Link>
               <a className="button secondary" href={`mailto:${site.email}?subject=Campus line dancing club`}>Share feedback with us</a>
             </div>
           </section>

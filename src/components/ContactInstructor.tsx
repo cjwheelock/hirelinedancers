@@ -17,6 +17,8 @@ export function ContactInstructor() {
   const [profileLoading, setProfileLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [successId, setSuccessId] = useState<string | null>(null);
+  const [successThreadId, setSuccessThreadId] = useState<string | null>(null);
+  const [fallbackConsent, setFallbackConsent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({
     eventType: "corporate-events",
@@ -87,6 +89,7 @@ export function ContactInstructor() {
     setBusy(true);
     setError(null);
     setSuccessId(null);
+    setSuccessThreadId(null);
 
     try {
       const { data, error: submitError } = await client.rpc("submit_inquiry", {
@@ -105,10 +108,16 @@ export function ContactInstructor() {
         p_music_requests: form.musicRequests || null,
         p_venue_has_speakers: booleanOrNull(form.venueHasSpeakers),
         p_venue_has_microphone: booleanOrNull(form.venueHasMicrophone),
-        p_message: form.message || null
+        p_message: form.message || null,
+        p_fallback_consent: fallbackConsent
       });
       if (submitError) throw submitError;
-      setSuccessId(String(data));
+      const inquiryId = String(data);
+      setSuccessId(inquiryId);
+      const { data: threadId } = await client.rpc("get_inquiry_primary_thread", {
+        p_inquiry_id: inquiryId
+      });
+      if (typeof threadId === "string") setSuccessThreadId(threadId);
     } catch (submitError) {
       setError(readableError(submitError));
     } finally {
@@ -156,7 +165,7 @@ export function ContactInstructor() {
       <section className={`${styles.shell} ${styles.narrow}`}>
         <h1 className={styles.title}>We could not start this inquiry</h1>
         <p className={styles.error}>{error}</p>
-        <Link className={styles.button} href="/#find">Find an instructor</Link>
+        <Link className={styles.button} href="/instructors/">Find an instructor</Link>
       </section>
     );
   }
@@ -169,12 +178,12 @@ export function ContactInstructor() {
         <p className={styles.success}>
           {profile?.isStaticListing
             ? "Our team received your inquiry and will confirm that this launch listing is available before connecting you."
-            : "We sent the instructor an email with your event details. They will reply directly to your account email."}
+            : "Your inquiry is in Messages, and we emailed the instructor a secure link to reply."}
         </p>
         <p className={styles.subtitle}>Ask the instructor about availability, final pricing, contracts, insurance, payment terms, and any venue requirements.</p>
         <div className={styles.buttonRow} style={{ marginTop: 26 }}>
-          <a className={styles.button} href="/account/">View my inquiries</a>
-          <Link className={styles.secondaryButton} href="/#find">Browse more instructors</Link>
+          <a className={styles.button} href={successThreadId ? `/account/?tab=inquiries&inquiry=${encodeURIComponent(successId)}&thread=${encodeURIComponent(successThreadId)}` : "/account/?tab=inquiries"}>View messages</a>
+          <Link className={styles.secondaryButton} href="/instructors/">Browse more instructors</Link>
         </div>
       </section>
     );
@@ -184,7 +193,7 @@ export function ContactInstructor() {
     <section className={`${styles.shell} ${styles.narrow}`}>
       <p className={styles.eyebrow}>Contact {profile?.display_name}</p>
       <h1 className={styles.title}>Tell the instructor about your event</h1>
-      <p className={styles.subtitle}>This is an inquiry, not a booking. The instructor will confirm availability, rates, and terms by email.</p>
+      <p className={styles.subtitle}>This is an inquiry, not a booking. The instructor will confirm availability, rates, and terms through Hire Line Dancers.</p>
       <form className={`${styles.card} ${styles.stack}`} onSubmit={submit}>
         <div className={styles.grid}>
           <label className={styles.field}>
@@ -256,6 +265,11 @@ export function ContactInstructor() {
           <span>Anything else the instructor should know?</span>
           <textarea maxLength={3000} value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} />
         </label>
+        <label className={styles.check}>
+          <input required type="checkbox" checked={fallbackConsent} onChange={(event) => setFallbackConsent(event.target.checked)} />
+          <span>If this instructor does not respond within 72 hours, Hire Line Dancers may share this inquiry and your contact details with one qualified instructor at a time.</span>
+        </label>
+        <p className={styles.help}>Messages are handled through Hire Line Dancers. Authorized administrators can view them to support the inquiry.</p>
         {error ? <p className={styles.error}>{error}</p> : null}
         <button className={styles.button} disabled={busy} type="submit">{busy ? "Sending inquiry..." : "Send inquiry"}</button>
       </form>

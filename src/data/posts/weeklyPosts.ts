@@ -25,7 +25,7 @@ export const weeklyPosts: BlogPost[] = [
 <p>Ballroom, barn, backyard, brewery, office. If there's floor space and a speaker, it works.</p>
 <h2>7. It's the lasting memory</h2>
 <p>Guests forget the centerpieces. They don't forget the moment the whole room did the same dance. That's the memory line dancing manufactures on demand.</p>
-<p>Ready to try it? <a href="/#find">Find a line dance instructor near you</a>.</p>
+<p>Ready to try it? <a href="/instructors/">Find a line dance instructor near you</a>.</p>
 `
   },
   {
@@ -38,7 +38,7 @@ export const weeklyPosts: BlogPost[] = [
     body: `
 <p>The best events give guests something to do, not just something to see. Here are five interactive entertainment options that reliably work, with honest notes on where each fits best.</p>
 <h2>1. Line dance instructor</h2>
-<p>One pro turns your whole guest list into the entertainment. Best for: weddings, corporate parties, reunions, or any mixed crowd. Works for 10 to 500+ people, needs no equipment beyond sound, and every guest can join regardless of age or ability. The finale doubles as your best photo op. <a href="/#find">Find one near you</a>.</p>
+<p>One pro turns your whole guest list into the entertainment. Best for: weddings, corporate parties, reunions, or any mixed crowd. Works for 10 to 500+ people, needs no equipment beyond sound, and every guest can join regardless of age or ability. The finale doubles as your best photo op. <a href="/instructors/">Find one near you</a>.</p>
 <h2>2. Casino night tables</h2>
 <p>Blackjack and craps tables with funny money get strangers talking. Best for: corporate mixers and fundraisers. Watch for: cost scales with table count, and it splinters the room into small groups rather than uniting it.</p>
 <h2>3. Photo booth or 360 camera</h2>
@@ -146,7 +146,7 @@ export const weeklyPosts: BlogPost[] = [
 <p><strong>Strengths:</strong> converts non-dancers. Teaching simple line dances step by step gives every guest permission and ability at the same time, which is why an instructor can take a floor from empty to full in one song. <strong>Weakness:</strong> it's a session (30 to 90 minutes), not all-night programming.</p>
 <h2>The honest answer: sequence them</h2>
 <p>The best-planned events use an instructor as the ignition and a DJ as the engine: a guided lesson right after dinner fills the floor, then the DJ keeps it full. You get participation and party, usually for less than the cost of a band alone.</p>
-<p>Compare real pricing in our <a href="/guides/cost-to-hire-line-dance-instructor/">cost guide</a>, or <a href="/#find">find an instructor near you</a>.</p>
+<p>Compare real pricing in our <a href="/guides/cost-to-hire-line-dance-instructor/">cost guide</a>, or <a href="/instructors/">find an instructor near you</a>.</p>
 `
   },
   {
@@ -200,7 +200,7 @@ export const weeklyPosts: BlogPost[] = [
 <li>Tell your photographer and videographer when the finale will happen; an elevated angle captures the whole floor.</li>
 <li>Ask the instructor for a photo-ready ending. Most build one in.</li>
 </ul>
-<p>One instructor, one hour, and your event markets itself. <a href="/#find">Find one near you</a>.</p>
+<p>One instructor, one hour, and your event markets itself. <a href="/instructors/">Find one near you</a>.</p>
 `
   }
 ];

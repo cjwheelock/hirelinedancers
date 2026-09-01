@@ -16,6 +16,12 @@ import {
   verifiedPaidMembershipInvoices,
 } from "../_shared/hld-stripe.ts";
 import {
+  applyPendingMembershipCredit,
+  reconcileMembershipCreditInvoice,
+  reconcileOrRequeueCanceledMembershipCredits,
+} from "../_shared/hld-membership-credit.ts";
+import { supabaseServerOptions } from "../_shared/hld-supabase-admin.ts";
+import {
   INSTRUCTOR_PAYMENT_SETUP_TERMS_VERSION,
   validCheckoutSessionId,
   validUuid as validPaymentSetupUuid,
@@ -103,7 +109,10 @@ function eventSubscriptionId(event: Stripe.Event): {
     };
   }
 
-  if (event.type === "invoice.paid" || event.type === "invoice.payment_failed") {
+  if (
+    event.type === "invoice.finalized" || event.type === "invoice.paid" ||
+    event.type === "invoice.payment_failed"
+  ) {
     const invoice = event.data.object as Stripe.Invoice;
     return {
       subscriptionId: stripeInvoiceSubscriptionId(invoice),
@@ -132,6 +141,7 @@ function eventSubscriptionId(event: Stripe.Event): {
 
 const handledEvents = new Set<string>([
   "checkout.session.completed",
+  "invoice.finalized",
   "invoice.paid",
   "invoice.payment_failed",
   "customer.subscription.created",
@@ -142,6 +152,9 @@ const handledEvents = new Set<string>([
 ]);
 
 const stripe = new Stripe(requiredEnv("STRIPE_SECRET_KEY"));
+const membershipCreditStripe = new Stripe(
+  requiredEnv("STRIPE_MEMBERSHIP_CREDIT_KEY"),
+);
 const cryptoProvider = Stripe.createSubtleCryptoProvider();
 
 async function processInstructorPaymentSetupCompleted(
@@ -471,7 +484,11 @@ async function canonicalSetupActivation(
 }
 
 export default {
-  fetch: withSupabase<any>({ auth: "none", cors: false }, async (req, ctx) => {
+  fetch: withSupabase<any>({
+    auth: "none",
+    cors: false,
+    supabaseOptions: supabaseServerOptions(),
+  }, async (req, ctx) => {
     if (req.method !== "POST") {
       return new Response("Method not allowed", { status: 405 });
     }
@@ -957,6 +974,48 @@ export default {
         offerResult = data;
       }
 
+      let membershipCreditApplicationResult: unknown = null;
+      let membershipCreditConsumptionResult: unknown = null;
+      let membershipCreditsRequeued = 0;
+      if (instructorProfileId && subscription.status === "canceled") {
+        const cancellationResult =
+          await reconcileOrRequeueCanceledMembershipCredits(
+            membershipCreditStripe,
+            ctx.supabaseAdmin,
+            stripeConfig,
+            event,
+            subscription,
+            instructorProfileId,
+          );
+        membershipCreditsRequeued = cancellationResult.requeuedCount;
+        membershipCreditConsumptionResult =
+          cancellationResult.consumptionResult;
+      } else if (
+        instructorProfileId && membershipItem &&
+        syncResult !== "lifetime_access_ignored" &&
+        syncResult !== "stale_subscription"
+      ) {
+        membershipCreditApplicationResult = await applyPendingMembershipCredit(
+          membershipCreditStripe,
+          ctx.supabaseAdmin,
+          stripeConfig,
+          instructorProfileId,
+        );
+      }
+
+      if (
+        event.type === "invoice.finalized" || event.type === "invoice.paid"
+      ) {
+        membershipCreditConsumptionResult =
+          await reconcileMembershipCreditInvoice(
+            membershipCreditStripe,
+            ctx.supabaseAdmin,
+            stripeConfig,
+            event,
+            event.data.object as Stripe.Invoice,
+          );
+      }
+
       let paidInvoiceResult:
         | string[]
         | "stale_subscription_ignored"
@@ -1073,6 +1132,19 @@ export default {
         }
       }
 
+      if (
+        event.type === "invoice.paid" && instructorProfileId &&
+        membershipItem && syncResult !== "lifetime_access_ignored" &&
+        syncResult !== "stale_subscription"
+      ) {
+        membershipCreditApplicationResult = await applyPendingMembershipCredit(
+          membershipCreditStripe,
+          ctx.supabaseAdmin,
+          stripeConfig,
+          instructorProfileId,
+        );
+      }
+
       console.info("Stripe subscription sync complete", event.id, syncResult);
       return Response.json({
         received: true,
@@ -1081,6 +1153,9 @@ export default {
         paidInvoiceResult,
         billingRecoveryResult,
         billingRecoveryResolutions,
+        membershipCreditApplicationResult,
+        membershipCreditConsumptionResult,
+        membershipCreditsRequeued,
       });
     } catch (error) {
       const message = error instanceof Error

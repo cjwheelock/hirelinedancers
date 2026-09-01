@@ -3,7 +3,7 @@
 import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { AlertCircle, CheckCircle2, LoaderCircle, Mail, MailCheck, RotateCcw } from "lucide-react";
-import { cities, eventTypes } from "@/data/site";
+import { eventTypes, serviceMarkets } from "@/data/site";
 import {
   approvalEmailNeedsAttention,
   approvalEmailStatusCopy,
@@ -27,6 +27,8 @@ import {
 } from "@/lib/commercialTerms";
 import { useMarketplaceSession } from "@/hooks/useMarketplaceSession";
 import { ImageCropDialog } from "./ImageCropDialog";
+import { InquiryInbox } from "./InquiryInbox";
+import { MembershipCreditAdmin } from "./MembershipCreditAdmin";
 import {
   cleanAccountIntent,
   cleanInstructorInvitationToken,
@@ -98,12 +100,18 @@ export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean })
     setEntryInvitationToken(invitationToken);
     setEntryIntent(invitationToken ? "instructor" : cleanAccountIntent(params.get("intent")));
     const requestedReturn = params.get("returnTo");
-    setEntryReturnTo(requestedReturn ? cleanReturnPath(requestedReturn) : null);
+    const preserveCurrentRoute = !invitationToken
+      && !params.has("intent")
+      && ["thread", "inquiry", "tab", "followup"].some((name) => params.has(name));
+    const currentReturn = preserveCurrentRoute
+      ? cleanReturnPath(`${window.location.pathname}${window.location.search}${window.location.hash}`)
+      : null;
+    setEntryReturnTo(requestedReturn ? cleanReturnPath(requestedReturn) : currentReturn);
   }, []);
 
   useEffect(() => {
     if (loading || !configured || session || entryIntent === undefined || entryInvitationToken === undefined) return;
-    const next = adminOnly ? "/admin/" : entryReturnTo ?? "/account/";
+    const next = entryReturnTo ?? (adminOnly ? "/admin/" : "/account/");
     const signInHref = entryInvitationToken
       ? `${signInUrl(next, "instructor")}&invite=${encodeURIComponent(entryInvitationToken)}`
       : signInUrl(next, entryIntent ?? undefined);
@@ -556,13 +564,12 @@ function OnboardingForm({
 function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
   const [tab, setTab] = useState<InstructorTab>("profile");
   const [focusInquiryId, setFocusInquiryId] = useState<string | null>(null);
-  const [focusFollowup, setFocusFollowup] = useState<"booking" | "completion" | null>(null);
+  const [focusThreadId, setFocusThreadId] = useState<string | null>(null);
   const [profile, setProfile] = useState<InstructorProfile | null>(null);
   const [settings, setSettings] = useState<InstructorPrivateSettings | null>(null);
   const [billingRecovery, setBillingRecovery] = useState<InstructorBillingRecovery | null>(null);
   const [hasLifetimeAccess, setHasLifetimeAccess] = useState<boolean | null>(null);
   const [invitationOffer, setInvitationOffer] = useState<InstructorInvitationOfferStatus | null>(null);
-  const [inquiries, setInquiries] = useState<MarketplaceInquiry[]>([]);
   const [loading, setLoading] = useState(true);
   const [checkoutPending, setCheckoutPending] = useState(false);
   const [checkoutRecoveryError, setCheckoutRecoveryError] = useState<string | null>(null);
@@ -596,9 +603,8 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
     const loadedProfile = profileData as InstructorProfile | null;
     setProfile(loadedProfile);
     if (loadedProfile) {
-      const [privateResult, inquiryResult, lifetimeAccessResult, invitationOfferResult, billingRecoveryResult] = await Promise.all([
+      const [privateResult, lifetimeAccessResult, invitationOfferResult, billingRecoveryResult] = await Promise.all([
         client.from("instructor_private_settings").select("*").eq("instructor_profile_id", loadedProfile.id).maybeSingle(),
-        client.from("inquiries").select("*").eq("instructor_profile_id", loadedProfile.id).order("created_at", { ascending: false }),
         client.rpc("current_instructor_lifetime_access"),
         client.rpc("current_instructor_invitation_offer"),
         client.from("instructor_billing_recoveries")
@@ -609,10 +615,9 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
           .limit(1)
           .maybeSingle()
       ]);
-      const loadError = privateResult.error ?? inquiryResult.error ?? lifetimeAccessResult.error ?? invitationOfferResult.error ?? billingRecoveryResult.error;
+      const loadError = privateResult.error ?? lifetimeAccessResult.error ?? invitationOfferResult.error ?? billingRecoveryResult.error;
       if (loadError) setError(loadError.message);
       setSettings(privateResult.data as InstructorPrivateSettings | null);
-      setInquiries((inquiryResult.data as MarketplaceInquiry[] | null) ?? []);
       setHasLifetimeAccess(lifetimeAccessResult.error ? null : Boolean(lifetimeAccessResult.data));
       setInvitationOffer(invitationOfferResult.error
         ? null
@@ -622,7 +627,6 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
         : (billingRecoveryResult.data as InstructorBillingRecovery | null));
     } else {
       setSettings(null);
-      setInquiries([]);
       setHasLifetimeAccess(null);
       setInvitationOffer(null);
       setBillingRecovery(null);
@@ -704,18 +708,18 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
 
     const requestedTab = params.get("tab");
     const requestedInquiry = params.get("inquiry");
-    const requestedFollowup = params.get("followup");
+    const requestedThread = params.get("thread");
     const validInquiry = requestedInquiry && /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(requestedInquiry)
       ? requestedInquiry
       : null;
-    const validFollowup = requestedFollowup === "booking" || requestedFollowup === "completion"
-      ? requestedFollowup
+    const validThread = requestedThread && /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(requestedThread)
+      ? requestedThread
       : null;
 
-    if (validInquiry) {
+    if (validInquiry || validThread) {
       setTab("inquiries");
       setFocusInquiryId(validInquiry);
-      setFocusFollowup(validFollowup);
+      setFocusThreadId(validThread);
       return;
     }
     if (requestedTab === "media") {
@@ -957,20 +961,11 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
   function chooseTab(name: InstructorTab) {
     setTab(name);
     setFocusInquiryId(null);
-    setFocusFollowup(null);
+    setFocusThreadId(null);
     const url = new URL(window.location.href);
     url.searchParams.set("tab", name);
     url.searchParams.delete("inquiry");
-    url.searchParams.delete("followup");
-    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
-  }
-
-  function clearInquiryFocus() {
-    setFocusInquiryId(null);
-    setFocusFollowup(null);
-    const url = new URL(window.location.href);
-    url.searchParams.set("tab", "inquiries");
-    url.searchParams.delete("inquiry");
+    url.searchParams.delete("thread");
     url.searchParams.delete("followup");
     window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
   }
@@ -1024,7 +1019,7 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
             aria-selected={tab === name}
             onClick={() => chooseTab(name)}
           >
-            {name[0].toUpperCase() + name.slice(1)}
+            {name === "inquiries" ? "Messages" : name[0].toUpperCase() + name.slice(1)}
           </button>
         ))}
       </div>
@@ -1043,13 +1038,12 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
         <InstructorProfileForm profile={profile} settings={settings} hasLifetimeAccess={hasLifetimeAccess} onSaved={() => void load()} />
       ) : null}
       {!loading && tab === "inquiries" ? (
-        <InquiryList
-          inquiries={inquiries}
+        <InquiryInbox
           perspective="instructor"
+          accountId={account.id}
           focusInquiryId={focusInquiryId}
-          focusFollowup={focusFollowup}
-          onChange={() => void load()}
-          onFeedbackSubmitted={clearInquiryFocus}
+          focusThreadId={focusThreadId}
+          onDataChange={() => void load(true)}
         />
       ) : null}
       {!loading && profile && tab === "membership" && hasLifetimeAccess !== null ? (
@@ -1271,11 +1265,11 @@ function InstructorProfileForm({
 
   const canEdit = ["draft", "approved", "published"].includes(profile.status);
   const canContinue = profile.status === "draft";
-  const selectedMarket = cities.find((market) => market.city === form.city && market.state === form.region);
+  const selectedMarket = serviceMarkets.find((market) => market.city === form.city && market.state === form.region);
   const allEventTypesSelected = eventTypes.every((item) => form.event_types.includes(item.slug));
 
   function selectMarket(slug: string) {
-    const market = cities.find((item) => item.slug === slug);
+    const market = serviceMarkets.find((item) => item.slug === slug);
     if (!market) return;
     setForm((current) => ({ ...current, city: market.city, region: market.state }));
   }
@@ -1316,8 +1310,8 @@ function InstructorProfileForm({
         <label className={styles.field}>
           <span>City or metro area</span>
           <select disabled={!canEdit} required value={selectedMarket?.slug ?? ""} onChange={(e) => selectMarket(e.target.value)}>
-            <option value="">Select one of our launch areas</option>
-            {cities.map((market) => (
+            <option value="">Select a service market</option>
+            {serviceMarkets.map((market) => (
               <option key={market.slug} value={market.slug}>{market.city}, {market.state}</option>
             ))}
           </select>
@@ -1785,6 +1779,16 @@ function MembershipCard({
 type AdminNotificationJob = {
   id: number;
   channel: "email" | "sms";
+  notification_type: string;
+  status: string;
+  attempts: number;
+  last_error: string | null;
+  created_at: string;
+};
+
+type AdminThreadNotificationJob = {
+  id: number;
+  thread_id: string;
   notification_type: string;
   status: string;
   attempts: number;
@@ -2477,6 +2481,8 @@ function MembershipGuaranteeAdmin({ isOwner }: { isOwner: boolean }) {
             {!isOwner ? <p className={styles.notice}>Finance records are read-only for delegated administrators. Only the marketplace owner can change guarantees or verify refunds.</p> : null}
           </div>
 
+          <MembershipCreditAdmin instructorProfileId={selected.instructor_profile_id} isOwner={isOwner} />
+
           {isOwner ? (
             <>
               <form className={`${styles.card} ${styles.stack} ${styles.compactAdminCard}`} onSubmit={saveGuarantee}>
@@ -2569,11 +2575,14 @@ function MembershipGuaranteeAdmin({ isOwner }: { isOwner: boolean }) {
 }
 
 function AdminDashboard({ isOwner }: { isOwner: boolean }) {
-  const [tab, setTab] = useState<"overview" | "profiles" | "memberships" | "invitations" | "delivery" | "access">("overview");
+  const [tab, setTab] = useState<"overview" | "messages" | "profiles" | "memberships" | "invitations" | "delivery" | "access">("overview");
   const [focusedProfileId, setFocusedProfileId] = useState<string | null>(null);
+  const [focusedInquiryId, setFocusedInquiryId] = useState<string | null>(null);
+  const [focusedThreadId, setFocusedThreadId] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<InstructorProfile[]>([]);
   const [inquiries, setInquiries] = useState<MarketplaceInquiry[]>([]);
   const [jobs, setJobs] = useState<AdminNotificationJob[]>([]);
+  const [threadJobs, setThreadJobs] = useState<AdminThreadNotificationJob[]>([]);
   const [serviceJobs, setServiceJobs] = useState<AdminInstructorServiceNotificationJob[]>([]);
   const [media, setMedia] = useState<ProfileMedia[]>([]);
   const [admins, setAdmins] = useState<AdminAccess[]>([]);
@@ -2658,10 +2667,11 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
     if (!client) return;
     if (!silent) setLoading(true);
     setError(null);
-    const [profileResult, inquiryResult, jobResult, serviceJobResult, mediaResult, adminResult, feedbackResult, lifetimeResult, paymentSetupResult, entitlementResult, membershipResult, invitationResult] = await Promise.all([
+    const [profileResult, inquiryResult, jobResult, threadJobResult, serviceJobResult, mediaResult, adminResult, feedbackResult, lifetimeResult, paymentSetupResult, entitlementResult, membershipResult, invitationResult] = await Promise.all([
       client.from("instructor_profiles").select("*").order("updated_at", { ascending: false }),
       client.from("inquiries").select("*").order("created_at", { ascending: false }).limit(100),
       client.from("inquiry_notification_jobs").select("id,channel,notification_type,status,attempts,last_error,created_at").order("created_at", { ascending: false }).limit(100),
+      client.from("inquiry_thread_notification_jobs").select("id,thread_id,notification_type,status,attempts,last_error,created_at").order("created_at", { ascending: false }).limit(100),
       client.from("instructor_service_notification_jobs").select("id,instructor_profile_id,notification_type,status,attempts,last_error,created_at,sent_at").order("created_at", { ascending: false }).limit(100),
       client.from("profile_media").select("*").order("sort_order"),
       client.rpc("list_marketplace_admins"),
@@ -2672,12 +2682,13 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
       client.from("instructor_memberships").select("instructor_profile_id,stripe_customer_id,stripe_subscription_id,latest_checkout_session_id,status"),
       client.rpc("admin_list_instructor_invitations")
     ]);
-    const loadError = profileResult.error ?? inquiryResult.error ?? jobResult.error ?? serviceJobResult.error ?? mediaResult.error ?? adminResult.error ?? feedbackResult.error ?? lifetimeResult.error ?? paymentSetupResult.error ?? entitlementResult.error ?? membershipResult.error ?? invitationResult.error;
+    const loadError = profileResult.error ?? inquiryResult.error ?? jobResult.error ?? threadJobResult.error ?? serviceJobResult.error ?? mediaResult.error ?? adminResult.error ?? feedbackResult.error ?? lifetimeResult.error ?? paymentSetupResult.error ?? entitlementResult.error ?? membershipResult.error ?? invitationResult.error;
     if (loadError) setError(loadError.message);
     const loadedProfiles = (profileResult.data as InstructorProfile[] | null) ?? [];
     setProfiles(loadedProfiles);
     setInquiries((inquiryResult.data as MarketplaceInquiry[] | null) ?? []);
     setJobs((jobResult.data as AdminNotificationJob[] | null) ?? []);
+    setThreadJobs((threadJobResult.data as AdminThreadNotificationJob[] | null) ?? []);
     setServiceJobs((serviceJobResult.data as AdminInstructorServiceNotificationJob[] | null) ?? []);
     setMedia((mediaResult.data as ProfileMedia[] | null) ?? []);
     setAdmins((adminResult.data as AdminAccess[] | null) ?? []);
@@ -2712,10 +2723,14 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const requestedTab = params.get("tab");
-    if (["overview", "profiles", "memberships", "invitations", "delivery", "access"].includes(requestedTab ?? "")) {
+    if (["overview", "messages", "profiles", "memberships", "invitations", "delivery", "access"].includes(requestedTab ?? "")) {
       setTab(requestedTab as typeof tab);
     }
     setFocusedProfileId(params.get("profile"));
+    const inquiry = params.get("inquiry");
+    const thread = params.get("thread");
+    setFocusedInquiryId(inquiry && /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(inquiry) ? inquiry : null);
+    setFocusedThreadId(thread && /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(thread) ? thread : null);
     void loadOperations();
   }, []);
 
@@ -2950,6 +2965,7 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
     profile.status === "pending_review" || Boolean(profileApprovalStates[profile.id])
   );
   const failedDeliveryCount = jobs.filter((job) => job.status === "failed").length
+    + threadJobs.filter((job) => job.status === "failed").length
     + serviceJobs.filter((job) => job.status === "failed").length;
 
   function latestApprovalEmailJob(profileId: string) {
@@ -2965,6 +2981,10 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
     const url = new URL(window.location.href);
     url.searchParams.set("tab", nextTab);
     if (nextTab !== "profiles") url.searchParams.delete("profile");
+    if (nextTab !== "messages") {
+      url.searchParams.delete("inquiry");
+      url.searchParams.delete("thread");
+    }
     window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
   }
 
@@ -2972,8 +2992,8 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
     <>
       <div className={styles.tabs} role="tablist" aria-label="Admin dashboard sections">
         {(isOwner
-          ? (["overview", "profiles", "memberships", "invitations", "delivery", "access"] as const)
-          : (["overview", "profiles", "memberships", "invitations", "delivery"] as const)
+          ? (["overview", "messages", "profiles", "memberships", "invitations", "delivery", "access"] as const)
+          : (["overview", "messages", "profiles", "memberships", "invitations", "delivery"] as const)
         ).map((name) => (
           <button key={name} className={`${styles.tab} ${tab === name ? styles.activeTab : ""}`} type="button" onClick={() => selectAdminTab(name)}>
             {name[0].toUpperCase() + name.slice(1)}
@@ -2983,6 +3003,14 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
       {message ? <p className={styles.success} role="status">{message}</p> : null}
       {loading ? <div className={styles.loading}>Loading marketplace operations...</div> : null}
+
+      {!loading && tab === "messages" ? (
+        <InquiryInbox
+          perspective="admin"
+          focusInquiryId={focusedInquiryId}
+          focusThreadId={focusedThreadId}
+        />
+      ) : null}
 
       {!loading && tab === "overview" ? (
         <div className={styles.compactAdminStack}>
@@ -3500,6 +3528,13 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
                 {job.last_error ? <p className={styles.error}>{job.last_error}</p> : null}
               </article>
             ))}
+            {threadJobs.slice(0, 100).map((job) => (
+              <article className={styles.listItem} key={`thread-${job.id}`}>
+                <div className={styles.buttonRow}><strong>EMAIL · {job.notification_type.replaceAll("_", " ")}</strong><span className={styles.status}>{job.status}</span></div>
+                <p>{new Date(job.created_at).toLocaleString()} · {job.attempts} attempt{job.attempts === 1 ? "" : "s"}</p>
+                {job.last_error ? <p className={styles.error}>{job.last_error}</p> : null}
+              </article>
+            ))}
             {jobs.slice(0, 100).map((job) => (
               <article className={styles.listItem} key={job.id}>
                 <div className={styles.buttonRow}><strong>{job.channel.toUpperCase()} · {job.notification_type.replaceAll("_", " ")}</strong><span className={styles.status}>{job.status}</span></div>
@@ -3535,230 +3570,30 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
 }
 
 function OrganizerDashboard({ accountId }: { accountId: string }) {
-  const [inquiries, setInquiries] = useState<MarketplaceInquiry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  async function load() {
-    const client = getMarketplaceClient();
-    if (!client) return;
-    const { data, error: loadError } = await client
-      .from("inquiries")
-      .select("*")
-      .eq("organizer_account_id", accountId)
-      .order("created_at", { ascending: false });
-    setInquiries((data as MarketplaceInquiry[] | null) ?? []);
-    setError(loadError?.message ?? null);
-    setLoading(false);
-  }
+  const [focusInquiryId, setFocusInquiryId] = useState<string | null>(null);
+  const [focusThreadId, setFocusThreadId] = useState<string | null>(null);
 
   useEffect(() => {
-    void load();
+    const params = new URLSearchParams(window.location.search);
+    const inquiry = params.get("inquiry");
+    const thread = params.get("thread");
+    setFocusInquiryId(inquiry && /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(inquiry) ? inquiry : null);
+    setFocusThreadId(thread && /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(thread) ? thread : null);
   }, [accountId]);
 
   return (
     <>
       <div className={styles.card}>
-        <h2>Your instructor inquiries</h2>
-        <p>Instructors reply to your account email so contracts, availability, rates, and payments can stay in your usual inbox.</p>
-        <Link className={styles.button} href="/#find">Find an instructor</Link>
+        <h2>Messages</h2>
+        <p>Contact instructors and keep each event conversation organized in your account.</p>
+        <Link className={styles.button} href="/instructors/">Find an instructor</Link>
       </div>
-      {loading ? <div className={styles.loading}>Loading inquiries...</div> : null}
-      {error ? <p className={styles.error}>{error}</p> : null}
-      {!loading ? <InquiryList inquiries={inquiries} perspective="organizer" onChange={() => void load()} /> : null}
+      <InquiryInbox
+        perspective="organizer"
+        accountId={accountId}
+        focusInquiryId={focusInquiryId}
+        focusThreadId={focusThreadId}
+      />
     </>
-  );
-}
-
-function InquiryList({
-  inquiries,
-  perspective,
-  onChange,
-  focusInquiryId = null,
-  focusFollowup = null,
-  onFeedbackSubmitted
-}: {
-  inquiries: MarketplaceInquiry[];
-  perspective: "organizer" | "instructor";
-  onChange: () => void;
-  focusInquiryId?: string | null;
-  focusFollowup?: "booking" | "completion" | null;
-  onFeedbackSubmitted?: () => void;
-}) {
-  const [busyId, setBusyId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [comments, setComments] = useState<Record<string, string>>({});
-  const [eventDates, setEventDates] = useState<Record<string, string>>(() => Object.fromEntries(
-    inquiries.map((inquiry) => [inquiry.id, inquiry.booking_event_date || inquiry.event_date || ""])
-  ));
-
-  useEffect(() => {
-    if (!focusInquiryId || !inquiries.some((inquiry) => inquiry.id === focusInquiryId)) return;
-    const timer = window.setTimeout(() => {
-      document.getElementById(`inquiry-${focusInquiryId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
-    }, 100);
-    return () => window.clearTimeout(timer);
-  }, [focusInquiryId, inquiries]);
-
-  async function setStatus(id: string, status: string) {
-    const client = getMarketplaceClient();
-    if (!client) return;
-    setBusyId(id);
-    setError(null);
-    const { error: actionError } = await client.rpc("set_inquiry_status", {
-      p_inquiry_id: id,
-      p_status: status,
-      p_note: null
-    });
-    setBusyId(null);
-    if (actionError) setError(actionError.message);
-    else onChange();
-  }
-
-  async function reportOutcome(id: string, outcome: string) {
-    const client = getMarketplaceClient();
-    if (!client) return;
-    setBusyId(id);
-    setError(null);
-    const { error: actionError } = await client.rpc("report_booking_outcome", {
-      p_inquiry_id: id,
-      p_outcome: outcome,
-      p_booking_value_cents: null,
-      p_note: null
-    });
-    setBusyId(null);
-    if (actionError) setError(actionError.message);
-    else onChange();
-  }
-
-  async function submitInstructorFeedback(
-    inquiry: MarketplaceInquiry,
-    stage: "booking" | "completion",
-    response: string
-  ) {
-    const client = getMarketplaceClient();
-    if (!client) return;
-    const requestId = `${inquiry.id}:${stage}`;
-    setBusyId(requestId);
-    setError(null);
-    const { error: actionError } = await client.rpc("submit_instructor_inquiry_feedback", {
-      p_inquiry_id: inquiry.id,
-      p_stage: stage,
-      p_response: response,
-      p_private_comment: comments[requestId]?.trim() || null,
-      p_confirmed_event_date: stage === "booking" && response === "booked"
-        ? eventDates[inquiry.id] || inquiry.event_date
-        : null
-    });
-    setBusyId(null);
-    if (actionError) setError(actionError.message);
-    else {
-      onChange();
-      onFeedbackSubmitted?.();
-    }
-  }
-
-  if (!inquiries.length) {
-    return <p className={styles.notice}>{perspective === "instructor" ? "No inquiries yet. New inquiries will appear here and arrive by email." : "You have not contacted an instructor yet."}</p>;
-  }
-
-  return (
-    <div className={styles.list}>
-      {error ? <p className={styles.error}>{error}</p> : null}
-      {focusInquiryId && !inquiries.some((inquiry) => inquiry.id === focusInquiryId) ? (
-        <p className={styles.error}>That inquiry is not available in this instructor account.</p>
-      ) : null}
-      {inquiries.map((inquiry) => (
-        <article
-          className={`${styles.listItem} ${focusInquiryId === inquiry.id ? styles.focusedItem : ""}`}
-          id={`inquiry-${inquiry.id}`}
-          key={inquiry.id}
-        >
-          <div className={styles.buttonRow}>
-            <span className={styles.status}>{inquiry.status.replace("_", " ")}</span>
-            <span className={styles.muted}>{new Date(inquiry.created_at).toLocaleDateString()}</span>
-          </div>
-          <h3>{perspective === "instructor" ? inquiry.contact_name : inquiry.instructor_name}</h3>
-          <p>{[inquiry.event_type, inquiry.event_date, inquiry.event_city, inquiry.event_region].filter(Boolean).join(" · ")}</p>
-          {inquiry.guest_count ? <p>{inquiry.guest_count} expected attendees</p> : null}
-          {inquiry.message ? <p>{inquiry.message}</p> : null}
-          {perspective === "instructor" && inquiry.contact_email ? (
-            <p><a href={`mailto:${inquiry.contact_email}?subject=${encodeURIComponent(`Your line dance inquiry for ${inquiry.event_date ?? "your event"}`)}`}>Reply by email</a></p>
-          ) : null}
-          <div className={styles.buttonRow}>
-            {perspective === "instructor" && !["responded", "declined", "booked", "not_booked", "closed"].includes(inquiry.status) ? (
-              <button className={styles.secondaryButton} disabled={busyId === inquiry.id} type="button" onClick={() => void setStatus(inquiry.id, "responded")}>Mark responded</button>
-            ) : null}
-            {perspective === "organizer" && !["withdrawn", "booked", "not_booked", "closed"].includes(inquiry.status) ? (
-              <button className={styles.dangerButton} disabled={busyId === inquiry.id} type="button" onClick={() => void setStatus(inquiry.id, "withdrawn")}>Withdraw inquiry</button>
-            ) : null}
-            {perspective === "organizer" && (inquiry.booking_outcome === "unknown" || inquiry.booking_outcome === "still_deciding") ? (
-              <>
-                <button className={styles.button} disabled={busyId === inquiry.id} type="button" onClick={() => void reportOutcome(inquiry.id, "booked")}>Booked</button>
-                <button className={styles.dangerButton} disabled={busyId === inquiry.id} type="button" onClick={() => void reportOutcome(inquiry.id, "not_booked")}>Not booked</button>
-              </>
-            ) : null}
-          </div>
-
-          {perspective === "instructor" ? (
-            <div className={`${styles.feedbackPanel} ${focusInquiryId === inquiry.id && focusFollowup === "booking" ? styles.focusedFeedback : ""}`}>
-              <div>
-                <strong>Did this inquiry turn into a booking?</strong>
-                <p>Current result: {inquiry.booking_outcome.replaceAll("_", " ")}</p>
-              </div>
-              <label className={styles.field}>
-                <span>Confirmed event date</span>
-                <input disabled={inquiry.completion_status !== "unknown"} type="date" value={eventDates[inquiry.id] ?? inquiry.event_date ?? ""} onChange={(event) => setEventDates((current) => ({ ...current, [inquiry.id]: event.target.value }))} />
-              </label>
-              <label className={styles.field}>
-                <span>Private comments (optional)</span>
-                <textarea
-                  disabled={inquiry.completion_status !== "unknown"}
-                  maxLength={2000}
-                  placeholder="Your feedback helps us improve Hire Line Dancers."
-                  value={comments[`${inquiry.id}:booking`] ?? ""}
-                  onChange={(event) => setComments((current) => ({ ...current, [`${inquiry.id}:booking`]: event.target.value }))}
-                />
-              </label>
-              <p className={styles.help}>Comments are visible only to you and Hire Line Dancers administrators.</p>
-              {inquiry.completion_status !== "unknown" ? <p className={styles.notice}>The booking result is locked because event completion has already been recorded.</p> : null}
-              <div className={styles.buttonRow}>
-                <button className={styles.button} disabled={inquiry.completion_status !== "unknown" || busyId === `${inquiry.id}:booking`} type="button" onClick={() => void submitInstructorFeedback(inquiry, "booking", "booked")}>Yes, booked</button>
-                <button className={styles.dangerButton} disabled={inquiry.completion_status !== "unknown" || busyId === `${inquiry.id}:booking`} type="button" onClick={() => void submitInstructorFeedback(inquiry, "booking", "not_booked")}>No</button>
-                <button className={styles.secondaryButton} disabled={inquiry.completion_status !== "unknown" || busyId === `${inquiry.id}:booking`} type="button" onClick={() => void submitInstructorFeedback(inquiry, "booking", "still_deciding")}>In progress</button>
-              </div>
-            </div>
-          ) : null}
-
-          {perspective === "instructor" && inquiry.booking_outcome === "booked" ? (() => {
-            const bookingDate = inquiry.booking_event_date || inquiry.event_date;
-            const eventHasArrived = !bookingDate || bookingDate <= dateInputValue(new Date());
-            return (
-              <div className={`${styles.feedbackPanel} ${focusInquiryId === inquiry.id && focusFollowup === "completion" ? styles.focusedFeedback : ""}`}>
-                <div>
-                  <strong>Did the booked event happen?</strong>
-                  <p>Current result: {inquiry.completion_status.replaceAll("_", " ")}</p>
-                </div>
-                {!eventHasArrived ? <p className={styles.notice}>This question opens after the event date, {new Date(`${bookingDate}T00:00:00`).toLocaleDateString()}.</p> : null}
-                <label className={styles.field}>
-                  <span>Private comments (optional)</span>
-                  <textarea
-                    maxLength={2000}
-                    placeholder="Tell us what went well or what could be better."
-                    value={comments[`${inquiry.id}:completion`] ?? ""}
-                    onChange={(event) => setComments((current) => ({ ...current, [`${inquiry.id}:completion`]: event.target.value }))}
-                  />
-                </label>
-                <p className={styles.help}>Comments are visible only to you and Hire Line Dancers administrators.</p>
-                <div className={styles.buttonRow}>
-                  <button className={styles.button} disabled={!eventHasArrived || busyId === `${inquiry.id}:completion`} type="button" onClick={() => void submitInstructorFeedback(inquiry, "completion", "completed")}>Yes, it happened</button>
-                  <button className={styles.dangerButton} disabled={!eventHasArrived || busyId === `${inquiry.id}:completion`} type="button" onClick={() => void submitInstructorFeedback(inquiry, "completion", "did_not_happen")}>No</button>
-                </div>
-              </div>
-            );
-          })() : null}
-        </article>
-      ))}
-    </div>
   );
 }

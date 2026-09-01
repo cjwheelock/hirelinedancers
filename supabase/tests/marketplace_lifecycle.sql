@@ -908,8 +908,8 @@ select pg_temp.expect_error(
   'regular instructor organizer submission'
 );
 
--- Organizer inquiry submission creates exactly one email job. SMS recipient
--- data and SMS jobs remain absent. Static listings use the support inbox.
+-- Organizer inquiry submission creates one private thread and one email job.
+-- SMS recipient data and SMS jobs remain absent. Static listings use support.
 select pg_temp.set_request(
   '00000000-0000-0000-0000-000000000020',
   'organizer@example.test',
@@ -925,12 +925,12 @@ reset role;
 select pg_temp.set_request(null, null, 'postgres');
 select pg_temp.test_assert(
   (select count(*) = 1
-   from public.inquiry_notification_jobs job
-   join public.inquiry_recipients recipient on recipient.id = job.inquiry_recipient_id
-   where recipient.inquiry_id = :'alice_inquiry_id'::uuid
+   from public.inquiry_thread_notification_jobs job
+   join public.inquiry_threads thread on thread.id = job.thread_id
+   where thread.inquiry_id = :'alice_inquiry_id'::uuid
      and job.channel = 'email'
-     and job.notification_type = 'new_inquiry'),
-  'an instructor inquiry must enqueue one email'
+     and job.notification_type = 'new_thread'),
+  'an instructor inquiry must enqueue one thread email'
 );
 select pg_temp.test_assert(
   (select recipient.delivered_to_email = 'alice@example.test'
@@ -943,9 +943,9 @@ select pg_temp.test_assert(
 select pg_temp.test_assert(
   not exists (
     select 1
-    from public.inquiry_notification_jobs job
-    join public.inquiry_recipients recipient on recipient.id = job.inquiry_recipient_id
-    where recipient.inquiry_id = :'alice_inquiry_id'::uuid
+    from public.inquiry_thread_notification_jobs job
+    join public.inquiry_threads thread on thread.id = job.thread_id
+    where thread.inquiry_id = :'alice_inquiry_id'::uuid
       and job.channel = 'sms'
   ),
   'an instructor inquiry must never enqueue SMS while paused'
@@ -973,9 +973,9 @@ select pg_temp.test_assert(
 select pg_temp.test_assert(
   not exists (
     select 1
-    from public.inquiry_notification_jobs job
-    join public.inquiry_recipients recipient on recipient.id = job.inquiry_recipient_id
-    where recipient.inquiry_id = :'static_inquiry_id'::uuid
+    from public.inquiry_thread_notification_jobs job
+    join public.inquiry_threads thread on thread.id = job.thread_id
+    where thread.inquiry_id = :'static_inquiry_id'::uuid
       and job.channel = 'sms'
   ),
   'a static listing inquiry must also remain email-only'
@@ -1121,14 +1121,14 @@ select pg_temp.set_request(
 );
 select public.submit_instructor_inquiry_feedback(
   :'bianca_inquiry_id'::uuid, 'booking', 'booked',
-  'Contract signed.', current_date
+  'Contract signed.', current_date - 1
 );
 reset role;
 select pg_temp.set_request(null, null, 'postgres');
 select pg_temp.test_assert(
   (select booking_outcome = 'booked'
       and outcome_next_ask_at is null
-      and booking_event_date = current_date
+      and booking_event_date = current_date - 1
       and completion_next_ask_at is not null
    from public.inquiries where id = :'bianca_inquiry_id'::uuid),
   'instructor booking feedback must schedule completion tracking'

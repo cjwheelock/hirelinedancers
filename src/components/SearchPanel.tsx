@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { CalendarDays, MapPin, Search, Users } from "lucide-react";
-import { cities, eventTypes, instructors, type Instructor } from "@/data/site";
+import { CalendarDays, MapPin, Search } from "lucide-react";
+import { eventTypes, instructors, serviceMarkets, type Instructor } from "@/data/site";
 import {
   getMarketplaceClient,
   marketplaceConfigured,
@@ -117,7 +117,7 @@ function locationLabel(profile: Pick<PublicProfile, "city" | "region">) {
 
 function marketMatches(profile: Pick<PublicProfile, "city" | "region">, citySlug?: string) {
   if (!citySlug) return true;
-  const market = cities.find((item) => item.slug === citySlug);
+  const market = serviceMarkets.find((item) => item.slug === citySlug);
   if (!market) return false;
   const profileCity = profile.city?.trim().toLowerCase();
   const marketCities = [market.city, ...market.serviceCities].map((item) => item.trim().toLowerCase());
@@ -127,7 +127,7 @@ function marketMatches(profile: Pick<PublicProfile, "city" | "region">, citySlug
 function exampleMarketMatches(instructor: Instructor, citySlug?: string) {
   if (instructor.demoEverywhere) return true;
   if (!citySlug) return true;
-  const market = cities.find((item) => item.slug === citySlug);
+  const market = serviceMarkets.find((item) => item.slug === citySlug);
   return Boolean(market?.serviceCities.includes(instructor.city));
 }
 
@@ -470,7 +470,6 @@ export function PublicInstructorResults({
 export function InstructorDirectoryBrowser() {
   const [city, setCity] = useState("");
   const [event, setEvent] = useState("");
-  const [groupSize, setGroupSize] = useState("");
   const [resultCount, setResultCount] = useState<number | null>(null);
 
   return (
@@ -479,8 +478,8 @@ export function InstructorDirectoryBrowser() {
         <label>
           <span><MapPin size={16} aria-hidden="true" /> Service market</span>
           <select value={city} onChange={(changeEvent) => setCity(changeEvent.target.value)}>
-            <option value="">All launch markets</option>
-            {cities.map((item) => <option key={item.slug} value={item.slug}>{item.city}, {item.state}</option>)}
+            <option value="">All service markets</option>
+            {serviceMarkets.map((item) => <option key={item.slug} value={item.slug}>{item.city}, {item.state}</option>)}
           </select>
         </label>
         <label>
@@ -489,10 +488,6 @@ export function InstructorDirectoryBrowser() {
             <option value="">Any event or program</option>
             {eventTypes.map((item) => <option key={item.slug} value={item.slug}>{item.label}</option>)}
           </select>
-        </label>
-        <label>
-          <span><Users size={16} aria-hidden="true" /> Approximate group size</span>
-          <input value={groupSize} onChange={(changeEvent) => setGroupSize(changeEvent.target.value)} type="number" min="1" placeholder="Any size" />
         </label>
         <button className="button primary" type="submit" disabled={resultCount === null}>
           <Search size={18} aria-hidden="true" />
@@ -503,72 +498,10 @@ export function InstructorDirectoryBrowser() {
         <PublicInstructorResults
           citySlug={city || undefined}
           eventSlug={event || undefined}
-          groupSize={Number(groupSize || 0)}
-          suppressEmptyMessage={!city && !event && !groupSize}
+          suppressEmptyMessage={!city && !event}
           onCountChange={setResultCount}
         />
       </div>
     </div>
-  );
-}
-
-export function SearchPanel() {
-  const [city, setCity] = useState("nashville-tn");
-  const [event, setEvent] = useState("");
-  const [groupSize, setGroupSize] = useState("100");
-  const [resultCount, setResultCount] = useState<number | null>(null);
-  const selectedEvent = eventTypes.find((item) => item.slug === event);
-
-  return (
-    <section className="search-section" id="find">
-      <div className="section-heading">
-        <h2>Find your match</h2>
-        <p>Pick your city, the kind of event or program, and roughly how many guests. We&rsquo;ll show every published instructor in that market, with the strongest fits first.</p>
-      </div>
-      <div className="search-grid">
-        <form className="search-form" onSubmit={(submitEvent) => submitEvent.preventDefault()}>
-          <label>
-            <span><MapPin size={16} aria-hidden="true" /> Your city</span>
-            <select value={city} onChange={(changeEvent) => setCity(changeEvent.target.value)}>
-              {cities.map((item) => (
-                <option key={item.slug} value={item.slug}>{item.city}, {item.state}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span><CalendarDays size={16} aria-hidden="true" /> Type of event or program</span>
-            <select value={event} onChange={(changeEvent) => setEvent(changeEvent.target.value)}>
-              <option value="">Any event or program</option>
-              {eventTypes.map((item) => (
-                <option key={item.slug} value={item.slug}>{item.label}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span><Users size={16} aria-hidden="true" /> Approximate group size</span>
-            <input value={groupSize} onChange={(changeEvent) => setGroupSize(changeEvent.target.value)} type="number" min="1" />
-          </label>
-          <button className="button primary" type="submit" disabled={resultCount === null}>
-            <Search size={18} aria-hidden="true" />
-            {resultCount === null ? "Loading instructors" : `Show ${resultCount} instructor profile${resultCount === 1 ? "" : "s"}`}
-          </button>
-        </form>
-        <div className="results-list" aria-live="polite">
-          <PublicInstructorResults
-            citySlug={city}
-            eventSlug={event || undefined}
-            groupSize={Number(groupSize || 0)}
-            compact
-            darkBackground
-            showExamplesWhenUnconfigured
-            emptyTitle="No published instructor is based in this city yet."
-            emptyBody={selectedEvent
-              ? `Check back as instructors join. Your ${selectedEvent.label.toLowerCase()} and group-size selections will rank local profiles.`
-              : "Check back as instructors join. Your group-size selection will rank local profiles."}
-            onCountChange={setResultCount}
-          />
-        </div>
-      </div>
-    </section>
   );
 }

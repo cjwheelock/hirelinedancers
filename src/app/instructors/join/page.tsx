@@ -4,9 +4,7 @@ import {
   capitalizePolicyText,
   foundingOfferLabel,
   freePeriod,
-  guaranteeClaimWindow,
   guaranteeCoverage,
-  guaranteeCoverageDays,
   monthlyPriceWithCurrency,
   offerValue
 } from "@/lib/commercialTerms";
@@ -21,11 +19,7 @@ export default function JoinPage() {
   return (
     <section className="page-shell">
       <h1>Get booked by people planning events in your city.</h1>
-      <p className="lede">Hire Line Dancers helps event planners, couples, and companies find instructors who can get their guests dancing. Build a profile, appear in relevant local searches, and receive event inquiries by email.</p>
-
-      <p className="founding-offer">
-        <strong>Founding instructor offer:</strong> The {foundingOfferLabel} who complete payment setup get their first {freePeriod} free (a {offerValue} value), in addition to our ongoing <Link href="/legal/refund-policy/">{guaranteeCoverage} money-back guarantee</Link>.
-      </p>
+      <p className="lede">Hire Line Dancers helps event planners, couples, and companies find instructors who can get their guests dancing. Build a profile, appear in relevant local searches, and receive and reply to event inquiries through your account.</p>
 
       <div className="hero-actions" style={{ marginTop: 28 }}>
         <Link className="button primary" href={signInUrl("/account/", "instructor")}>Apply to get listed <ArrowRight size={18} /></Link>
@@ -69,7 +63,7 @@ export default function JoinPage() {
           <article className="step">
             <div className="step-num"><ShieldCheck size={20} /></div>
             <h3>3. Get reviewed and go live</h3>
-            <p>We personally review every profile. If approved, your membership starts automatically and we publish your profile. The {foundingOfferLabel} who complete payment setup receive their first {freePeriod} free.</p>
+            <p>We personally review every profile. If approved, your membership starts automatically and we publish your profile.</p>
           </article>
         </div>
       </div>
@@ -77,35 +71,24 @@ export default function JoinPage() {
       {/* PRICING: only shown here, gated from buyers */}
       <div className="faq-block">
         <h2>Instructor membership</h2>
-        <p className="lede">Pricing is shared here for instructors only. It never appears on the pages event planners browse.</p>
         <div className="pricing-grid">
           <article className="price-card featured">
             <BadgeCheck size={28} />
             <h2>{capitalizePolicyText(freePeriod)} free</h2>
             <p className="price">{monthlyPriceWithCurrency} <span>per month after offer</span></p>
-            <p>The {foundingOfferLabel} who complete payment setup receive their first {freePeriod} free (a {offerValue} value). Stripe saves your card when you submit your profile, but no subscription starts and no charge is made before approval. If approved, your membership starts automatically. After the free period, it renews at {monthlyPriceWithCurrency} per month until canceled.</p>
-            <p>The founding instructor offer is in addition to our ongoing {guaranteeCoverage} money-back guarantee. Your {guaranteeCoverage} guarantee begins when Stripe collects your first membership payment after the free period.</p>
+            <ul className="check-list">
+              <li>The {foundingOfferLabel} who complete payment setup receive their first {freePeriod} free (a {offerValue} value).</li>
+              <li>Stripe saves your card when you submit your profile, but no subscription starts and no charge is made before approval.</li>
+              <li>If approved, your membership starts automatically.</li>
+              <li>After the free period, it renews at {monthlyPriceWithCurrency} per month until canceled.</li>
+              <li>The founding instructor offer is in addition to our ongoing {guaranteeCoverage} money-back guarantee.</li>
+              <li>Your {guaranteeCoverage} guarantee begins when Stripe collects your first membership payment after the free period.</li>
+            </ul>
+            <p>See the <Link href="/legal/refund-policy/">full refund policy</Link>.</p>
             <Link className="button primary" href={signInUrl("/account/", "instructor")}>Apply for a profile</Link>
           </article>
         </div>
         <p style={{ marginTop: 16 }}>You set your rates and payment terms directly with each client. Hire Line Dancers does not take a commission or handle payment for your events.</p>
-      </div>
-
-      <div className="faq-block">
-        <h2>Your profile, your rules</h2>
-        <p>Your profile isn&rsquo;t just for line dancing. Teach country swing, two step, or West Coast swing? List it. Offer choreography, private lessons, or DJ services? Add them. You can edit and update your profile whenever you want: your rates, your services, your photos, your words. We don&rsquo;t limit what you offer; our job is to send planners your way.</p>
-      </div>
-
-      <div className="faq-block">
-        <h2>Why we&rsquo;re building this</h2>
-        <p>Our mission is simple: get more people dancing. We want more rooms full of people moving to music, trying something new, and having fun together. We also want more working instructors making a real living doing it. Our first goal for every instructor is the same: help you earn at least one booking, so the membership pays for itself and we grow from there together.</p>
-      </div>
-
-      <div className="policy-box">
-        <h2>Our {guaranteeCoverage} money-back guarantee</h2>
-        <p>Every new paid membership includes our ongoing {guaranteeCoverage} money-back guarantee. The guarantee begins when Stripe collects your first membership payment. For instructors who receive the founding offer, that happens after the {freePeriod} free. If Hire Line Dancers does not help you get booked for a qualifying paid event during those {guaranteeCoverageDays}, you may request a review for a refund of eligible membership fees paid during the guarantee period.</p>
-        <p>The honest ask is time. We are building local awareness, improving search visibility, and introducing event professionals to line dancing as a participatory option. We would rather earn your trust through useful work than promise a specific number of inquiries or bookings.</p>
-        <p>You may request a guarantee review only after the {guaranteeCoverage} period ends and within the next {guaranteeClaimWindow}. Requests are reviewed manually. Approval and refunds are not automatic. Terms require a complete approved profile, current contact and service-area details, and reasonable inquiry response. See the <Link href="/legal/refund-policy/">full refund policy</Link>.</p>
       </div>
     </section>
   );

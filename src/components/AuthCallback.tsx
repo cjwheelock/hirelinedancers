@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { cleanReturnPath, getMarketplaceClient, readableError } from "@/lib/marketplace";
+import { cleanReturnPath, getMarketplaceClient, readableError, signInUrl } from "@/lib/marketplace";
 import styles from "./Marketplace.module.css";
 
 export function AuthCallback() {
   const started = useRef(false);
   const [error, setError] = useState<string | null>(null);
+  const [retryHref, setRetryHref] = useState("/sign-in/");
 
   useEffect(() => {
     if (started.current) return;
@@ -21,6 +22,7 @@ export function AuthCallback() {
 
       const url = new URL(window.location.href);
       const next = cleanReturnPath(url.searchParams.get("next"));
+      setRetryHref(signInUrl(next));
       const providerError = url.searchParams.get("error_description") ?? url.searchParams.get("error");
       if (providerError) {
         setError(providerError);
@@ -85,7 +87,7 @@ export function AuthCallback() {
         {error ? (
           <>
             <p className={styles.error} role="alert">{error}</p>
-            <a className={styles.button} href="/sign-in/">Try again</a>
+            <a className={styles.button} href={retryHref}>Try again</a>
           </>
         ) : (
           <p className={styles.notice} role="status">Please wait while we open your account.</p>

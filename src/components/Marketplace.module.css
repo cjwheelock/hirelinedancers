@@ -974,7 +974,7 @@
   display: grid;
   grid-template-columns: minmax(220px, 1.5fr) minmax(180px, 0.8fr) auto;
   gap: 10px;
-  align-items: end;
+  align-items: flex-end;
   margin-top: 12px;
 }
 
@@ -1228,7 +1228,7 @@
   display: grid;
   grid-template-columns: minmax(230px, 1fr) minmax(230px, 1fr) auto;
   gap: 12px;
-  align-items: end;
+  align-items: flex-end;
   margin-top: 12px;
 }
 
@@ -1532,6 +1532,498 @@
   margin-top: 20px;
 }
 
+.inboxSection {
+  display: grid;
+  gap: 16px;
+  margin-top: 28px;
+}
+
+.inboxToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+  padding: 14px;
+  border: 2px solid #1c2a44;
+  background: #fbfaf5;
+}
+
+.inboxSearch {
+  display: flex;
+  flex: 1 1 280px;
+  min-height: 46px;
+  align-items: center;
+  gap: 9px;
+  padding: 0 12px;
+  border: 1.5px solid #8b91a2;
+  background: #fff;
+}
+
+.inboxSearch:focus-within {
+  border-color: #b5472b;
+  outline: 3px solid rgb(181 71 43 / 18%);
+  outline-offset: 1px;
+}
+
+.inboxSearch input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #1c2a44;
+  font: inherit;
+}
+
+.inboxSelect {
+  display: grid;
+  gap: 5px;
+  min-width: 155px;
+}
+
+.inboxSelect > span {
+  color: #1c2a44;
+  font: 700 0.7rem/1.2 "IBM Plex Mono", monospace;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.inboxSelect select {
+  min-height: 46px;
+  padding: 9px 11px;
+  border: 1.5px solid #8b91a2;
+  background: #fff;
+  color: #1c2a44;
+  font: inherit;
+}
+
+.iconButton {
+  display: inline-grid;
+  width: 46px;
+  min-width: 46px;
+  height: 46px;
+  place-items: center;
+  border: 2px solid #1c2a44;
+  background: #1c2a44;
+  color: #fbfaf5;
+  cursor: pointer;
+}
+
+.iconButton:focus-visible,
+.threadListItem:focus-visible,
+.mobileBackButton:focus-visible {
+  outline: 3px solid #e7a33c;
+  outline-offset: 2px;
+}
+
+.inboxLayout {
+  display: grid;
+  min-height: 660px;
+  grid-template-columns: minmax(280px, 350px) minmax(0, 1fr);
+  overflow: hidden;
+  border: 2px solid #1c2a44;
+  background: #fff;
+}
+
+.threadList {
+  max-height: 780px;
+  overflow-y: auto;
+  border-right: 2px solid #1c2a44;
+  background: #f3efe5;
+}
+
+.threadLoadMore {
+  width: calc(100% - 24px);
+  margin: 12px;
+  padding: 10px 12px;
+  border: 1px solid #8b91a2;
+  background: #fff;
+  color: #1c2a44;
+  cursor: pointer;
+  font: 700 0.75rem/1.2 "IBM Plex Mono", monospace;
+}
+
+.threadLoadMore:hover:not(:disabled),
+.threadLoadMore:focus-visible {
+  border-color: #b5472b;
+  color: #b5472b;
+}
+
+.threadLoadMore:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.threadListItem {
+  display: grid;
+  width: 100%;
+  gap: 7px;
+  padding: 17px;
+  border: 0;
+  border-bottom: 1px solid #c6c8d0;
+  background: transparent;
+  color: #1c2a44;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.threadListItem:hover {
+  background: #fff;
+}
+
+.selectedThread {
+  box-shadow: inset 5px 0 0 #b5472b;
+  background: #fff;
+}
+
+.threadListHeading,
+.threadListMeta {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+}
+
+.threadListHeading strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.unreadBadge {
+  display: inline-grid;
+  min-width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 999px;
+  background: #b5472b;
+  color: #fff;
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.threadPreview {
+  display: -webkit-box;
+  overflow: hidden;
+  color: #57607a;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.threadListMeta small {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #9b3822;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.threadPanel {
+  min-width: 0;
+  background: #fff;
+}
+
+.mobileBackButton {
+  display: none;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 16px;
+  border: 0;
+  border-bottom: 1px solid #c6c8d0;
+  background: #f3efe5;
+  color: #1c2a44;
+  cursor: pointer;
+  font: 800 0.84rem/1 "Lato", sans-serif;
+}
+
+.threadHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-start;
+  padding: 22px 24px;
+  border-bottom: 2px solid #1c2a44;
+  background: #fbfaf5;
+}
+
+.threadHeader h2,
+.threadHeader p {
+  margin: 0;
+}
+
+.threadHeader h2 {
+  margin-bottom: 7px;
+  font-size: clamp(1.35rem, 2vw, 1.8rem);
+}
+
+.threadHeader .eyebrow {
+  margin-bottom: 6px;
+}
+
+.threadBody {
+  display: grid;
+  min-height: 590px;
+  grid-template-columns: minmax(205px, 250px) minmax(0, 1fr);
+}
+
+.eventSummary {
+  padding: 20px;
+  border-right: 1px solid #c6c8d0;
+  background: #fbfaf5;
+}
+
+.eventSummary h3 {
+  margin: 0 0 14px;
+}
+
+.eventSummary dl {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 18px;
+}
+
+.eventSummary dl > div {
+  display: grid;
+  gap: 3px;
+}
+
+.eventSummary dt {
+  color: #6d7488;
+  font: 700 0.68rem/1.2 "IBM Plex Mono", monospace;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.eventSummary dd {
+  margin: 0;
+}
+
+.eventSummary > .dangerButton {
+  width: 100%;
+  margin-top: 18px;
+}
+
+.conversationColumn {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+}
+
+.messageTimeline {
+  display: flex;
+  min-height: 420px;
+  max-height: 560px;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+  padding: 24px;
+  background: #fff;
+}
+
+.messageBubble {
+  width: fit-content;
+  max-width: min(78%, 620px);
+  padding: 12px 14px;
+  border: 1px solid #c6c8d0;
+  border-radius: 3px 14px 14px;
+  background: #f3efe5;
+  overflow-wrap: anywhere;
+}
+
+.messageBubble > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 7px;
+}
+
+.messageBubble time {
+  color: #6d7488;
+  font-size: 0.7rem;
+}
+
+.messageBubble p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.ownMessage {
+  align-self: flex-end;
+  border-color: #1c2a44;
+  border-radius: 14px 3px 14px 14px;
+  background: #1c2a44;
+  color: #fbfaf5;
+}
+
+.ownMessage time {
+  color: #d9dce4;
+}
+
+.systemMessage {
+  align-self: center;
+  max-width: 90%;
+  border-style: dashed;
+  border-radius: 3px;
+  background: #fff8df;
+  color: #57607a;
+  text-align: center;
+}
+
+.messageComposer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: flex-end;
+  padding: 16px 20px;
+  border-top: 1px solid #c6c8d0;
+  background: #fbfaf5;
+}
+
+.messageComposer textarea {
+  width: 100%;
+  min-height: 88px;
+  padding: 11px 12px;
+  border: 1.5px solid #8b91a2;
+  resize: vertical;
+  color: #1c2a44;
+  font: inherit;
+}
+
+.messageComposer textarea:focus {
+  border-color: #b5472b;
+  outline: 3px solid rgb(181 71 43 / 18%);
+  outline-offset: 1px;
+}
+
+.inboxLoading,
+.inboxEmpty {
+  display: grid;
+  min-height: 180px;
+  place-items: center;
+  align-content: center;
+  gap: 10px;
+  padding: 24px;
+  color: #57607a;
+  text-align: center;
+}
+
+.adminThreadTools {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  padding: 20px;
+  border-top: 2px solid #1c2a44;
+  background: #f3efe5;
+}
+
+.adminThreadTools > section {
+  padding: 16px;
+  border: 1px solid #c6c8d0;
+  background: #fff;
+}
+
+.adminThreadTools h3 {
+  margin-top: 0;
+}
+
+.adminNoteList {
+  display: grid;
+  gap: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+  margin-bottom: 14px;
+}
+
+.adminNoteList article {
+  padding: 10px;
+  border-left: 3px solid #e7a33c;
+  background: #fbfaf5;
+}
+
+.adminNoteList p {
+  margin: 0 0 5px;
+  white-space: pre-wrap;
+}
+
+.adminNoteList small {
+  color: #6d7488;
+}
+
+.outcomeActions {
+  display: grid;
+  gap: 10px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #c6c8d0;
+}
+
+.outcomeActions p {
+  margin: 0;
+}
+
+.outcomeActions .field textarea {
+  min-height: 80px;
+}
+
+.outcomeActions .button,
+.outcomeActions .secondaryButton,
+.outcomeActions .dangerButton {
+  min-height: 38px;
+  padding: 8px 10px;
+  font-size: 0.76rem;
+}
+
+.completionActions {
+  display: grid;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid #c6c8d0;
+}
+
+.creditHistory {
+  display: grid;
+  gap: 12px;
+}
+
+.creditHistory > article {
+  padding: 14px;
+  border: 1px solid #c6c8d0;
+  background: #fff;
+}
+
+.creditHistory dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 14px;
+  margin: 14px 0 0;
+}
+
+.creditHistory dl > div {
+  display: grid;
+  gap: 2px;
+}
+
+.creditHistory dt {
+  color: #6d7488;
+  font: 700 0.68rem/1.2 "IBM Plex Mono", monospace;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.creditHistory dd {
+  margin: 0;
+}
+
+.creditHistory article > p {
+  margin: 12px 0 0;
+  white-space: pre-wrap;
+}
+
 .muted {
   color: #6d7488;
 }
@@ -1544,6 +2036,19 @@
 }
 
 @media (max-width: 960px) {
+  .threadBody {
+    grid-template-columns: 1fr;
+  }
+
+  .eventSummary {
+    border-right: 0;
+    border-bottom: 1px solid #c6c8d0;
+  }
+
+  .eventSummary dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .productionPreviewBody {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1624,7 +2129,7 @@
   }
 
   .cropBackdrop {
-    align-items: end;
+    align-items: flex-end;
     padding: 0;
   }
 
@@ -1661,5 +2166,74 @@
 
   .compactSectionHeader {
     gap: 10px;
+  }
+
+  .inboxToolbar,
+  .adminThreadTools,
+  .messageComposer {
+    grid-template-columns: 1fr;
+  }
+
+  .inboxToolbar {
+    display: grid;
+  }
+
+  .inboxSearch,
+  .inboxSelect {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .iconButton {
+    width: 100%;
+  }
+
+  .inboxLayout {
+    min-height: 560px;
+    grid-template-columns: 1fr;
+  }
+
+  .threadList {
+    max-height: none;
+    border-right: 0;
+  }
+
+  .hasSelectedThread .threadList {
+    display: none;
+  }
+
+  .inboxLayout:not(.hasSelectedThread) .threadPanel {
+    display: none;
+  }
+
+  .mobileBackButton {
+    display: inline-flex;
+  }
+
+  .threadHeader {
+    padding: 18px;
+  }
+
+  .eventSummary dl,
+  .adminThreadTools {
+    grid-template-columns: 1fr;
+  }
+
+  .messageTimeline {
+    min-height: 360px;
+    max-height: 60dvh;
+    padding: 16px;
+  }
+
+  .messageBubble {
+    max-width: 90%;
+  }
+
+  .messageComposer .button {
+    width: 100%;
+  }
+
+  .creditHistory dl {
+    grid-template-columns: 1fr;
   }
 }

@@ -1,7 +1,7 @@
-import { cities, eventTypes, instructors } from "@/data/site";
+import { eventTypes, instructors, serviceMarkets } from "@/data/site";
 
 export function cityLabel(slug: string) {
-  const match = cities.find((city) => city.slug === slug);
+  const match = serviceMarkets.find((city) => city.slug === slug);
   return match ? `${match.city}, ${match.state}` : "Your city";
 }
 
@@ -10,7 +10,7 @@ export function eventLabel(slug: string) {
 }
 
 export function findInstructors(citySlug?: string, eventSlug?: string) {
-  const city = cities.find((item) => item.slug === citySlug);
+  const city = serviceMarkets.find((item) => item.slug === citySlug);
   return instructors
     .filter((instructor) => {
       const cityMatch = !city || instructor.demoEverywhere || city.serviceCities.includes(instructor.city);

@@ -114,6 +114,105 @@ export type MarketplaceInquiry = {
   completion_last_asked_at: string | null;
   completion_next_ask_at: string | null;
   first_responded_at: string | null;
+  fallback_consent: boolean;
+};
+
+export type InquiryThreadStatus =
+  | "awaiting_response"
+  | "active"
+  | "declined"
+  | "timed_out"
+  | "withdrawn"
+  | "closed";
+
+export type InquiryInboxThread = {
+  thread_id: string;
+  inquiry_id: string;
+  thread_status: InquiryThreadStatus | string;
+  assignment_order: number;
+  counterparty_name: string | null;
+  counterparty_profile_slug: string | null;
+  event_type: string | null;
+  event_date: string | null;
+  event_city: string | null;
+  event_region: string | null;
+  unread_count: number;
+  response_due_at: string | null;
+  last_message_id: number | null;
+  last_message_body: string | null;
+  last_message_at: string | null;
+  last_message_sender_account_id: string | null;
+  next_cursor_at: string | null;
+  next_cursor_id: string | null;
+};
+
+export type InquiryThreadMessage = {
+  id: number;
+  thread_id: string;
+  sender_account_id: string | null;
+  sender_role: "organizer" | "instructor" | "admin" | "system" | string;
+  body: string | null;
+  message_type: "participant" | "system" | string;
+  created_at: string;
+  redacted_at: string | null;
+};
+
+export type InquiryThreadParticipant = {
+  account_id: string;
+  participant_role: "organizer" | "instructor" | string;
+  display_name: string | null;
+  last_read_message_id: number | null;
+  last_read_at: string | null;
+};
+
+export type InquiryAdminNote = {
+  id: number;
+  thread_id: string;
+  note: string;
+  created_at: string;
+  author_name: string | null;
+};
+
+export type InquiryThreadDetail = {
+  thread: Record<string, unknown> & {
+    id?: string;
+    thread_id?: string;
+    inquiry_id?: string;
+    status?: string;
+    thread_status?: string;
+    assignment_source?: string;
+    response_due_at?: string | null;
+    first_instructor_message_at?: string | null;
+    is_current_assignment?: boolean;
+  };
+  inquiry: MarketplaceInquiry;
+  participants: InquiryThreadParticipant[];
+  messages: InquiryThreadMessage[];
+  admin_notes?: InquiryAdminNote[];
+};
+
+export type InquiryFallbackCandidate = {
+  instructor_profile_id: string;
+  display_name: string;
+  service_market_name: string | null;
+  active_thread_count: number;
+  last_fallback_assigned_at: string | null;
+  match_reasons: string[];
+  match_score: number;
+};
+
+export type MembershipCreditEntitlement = {
+  id: string;
+  instructor_profile_id: string;
+  benefit_code: string;
+  source: "admin" | "referral" | "welcome_video";
+  status: "pending" | "applying" | "applied" | "consumed" | "voided" | "needs_review";
+  source_reference: string;
+  awarded_at: string;
+  applied_at: string | null;
+  consumed_at: string | null;
+  expires_at: string | null;
+  internal_note: string | null;
 };
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;

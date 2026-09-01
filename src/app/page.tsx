@@ -13,9 +13,7 @@ import {
   Heart,
   MapPin
 } from "lucide-react";
-import { InstructorCard } from "@/components/InstructorCard";
-import { SearchPanel } from "@/components/SearchPanel";
-import { eventTypes, instructors, site, topCities } from "@/data/site";
+import { eventTypes, site, topCities } from "@/data/site";
 
 export default function Home() {
   const jsonLd = {
@@ -26,8 +24,6 @@ export default function Home() {
     areaServed: "United States",
     serviceType: "Line dance instructor for weddings, corporate events, and private parties"
   };
-
-  const featured = instructors.filter((i) => i.featured).slice(0, 3);
 
   const benefits = [
     {
@@ -72,7 +68,7 @@ export default function Home() {
           <h1>Live entertainment that gets the whole room moving.</h1>
           <p className="lede">Hire Line Dancers is an online directory that helps event planners find and contact line dance instructors for weddings, parties, and company events. Instructors can create profiles, manage their listings, and receive event inquiries.</p>
           <div className="hero-actions">
-            <Link className="button primary" href="#find">Find an instructor near you <ArrowRight size={18} /></Link>
+            <Link className="button primary" href="/instructors/">Find an instructor near you <ArrowRight size={18} /></Link>
             <Link className="button ghost-light" href="#how-it-works">See how it works</Link>
           </div>
           <div className="hero-badges">
@@ -118,7 +114,7 @@ export default function Home() {
           <article className="step">
             <div className="step-num">1</div>
             <h3>Tell us about your event</h3>
-            <p>Share your city, event type, and approximate group size so we can show you relevant profiles.</p>
+            <p>Share your city and event type so we can show you relevant profiles.</p>
           </article>
           <article className="step">
             <div className="step-num">2</div>
@@ -128,23 +124,8 @@ export default function Home() {
           <article className="step">
             <div className="step-num">3</div>
             <h3>Send an event inquiry</h3>
-            <p>Share the date and key details. The instructor can reply by email with availability, rates, and next steps.</p>
+            <p>Share the date and key details. The instructor can reply in your Hire Line Dancers conversation with availability, rates, and next steps.</p>
           </article>
-        </div>
-      </section>
-
-      {/* SEARCH / MATCH */}
-      <SearchPanel />
-
-      {/* FEATURED INSTRUCTORS */}
-      <section className="section">
-        <div className="section-heading">
-          <h2>Profile previews</h2>
-        </div>
-        <div className="card-grid">
-          {featured.map((instructor) => (
-            <InstructorCard key={instructor.slug} instructor={instructor} />
-          ))}
         </div>
       </section>
 
@@ -219,7 +200,7 @@ export default function Home() {
           <h2>Ready to get everyone dancing?</h2>
           <p>Find a line dance instructor near you and create a welcoming shared activity your guests can remember.</p>
           <div className="hero-actions">
-            <Link className="button secondary" href="#find"><MapPin size={18} /> Find an instructor near you</Link>
+            <Link className="button secondary" href="/instructors/"><MapPin size={18} /> Find an instructor near you</Link>
           </div>
         </div>
       </section>

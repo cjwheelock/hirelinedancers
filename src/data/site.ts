@@ -109,18 +109,21 @@ export const eventTypes = [
   }
 ];
 
-export type LaunchCity = {
+export type ServiceMarket = {
   slug: string;
   city: string;
   state: string;
-  blurb: string;
-  localIntro: string;
-  planningNote: string;
   serviceCities: string[];
 };
 
-// The single source of truth for the eleven launch markets used across navigation,
-// search, event pages, city routes, editorial content, and the sitemap.
+export type LaunchCity = ServiceMarket & {
+  blurb: string;
+  localIntro: string;
+  planningNote: string;
+};
+
+// Full launch-market records used for published city pages, navigation,
+// event pages, editorial content, and the sitemap.
 export const cities: LaunchCity[] = [
   {
     slug: "nashville-tn",
@@ -224,6 +227,22 @@ export const cities: LaunchCity[] = [
 ];
 
 export const topCities = cities;
+
+export const serviceMarkets: ServiceMarket[] = [
+  ...cities,
+  {
+    slug: "los-angeles-ca",
+    city: "Los Angeles",
+    state: "CA",
+    serviceCities: ["Los Angeles"]
+  },
+  {
+    slug: "san-diego-ca",
+    city: "San Diego",
+    state: "CA",
+    serviceCities: ["San Diego"]
+  }
+];
 
 export type Instructor = {
   slug: string;

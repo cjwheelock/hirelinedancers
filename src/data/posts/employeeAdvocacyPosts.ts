@@ -16,7 +16,7 @@ export const employeeAdvocacyPosts: BlogPost[] = [
 <div class="article-action-box">
 <p class="article-action-label">The three-minute version</p>
 <ol>
-<li><a href="/#find">Find an instructor or city near you</a>.</li>
+<li><a href="/instructors/">Find an instructor or city near you</a>.</li>
 <li>Copy one of the messages below.</li>
 <li>Send it to HR, People Operations, your office manager, or whoever plans company events.</li>
 </ol>
@@ -122,7 +122,7 @@ export const employeeAdvocacyPosts: BlogPost[] = [
 
 <h2>You only have to start the conversation</h2>
 <p>You do not need a complete proposal. You do not need to know the budget, book the venue, or plan the schedule.</p>
-<p><a href="/#find">Find an instructor near you</a>, copy the message above, and put the idea in front of the right person.</p>
+<p><a href="/instructors/">Find an instructor near you</a>, copy the message above, and put the idea in front of the right person.</p>
 <p>More instructors hired. Memorable experiences for attendees. More people dancing.</p>
 `
   }

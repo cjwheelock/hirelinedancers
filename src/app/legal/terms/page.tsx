@@ -15,14 +15,15 @@ export default function TermsPage() {
   return (
     <section className="page-shell article-page">
       <h1>Terms of Service</h1>
-      <p>Last updated: August 10, 2026.</p>
+      <p>Last updated: August 31, 2026.</p>
       <p>These Terms are between you and {site.legalName}, which operates the Hire Line Dancers service.</p>
       <h2>Marketplace role</h2>
       <p>Hire Line Dancers is a directory and lead-generation service. Instructors are independent providers, not employees or agents of Hire Line Dancers.</p>
-      <p>Event organizers and instructors communicate and contract directly. They are responsible for confirming rates, availability, insurance, travel fees, safety requirements, contracts, deposits, refunds, payment terms, and event details. Hire Line Dancers does not process or guarantee payments between organizers and instructors.</p>
+      <p>Event organizers and instructors communicate through Hire Line Dancers and contract directly. They are responsible for confirming rates, availability, insurance, travel fees, safety requirements, contracts, deposits, refunds, payment terms, and event details. Hire Line Dancers does not process or guarantee payments between organizers and instructors.</p>
       <h2>Accounts and inquiries</h2>
       <p>You must provide accurate information, protect access to your account, and use the service only for legitimate event or teaching needs. Organizers may browse without an account but must sign in before sending an inquiry. An inquiry is not a booking and does not require an instructor to accept an event.</p>
-      <p>Instructors should make reasonable efforts to respond to inquiries within the response window shown on their profile, including when they are unavailable. Hire Line Dancers does not guarantee a particular number of inquiries or bookings.</p>
+      <p>Instructors should respond to an inquiry within 72 hours, including when they are unavailable. Hire Line Dancers may send response reminders after 24 and 48 hours. A reply or an unavailable response satisfies the response requirement.</p>
+      <p>Hire Line Dancers personnel may access marketplace conversations to operate and support the service. If the organizer authorizes fallback sharing and the selected instructor does not respond within 72 hours, Hire Line Dancers may offer the inquiry to one qualified instructor at a time. Each instructor receives a separate private conversation. Hire Line Dancers does not guarantee that a replacement instructor will be available or that an inquiry will result in a booking.</p>
       <h2>Instructor membership</h2>
       <p>Instructors submit a complete profile and save a valid payment method through Stripe before administrative review. Saving a payment method does not start a subscription or authorize a charge before approval. If the profile is approved, the instructor membership starts automatically. Unless canceled, the membership renews at {monthlyPriceWithCurrency} per month after any applicable free period. Billing is processed by Stripe, and any applicable taxes may be added.</p>
       <p>The {foundingOfferLabel} who complete payment setup are eligible for the founding instructor offer. If an eligible profile is approved, its first {billingCycles} are free. The membership then renews at {monthlyPriceWithCurrency} per month until canceled. Hire Line Dancers displays the payment terms before redirecting to Stripe and records offer eligibility before activation.</p>
