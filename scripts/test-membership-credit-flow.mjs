@@ -195,7 +195,8 @@ test("invoice reconciliation proves exact full-price credit consumption", () => 
   assert.match(webhook, /"invoice\.paid"/);
   assert.match(webhook, /reconcileMembershipCreditInvoice/);
   assert.match(webhook, /reconcileOrRequeueCanceledMembershipCredits/);
-  assert.match(webhook, /STRIPE_MEMBERSHIP_CREDIT_KEY/);
+  assert.match(webhook, /const membershipCreditStripe = stripe/);
+  assert.doesNotMatch(webhook, /STRIPE_MEMBERSHIP_CREDIT_KEY/);
 });
 
 test("deleted-before-finalized webhook delivery cannot reuse a consumed credit", () => {

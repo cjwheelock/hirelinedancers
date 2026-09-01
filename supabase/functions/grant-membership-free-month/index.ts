@@ -47,7 +47,7 @@ function applicationResponse(value: Record<string, unknown> | null) {
   };
 }
 
-const stripe = new Stripe(requiredEnv("STRIPE_MEMBERSHIP_CREDIT_KEY"));
+const stripe = new Stripe(requiredEnv("STRIPE_SECRET_KEY"));
 
 export default {
   fetch: withSupabase<any>({

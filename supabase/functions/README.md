@@ -194,11 +194,9 @@ Promotion Code, redemption limit, or expiration. Never set it to the legacy
 `Z00npt3G` Coupon or `FREEMONTH` promotion. The integration never creates a
 Promotion Code.
 
-Use a dedicated restricted Stripe API key in
-`STRIPE_MEMBERSHIP_CREDIT_KEY`. Grant only the reads needed for the configured
-Product, Price, Coupon, Promotion Codes, Customer, Subscription, and Invoice,
-plus Subscription write access. Keep the key in Supabase secrets and never in
-browser code or a committed environment file.
+Membership credit operations use the existing `STRIPE_SECRET_KEY` stored in
+Supabase secrets. The key must remain in server-side secrets and must never be
+placed in browser code or a committed environment file.
 
 ### `process-inquiry-notifications`
 
@@ -239,7 +237,6 @@ STRIPE_PRODUCT_ID=prod_...
 STRIPE_PRICE_ID=price_...
 STRIPE_INSTRUCTOR_OFFER_COUPON_ID=...
 STRIPE_MEMBERSHIP_FREE_MONTH_COUPON_ID=...
-STRIPE_MEMBERSHIP_CREDIT_KEY=rk_live_...
 STRIPE_BILLING_PORTAL_CONFIGURATION_ID=bpc_1U1CG4PoYzwtbFuToKoH8q3u
 STRIPE_REQUIRE_TERMS_CONSENT=true
 STRIPE_WEBHOOK_SIGNING_SECRET=whsec_...

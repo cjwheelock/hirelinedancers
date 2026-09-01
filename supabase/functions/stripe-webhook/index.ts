@@ -152,9 +152,7 @@ const handledEvents = new Set<string>([
 ]);
 
 const stripe = new Stripe(requiredEnv("STRIPE_SECRET_KEY"));
-const membershipCreditStripe = new Stripe(
-  requiredEnv("STRIPE_MEMBERSHIP_CREDIT_KEY"),
-);
+const membershipCreditStripe = stripe;
 const cryptoProvider = Stripe.createSubtleCryptoProvider();
 
 async function processInstructorPaymentSetupCompleted(
