@@ -3982,6 +3982,8 @@ begin
 end;
 $$;
 
+set constraints inquiry_threads_last_message_fkey immediate;
+
 alter table public.service_markets enable row level security;
 alter table public.service_market_localities enable row level security;
 alter table public.instructor_service_markets enable row level security;
