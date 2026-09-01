@@ -107,6 +107,7 @@ Deno.test("future JWT validation failures are retried after the configured delay
       return Promise.resolve();
     },
     [1_500, 4_000],
+    () => null,
   );
 
   const response = await wrappedFetch(
@@ -137,6 +138,7 @@ Deno.test("unrelated authorization failures are not retried", async () => {
     fetcher,
     () => Promise.resolve(),
     [1_500, 4_000],
+    () => null,
   );
 
   const response = await wrappedFetch(
@@ -164,6 +166,7 @@ Deno.test("future JWT validation retries remain bounded", async () => {
       return Promise.resolve();
     },
     [1_500, 4_000],
+    () => null,
   );
 
   const response = await wrappedFetch(
@@ -173,4 +176,58 @@ Deno.test("future JWT validation retries remain bounded", async () => {
   assertEquals(String(response.status), "401");
   assertEquals(String(attempts), "3");
   assertEquals(delays.join(","), "1500,4000");
+});
+
+Deno.test("persistent new-key clock failures fall back once to the legacy service role", async () => {
+  const newKey = "sb_secret_test_admin_transport_key";
+  const legacyKey =
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.service-role.signature";
+  const attempts: Array<
+    { apiKey: string | null; authorization: string | null }
+  > = [];
+  const fetcher: typeof fetch = (input, init) => {
+    const headers = new Headers(
+      init?.headers ?? (input instanceof Request ? input.headers : undefined),
+    );
+    attempts.push({
+      apiKey: headers.get("apikey"),
+      authorization: headers.get("authorization"),
+    });
+    if (attempts.length <= 3) {
+      return Promise.resolve(Response.json({
+        code: "PGRST303",
+        message: "JWT issued at future",
+      }, { status: 401 }));
+    }
+    return Promise.resolve(Response.json({ ok: true }));
+  };
+  const wrappedFetch = supabaseApiKeyOnlyFetch(
+    fetcher,
+    () => Promise.resolve(),
+    [1_500, 4_000],
+    () => legacyKey,
+  );
+
+  const response = await wrappedFetch(
+    "https://example.supabase.co/rest/v1/test",
+    {
+      headers: {
+        apikey: newKey,
+        Authorization: `Bearer ${newKey}`,
+      },
+    },
+  );
+
+  assertEquals(String(response.status), "200");
+  assertEquals(String(attempts.length), "4");
+  assertEquals(
+    attempts.slice(0, 3).map((attempt) => attempt.apiKey).join(","),
+    [newKey, newKey, newKey].join(","),
+  );
+  assertEquals(
+    attempts.slice(0, 3).map((attempt) => attempt.authorization).join(","),
+    ",,",
+  );
+  assertEquals(attempts[3].apiKey, legacyKey);
+  assertEquals(attempts[3].authorization, `Bearer ${legacyKey}`);
 });
