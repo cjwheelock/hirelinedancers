@@ -12,8 +12,10 @@ function assertEquals(actual: string | null, expected: string | null): void {
 
 function captureFetch() {
   let capturedHeaders: Headers | null = null;
-  const fetcher: typeof fetch = (_input, init) => {
-    capturedHeaders = new Headers(init?.headers);
+  const fetcher: typeof fetch = (input, init) => {
+    capturedHeaders = new Headers(
+      init?.headers ?? (input instanceof Request ? input.headers : undefined),
+    );
     return Promise.resolve(
       new Response("null", {
         status: 200,
@@ -81,4 +83,94 @@ Deno.test("user JWT Bearer authorization is preserved", async () => {
   const headers = capture.headers();
   assertEquals(headers.get("apikey"), secretKey);
   assertEquals(headers.get("authorization"), `Bearer ${userJwt}`);
+});
+
+Deno.test("future JWT validation failures are retried after the configured delay", async () => {
+  let attempts = 0;
+  const delays: number[] = [];
+  const bodies: string[] = [];
+  const fetcher: typeof fetch = async (input) => {
+    attempts += 1;
+    bodies.push(input instanceof Request ? await input.text() : "");
+    if (attempts === 1) {
+      return Response.json({
+        code: "PGRST303",
+        message: "JWT issued at future",
+      }, { status: 401 });
+    }
+    return Response.json({ ok: true });
+  };
+  const wrappedFetch = supabaseApiKeyOnlyFetch(
+    fetcher,
+    (delayMs) => {
+      delays.push(delayMs);
+      return Promise.resolve();
+    },
+    [1_500, 4_000],
+  );
+
+  const response = await wrappedFetch(
+    "https://example.supabase.co/rest/v1/rpc",
+    {
+      method: "POST",
+      headers: { apikey: "sb_secret_test_admin_transport_key" },
+      body: "{}",
+    },
+  );
+
+  assertEquals(String(response.status), "200");
+  assertEquals(String(attempts), "2");
+  assertEquals(delays.join(","), "1500");
+  assertEquals(bodies.join(","), "{},{}");
+});
+
+Deno.test("unrelated authorization failures are not retried", async () => {
+  let attempts = 0;
+  const fetcher: typeof fetch = () => {
+    attempts += 1;
+    return Promise.resolve(Response.json({
+      code: "PGRST301",
+      message: "JWT expired",
+    }, { status: 401 }));
+  };
+  const wrappedFetch = supabaseApiKeyOnlyFetch(
+    fetcher,
+    () => Promise.resolve(),
+    [1_500, 4_000],
+  );
+
+  const response = await wrappedFetch(
+    "https://example.supabase.co/rest/v1/test",
+  );
+
+  assertEquals(String(response.status), "401");
+  assertEquals(String(attempts), "1");
+});
+
+Deno.test("future JWT validation retries remain bounded", async () => {
+  let attempts = 0;
+  const delays: number[] = [];
+  const fetcher: typeof fetch = () => {
+    attempts += 1;
+    return Promise.resolve(Response.json({
+      code: "PGRST303",
+      message: "JWT issued at future",
+    }, { status: 401 }));
+  };
+  const wrappedFetch = supabaseApiKeyOnlyFetch(
+    fetcher,
+    (delayMs) => {
+      delays.push(delayMs);
+      return Promise.resolve();
+    },
+    [1_500, 4_000],
+  );
+
+  const response = await wrappedFetch(
+    "https://example.supabase.co/rest/v1/test",
+  );
+
+  assertEquals(String(response.status), "401");
+  assertEquals(String(attempts), "3");
+  assertEquals(delays.join(","), "1500,4000");
 });
