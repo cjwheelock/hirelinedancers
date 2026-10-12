@@ -122,14 +122,17 @@ export function LoginScreen() {
     if (!client) return;
     setBusy("google");
     setError(null);
-    const { error: authError } = await client.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: callbackUrl(next)
-      }
-    });
-    if (authError) {
-      setError(authError.message);
+    try {
+      const { error: authError } = await client.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: callbackUrl(next),
+          queryParams: { prompt: "select_account" }
+        }
+      });
+      if (authError) throw authError;
+    } catch (authError) {
+      setError(readableError(authError));
       setBusy(null);
     }
   }

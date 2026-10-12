@@ -30,6 +30,7 @@ import { ImageCropDialog } from "./ImageCropDialog";
 import { InquiryInbox } from "./InquiryInbox";
 import { MembershipCreditAdmin } from "./MembershipCreditAdmin";
 import {
+  accountEntryRedirect,
   cleanAccountIntent,
   cleanInstructorInvitationToken,
   cleanReturnPath,
@@ -110,19 +111,21 @@ export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean })
   }, []);
 
   useEffect(() => {
-    if (loading || !configured || session || entryIntent === undefined || entryInvitationToken === undefined) return;
+    if (signingOut || loading || !configured || session || entryIntent === undefined || entryInvitationToken === undefined) return;
     const next = entryReturnTo ?? (adminOnly ? "/admin/" : "/account/");
     const signInHref = entryInvitationToken
       ? `${signInUrl(next, "instructor")}&invite=${encodeURIComponent(entryInvitationToken)}`
       : signInUrl(next, entryIntent ?? undefined);
     window.location.replace(signInHref);
-  }, [adminOnly, configured, entryIntent, entryInvitationToken, entryReturnTo, loading, session]);
+  }, [adminOnly, configured, entryIntent, entryInvitationToken, entryReturnTo, loading, session, signingOut]);
 
   useEffect(() => {
     if (entryIntent === undefined || !account) return;
     if (entryInvitationToken) return;
-    if ((account.role === entryIntent || (isAdmin && entryIntent === "organizer")) && entryReturnTo) {
-      window.location.replace(entryReturnTo);
+    const currentPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    const destination = accountEntryRedirect(account.role, entryIntent, isAdmin, entryReturnTo, currentPath);
+    if (destination) {
+      window.location.replace(destination);
       return;
     }
 
@@ -189,6 +192,21 @@ export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean })
       return;
     }
     window.location.replace("/");
+  }
+
+  async function restartAccountSignIn() {
+    const client = getMarketplaceClient();
+    if (!client || signingOut) return;
+    setSigningOut(true);
+    setSignOutError(null);
+    try {
+      const { error: authError } = await client.auth.signOut({ scope: "local" });
+      if (authError) throw authError;
+      window.location.replace(signInUrl(entryReturnTo ?? "/account/", entryIntent ?? undefined));
+    } catch (authError) {
+      setSignOutError(readableError(authError));
+      setSigningOut(false);
+    }
   }
 
   async function restartInvitationSignIn() {
@@ -421,6 +439,11 @@ export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean })
               : "Choose the account workspace you need. You can contact support later if you need both."}
         </p>
         {error ? <p className={styles.error}>{error}</p> : null}
+        <p className={styles.notice}>Signed in as {session.user.email}. To use an existing account, sign in with the email address used for that account.</p>
+        <button className={styles.secondaryButton} type="button" disabled={signingOut} onClick={() => void restartAccountSignIn()}>
+          {signingOut ? "Signing out..." : "Use another account"}
+        </button>
+        {signOutError ? <p className={styles.error} role="alert">{signOutError}</p> : null}
         <OnboardingForm
           email={session.user.email ?? ""}
           initialName={account?.full_name ?? session.user.user_metadata.full_name ?? ""}

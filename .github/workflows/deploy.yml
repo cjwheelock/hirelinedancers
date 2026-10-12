@@ -30,6 +30,8 @@ jobs:
         run: npm run lint
       - name: Test instructor approval flow
         run: npm run test:approval
+      - name: Test authentication routing
+        run: npm run test:auth
       - name: Build static export
         run: npm run build
         env:

@@ -263,6 +263,20 @@ export function cleanAccountIntent(value: string | null | undefined): AccountInt
   return value === "instructor" || value === "organizer" ? value : null;
 }
 
+/** Return only after an explicit account choice is fulfilled, never back to the current page. */
+export function accountEntryRedirect(
+  role: AccountRole | null,
+  intent: AccountIntent | null | undefined,
+  isAdmin: boolean,
+  returnTo: string | null,
+  currentPath: string
+): string | null {
+  if (!intent || !returnTo) return null;
+  if (role !== intent && !(isAdmin && intent === "organizer")) return null;
+  const destination = cleanReturnPath(returnTo);
+  return destination === cleanReturnPath(currentPath) ? null : destination;
+}
+
 export function cleanInstructorInvitationToken(value: string | null | undefined): string | null {
   if (!value) return null;
   const token = value.trim().toLowerCase();

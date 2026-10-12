@@ -10,7 +10,8 @@
     "terms:sync": "node scripts/sync-commercial-terms.mjs",
     "terms:audit": "node scripts/audit-commercial-terms.mjs",
     "audit:static": "node scripts/audit-static-site.mjs",
-    "test:approval": "node --test scripts/test-approval-flow.mjs"
+    "test:approval": "node --test scripts/test-approval-flow.mjs",
+    "test:auth": "node --test scripts/test-auth-routing.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.2",
