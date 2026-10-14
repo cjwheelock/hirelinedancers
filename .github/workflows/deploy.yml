@@ -32,6 +32,8 @@ jobs:
         run: npm run test:approval
       - name: Test authentication routing
         run: npm run test:auth
+      - name: Test instructor and organizer journeys
+        run: npm run test:journeys
       - name: Build static export
         run: npm run build
         env:

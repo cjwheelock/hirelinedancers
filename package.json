@@ -11,7 +11,8 @@
     "terms:audit": "node scripts/audit-commercial-terms.mjs",
     "audit:static": "node scripts/audit-static-site.mjs",
     "test:approval": "node --test scripts/test-approval-flow.mjs",
-    "test:auth": "node --test scripts/test-auth-routing.mjs"
+    "test:auth": "node --test scripts/test-auth-routing.mjs",
+    "test:journeys": "node --test scripts/test-user-journeys.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.2",

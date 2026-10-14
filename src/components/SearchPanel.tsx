@@ -356,8 +356,8 @@ export function PublicInstructorResults({
     .filter((instructor) => instructor.demoEverywhere), []);
 
   const visibleCount = marketplaceConfigured
-    ? results.length + demoResults.length
-    : showExamplesWhenUnconfigured ? exampleResults.length : demoResults.length;
+    ? results.length
+    : showExamplesWhenUnconfigured ? exampleResults.length : 0;
 
   useEffect(() => {
     onCountChange?.(loading ? null : visibleCount);

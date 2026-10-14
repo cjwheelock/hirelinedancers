@@ -6,6 +6,7 @@ import { ChevronLeft, Clock3, Inbox, RefreshCw, Search, Send } from "lucide-reac
 import { eventTypes } from "@/data/site";
 import {
   getMarketplaceClient,
+  readableError,
   type InquiryFallbackCandidate,
   type InquiryInboxThread,
   type InquiryThreadDetail,
@@ -94,7 +95,7 @@ export function InquiryInbox({
   const [hasMore, setHasMore] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [sending, setSending] = useState(false);
-  const [messageBody, setMessageBody] = useState("");
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
@@ -105,6 +106,17 @@ export function InquiryInbox({
   const [candidateSearchComplete, setCandidateSearchComplete] = useState(false);
   const messageEndRef = useRef<HTMLDivElement | null>(null);
   const detailRequestRef = useRef(0);
+  const listRequestRef = useRef(0);
+  const moreRequestRef = useRef(0);
+  const selectedThreadRef = useRef(selectedThreadId);
+  selectedThreadRef.current = selectedThreadId;
+  const queryKey = JSON.stringify([searchInput.trim(), filter, sort, perspective]);
+  const queryKeyRef = useRef(queryKey);
+  queryKeyRef.current = queryKey;
+  const sendRequestRef = useRef(false);
+  const sendKeysRef = useRef<Record<string, { body: string; key: string }>>({});
+  const openThreadId = typeof detail?.thread.id === "string" ? detail.thread.id : null;
+  const messageBody = openThreadId ? drafts[openThreadId] ?? "" : "";
   const initialFocusResolvedRef = useRef(false);
   const selectionInitializedRef = useRef(Boolean(focusThreadId));
 
@@ -116,6 +128,11 @@ export function InquiryInbox({
   const loadThreads = useCallback(async (silent = false) => {
     const client = getMarketplaceClient();
     if (!client) return;
+    const requestId = ++listRequestRef.current;
+    const requestQuery = JSON.stringify([search, filter, sort, perspective]);
+    const current = () => requestId === listRequestRef.current && requestQuery === queryKeyRef.current;
+    moreRequestRef.current += 1;
+    setLoadingMore(false);
     if (!silent) setLoadingThreads(true);
     setError(null);
     const { data, error: loadError } = await client.rpc("list_inquiry_threads", {
@@ -127,9 +144,9 @@ export function InquiryInbox({
       p_cursor_id: null,
       p_admin: perspective === "admin"
     });
+    if (!current()) return;
     if (loadError) {
       setError(loadError.message);
-      setThreads([]);
       setLoadingThreads(false);
       return;
     }
@@ -138,7 +155,6 @@ export function InquiryInbox({
     setHasMore(rows.length === inboxPageSize && Boolean(lastRow?.next_cursor_at && lastRow.next_cursor_id));
     let requestedThreadId: string | null = null;
     if (!initialFocusResolvedRef.current) {
-      initialFocusResolvedRef.current = true;
       requestedThreadId = focusThreadId;
       if (!requestedThreadId && focusInquiryId) {
         requestedThreadId = rows.find((row) => row.inquiry_id === focusInquiryId)?.thread_id ?? null;
@@ -146,9 +162,11 @@ export function InquiryInbox({
           const { data: primaryThreadId } = await client.rpc("get_inquiry_primary_thread", {
             p_inquiry_id: focusInquiryId
           });
+          if (!current()) return;
           if (typeof primaryThreadId === "string") requestedThreadId = primaryThreadId;
         }
       }
+      initialFocusResolvedRef.current = true;
     }
     const selectionWasInitialized = selectionInitializedRef.current;
     selectionInitializedRef.current = true;
@@ -173,12 +191,11 @@ export function InquiryInbox({
     if (requestId !== detailRequestRef.current) return;
     if (loadError) {
       setError(loadError.message);
-      setDetail(null);
       setLoadingDetail(false);
       return;
     }
     const normalized = normalizeDetail(data);
-    setDetail(normalized);
+    setDetail(normalized ? { ...normalized, thread: { ...normalized.thread, id: threadId } } : null);
     setLoadingDetail(false);
     if (normalized) {
       const url = new URL(window.location.href);
@@ -241,19 +258,35 @@ export function InquiryInbox({
   }, [detail?.messages.length]);
 
   function chooseThread(threadId: string | null) {
+    if (threadId === selectedThreadId) {
+      if (threadId && !loadingDetail && openThreadId !== threadId) void loadDetail(threadId);
+      return;
+    }
     detailRequestRef.current += 1;
     selectionInitializedRef.current = true;
-    setDetail(null);
+    selectedThreadRef.current = threadId;
+    if (!threadId) {
+      setDetail(null);
+      setLoadingDetail(false);
+      const url = new URL(window.location.href);
+      url.searchParams.delete("thread");
+      url.searchParams.delete("inquiry");
+      window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+    }
     setSelectedThreadId(threadId);
   }
 
   async function loadMoreThreads() {
     const client = getMarketplaceClient();
     const lastRow = threads.at(-1);
+    if (loadingMore || loadingThreads) return;
     if (!client || !lastRow?.next_cursor_at || !lastRow.next_cursor_id) {
       setHasMore(false);
       return;
     }
+    const listGeneration = listRequestRef.current;
+    const requestId = ++moreRequestRef.current;
+    const requestQuery = JSON.stringify([search, filter, sort, perspective]);
     setLoadingMore(true);
     setError(null);
     const { data, error: loadError } = await client.rpc("list_inquiry_threads", {
@@ -265,6 +298,7 @@ export function InquiryInbox({
       p_cursor_id: lastRow.next_cursor_id,
       p_admin: perspective === "admin"
     });
+    if (listGeneration !== listRequestRef.current || requestId !== moreRequestRef.current || requestQuery !== queryKeyRef.current) return;
     if (loadError) {
       setError(loadError.message);
       setLoadingMore(false);
@@ -283,37 +317,54 @@ export function InquiryInbox({
   async function sendMessage(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const client = getMarketplaceClient();
-    const body = messageBody.trim();
-    if (!client || !selectedThreadId || !body) return;
+    const threadId = openThreadId;
+    const draft = messageBody;
+    const body = draft.trim();
+    if (!client || !threadId || !body || sendRequestRef.current) return;
+    sendRequestRef.current = true;
+    const previous = sendKeysRef.current[threadId];
+    const request = previous?.body === body ? previous : { body, key: crypto.randomUUID() };
+    sendKeysRef.current[threadId] = request;
     setSending(true);
     setError(null);
-    const { error: sendError } = await client.rpc("send_inquiry_message", {
-      p_thread_id: selectedThreadId,
-      p_body: body,
-      p_client_request_id: crypto.randomUUID()
-    });
-    if (sendError) setError(sendError.message);
-    else {
-      setMessageBody("");
-      await Promise.all([loadDetail(selectedThreadId, true), loadThreads(true)]);
-      onDataChange?.();
+    try {
+      const { error: sendError } = await client.rpc("send_inquiry_message", {
+        p_thread_id: threadId,
+        p_body: body,
+        p_client_request_id: request.key
+      });
+      if (sendError) {
+        if (selectedThreadRef.current === threadId) setError(sendError.message);
+      } else {
+        setDrafts((current) => current[threadId] === draft ? { ...current, [threadId]: "" } : current);
+        delete sendKeysRef.current[threadId];
+        await Promise.all([
+          selectedThreadRef.current === threadId ? loadDetail(threadId, true) : Promise.resolve(),
+          loadThreads(true)
+        ]);
+        onDataChange?.();
+      }
+    } catch (sendError) {
+      if (selectedThreadRef.current === threadId) setError(readableError(sendError));
+    } finally {
+      sendRequestRef.current = false;
+      setSending(false);
     }
-    setSending(false);
   }
 
   async function runThreadAction(action: "decline" | "withdraw") {
     const client = getMarketplaceClient();
-    if (!client || !detail || !selectedThreadId) return;
+    if (!client || !detail || !openThreadId) return;
     setBusyAction(action);
     setError(null);
     setActionMessage(null);
     const result = action === "decline"
-      ? await client.rpc("decline_inquiry_thread", { p_thread_id: selectedThreadId, p_message: null })
+      ? await client.rpc("decline_inquiry_thread", { p_thread_id: openThreadId, p_message: null })
       : await client.rpc("withdraw_inquiry", { p_inquiry_id: detail.inquiry.id });
     if (result.error) setError(result.error.message);
     else {
       setActionMessage(action === "decline" ? "The organizer was notified that you are unavailable." : "The inquiry was withdrawn.");
-      await Promise.all([loadDetail(selectedThreadId, true), loadThreads(true)]);
+      await Promise.all([selectedThreadRef.current === openThreadId ? loadDetail(openThreadId, true) : Promise.resolve(), loadThreads(true)]);
       onDataChange?.();
     }
     setBusyAction(null);
@@ -321,11 +372,11 @@ export function InquiryInbox({
 
   async function loadFallbackCandidates() {
     const client = getMarketplaceClient();
-    if (!client || !selectedThreadId) return;
+    if (!client || !openThreadId) return;
     setLoadingCandidates(true);
     setError(null);
     const { data, error: candidateError } = await client.rpc("admin_list_fallback_candidates", {
-      p_thread_id: selectedThreadId
+      p_thread_id: openThreadId
     });
     if (candidateError) setError(candidateError.message);
     else setCandidates((Array.isArray(data) ? data : []) as InquiryFallbackCandidate[]);
@@ -335,12 +386,12 @@ export function InquiryInbox({
 
   async function routeInquiry() {
     const client = getMarketplaceClient();
-    if (!client || !selectedThreadId || !selectedCandidateId) return;
+    if (!client || !openThreadId || !selectedCandidateId) return;
     setBusyAction("route");
     setError(null);
     setActionMessage(null);
     const { data, error: routeError } = await client.rpc("admin_route_inquiry", {
-      p_thread_id: selectedThreadId,
+      p_thread_id: openThreadId,
       p_instructor_profile_id: selectedCandidateId,
       p_note: null
     });
@@ -360,24 +411,24 @@ export function InquiryInbox({
   async function addAdminNote(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const client = getMarketplaceClient();
-    if (!client || !selectedThreadId || !adminNote.trim()) return;
+    if (!client || !openThreadId || !adminNote.trim()) return;
     setBusyAction("note");
     setError(null);
     const { error: noteError } = await client.rpc("admin_add_inquiry_note", {
-      p_thread_id: selectedThreadId,
+      p_thread_id: openThreadId,
       p_note: adminNote.trim()
     });
     if (noteError) setError(noteError.message);
     else {
       setAdminNote("");
-      await loadDetail(selectedThreadId, true);
+      if (selectedThreadRef.current === openThreadId) await loadDetail(openThreadId, true);
     }
     setBusyAction(null);
   }
 
   const selectedRow = useMemo(
-    () => threads.find((row) => row.thread_id === selectedThreadId) ?? null,
-    [selectedThreadId, threads]
+    () => threads.find((row) => row.thread_id === openThreadId) ?? null,
+    [openThreadId, threads]
   );
   const threadStatus = String(detail?.thread.thread_status ?? detail?.thread.status ?? selectedRow?.thread_status ?? "active");
   const canReply = (
@@ -424,7 +475,7 @@ export function InquiryInbox({
 
       <div className={`${styles.inboxLayout} ${selectedThreadId ? styles.hasSelectedThread : ""}`}>
         <aside className={styles.threadList} aria-label="Conversations">
-          {loadingThreads ? <div className={styles.inboxLoading}>Loading conversations...</div> : null}
+          {loadingThreads && !threads.length ? <div className={styles.inboxLoading}>Loading conversations...</div> : null}
           {!loadingThreads && !threads.length ? (
             <div className={styles.inboxEmpty}>
               <Inbox aria-hidden="true" size={28} />
@@ -435,7 +486,7 @@ export function InquiryInbox({
             const deadline = responseDeadline(thread.response_due_at);
             return (
               <button
-                className={`${styles.threadListItem} ${thread.thread_id === selectedThreadId ? styles.selectedThread : ""}`}
+                className={`${styles.threadListItem} ${thread.thread_id === openThreadId ? styles.selectedThread : ""}`}
                 key={thread.thread_id}
                 type="button"
                 onClick={() => chooseThread(thread.thread_id)}
@@ -454,7 +505,7 @@ export function InquiryInbox({
             );
           })}
           {hasMore ? (
-            <button className={styles.threadLoadMore} disabled={loadingMore} type="button" onClick={() => void loadMoreThreads()}>
+            <button className={styles.threadLoadMore} disabled={loadingMore || loadingThreads} type="button" onClick={() => void loadMoreThreads()}>
               {loadingMore ? "Loading..." : "Load more conversations"}
             </button>
           ) : null}
@@ -466,14 +517,14 @@ export function InquiryInbox({
               <ChevronLeft aria-hidden="true" size={18} /> Conversations
             </button>
           ) : null}
-          {loadingDetail ? <div className={styles.inboxLoading}>Opening conversation...</div> : null}
+          {loadingDetail && !detail ? <div className={styles.inboxLoading}>Opening conversation...</div> : null}
           {!loadingDetail && !detail ? (
             <div className={styles.inboxEmpty}>
               <Inbox aria-hidden="true" size={32} />
               <p>Select a conversation to open it.</p>
             </div>
           ) : null}
-          {!loadingDetail && detail ? (
+          {detail ? (
             <>
               <header className={styles.threadHeader}>
                 <div>
@@ -495,14 +546,14 @@ export function InquiryInbox({
                     {perspective === "admin" ? <div><dt>Contact</dt><dd>{detail.inquiry.contact_name || detail.inquiry.contact_email || "Organizer"}</dd></div> : null}
                   </dl>
                   {selectedRow?.counterparty_profile_slug && perspective !== "instructor" ? (
-                    <Link href={`/instructors/${selectedRow.counterparty_profile_slug}/`}>View instructor profile</Link>
+                    <Link href={`/profile/?instructor=${encodeURIComponent(selectedRow.counterparty_profile_slug)}`}>View instructor profile</Link>
                   ) : null}
                   {perspective !== "instructor" || detail.thread.is_current_assignment === true ? (
                     <InquiryOutcomeActions
                       inquiry={detail.inquiry}
                       perspective={perspective}
                       onChanged={async () => {
-                        if (selectedThreadId) await loadDetail(selectedThreadId, true);
+                        if (openThreadId && selectedThreadRef.current === openThreadId) await loadDetail(openThreadId, true);
                         onDataChange?.();
                       }}
                     />
@@ -537,7 +588,10 @@ export function InquiryInbox({
                     <form className={styles.messageComposer} onSubmit={sendMessage}>
                       <label>
                         <span className={styles.srOnly}>Reply</span>
-                        <textarea required maxLength={4000} value={messageBody} onChange={(event) => setMessageBody(event.target.value)} placeholder="Write a reply" />
+                        <textarea required maxLength={4000} value={messageBody} onChange={(event) => {
+                          const value = event.target.value;
+                          if (openThreadId) setDrafts((current) => ({ ...current, [openThreadId]: value }));
+                        }} placeholder="Write a reply" />
                       </label>
                       <button className={styles.button} disabled={sending || !messageBody.trim()} type="submit">
                         <Send aria-hidden="true" size={17} /> {sending ? "Sending..." : "Send"}

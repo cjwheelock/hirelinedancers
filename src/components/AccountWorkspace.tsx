@@ -1057,8 +1057,10 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
           <button className={styles.button} type="button" onClick={() => setPaymentSetupRetryVersion((current) => current + 1)}>Check payment setup again</button>
         </div>
       ) : null}
-      {!loading && profile && tab === "profile" ? (
-        <InstructorProfileForm profile={profile} settings={settings} hasLifetimeAccess={hasLifetimeAccess} onSaved={() => void load()} />
+      {profile ? (
+        <div hidden={tab !== "profile"}>
+          <InstructorProfileForm key={profile.id} profile={profile} settings={settings} hasLifetimeAccess={hasLifetimeAccess} onSaved={() => void load(true)} />
+        </div>
       ) : null}
       {!loading && tab === "inquiries" ? (
         <InquiryInbox
