@@ -77,14 +77,17 @@
         "npm:@types/node@^22.10.1",
         "npm:@types/react-dom@^19.0.1",
         "npm:@types/react@^19.0.1",
-        "npm:eslint-config-next@^15.0.4",
+        "npm:eslint-config-next@^15.5.25",
         "npm:eslint@^9.16.0",
         "npm:lucide-react@0.468",
-        "npm:next@^15.0.4",
+        "npm:next@^15.5.25",
         "npm:react-dom@19",
         "npm:react@19",
         "npm:typescript@^5.7.2"
-      ]
+      ],
+      "overrides": {
+        "postcss": "8.5.26"
+      }
     }
   }
 }
