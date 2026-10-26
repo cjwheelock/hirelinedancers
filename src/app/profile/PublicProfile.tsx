@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { InstructorContactLink } from "@/components/InstructorContactLink";
 import {
+  Award,
   CalendarCheck,
   Clock,
   Headphones,
@@ -21,6 +22,7 @@ import {
   marketplaceConfigured,
   type InstructorProfile
 } from "@/lib/marketplace";
+import { isFoundingInstructor } from "@/lib/commercialTerms";
 import styles from "./profile.module.css";
 
 type PublicInstructorProfile = Pick<
@@ -47,7 +49,7 @@ type PublicInstructorProfile = Pick<
   | "provides_music_playback"
   | "liability_insurance_status"
   | "preferred_response_hours"
->;
+> & { created_at: string | null };
 
 type ProfileMedia = {
   id: string;
@@ -83,7 +85,8 @@ const publicProfileFields = [
   "provides_microphone",
   "provides_music_playback",
   "liability_insurance_status",
-  "preferred_response_hours"
+  "preferred_response_hours",
+  "created_at"
 ].join(",");
 
 function isUuid(value: string) {
@@ -295,6 +298,9 @@ export function PublicProfile() {
           ) : initials(profile.display_name)}
         </div>
         <div className={styles.heroCopy}>
+          {isFoundingInstructor(profile.created_at)
+            ? <span className="founding-badge"><Award size={15} aria-hidden="true" /> Founding instructor</span>
+            : null}
           <h1>{profile.display_name}</h1>
           <p className={styles.headline}>{profile.headline || "Beginner-friendly line dance instruction for events and programs."}</p>
           <InstructorContactLink

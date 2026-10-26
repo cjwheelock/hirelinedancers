@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { CalendarDays, MapPin, Search } from "lucide-react";
+import { Award, CalendarDays, MapPin, Search } from "lucide-react";
+import { isFoundingInstructor } from "@/lib/commercialTerms";
 import { eventTypes, instructors, serviceMarkets, type Instructor } from "@/data/site";
 import {
   getMarketplaceClient,
@@ -33,6 +34,7 @@ type PublicProfile = Pick<
   | "liability_insurance_status"
   | "preferred_response_hours"
 > & {
+  created_at: string | null;
   headshotUrl: string | null;
   headshotAlt: string | null;
 };
@@ -81,7 +83,8 @@ const publicProfileFields = [
   "provides_microphone",
   "provides_music_playback",
   "liability_insurance_status",
-  "preferred_response_hours"
+  "preferred_response_hours",
+  "created_at"
 ].join(",");
 
 function initials(name: string) {
@@ -227,7 +230,9 @@ function PublicProfileCard({ profile, compact = false }: { profile: PublicProfil
               {profile.business_name ? `${profile.business_name} · ` : ""}{locationLabel(profile)}
             </p>
           </div>
-          <span className="pill">Published profile</span>
+          {isFoundingInstructor(profile.created_at)
+            ? <span className="founding-badge compact"><Award size={13} aria-hidden="true" /> Founding instructor</span>
+            : <span className="pill">Published profile</span>}
         </div>
       </div>
 

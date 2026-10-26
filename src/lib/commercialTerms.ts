@@ -72,3 +72,14 @@ export function bookingExample(priceCents: number) {
     payout: usd.format((priceCents - platformFee) / 100)
   };
 }
+
+// Instructors whose profile was created before this moment (midnight Eastern
+// on January 1, 2027) are founding instructors and get a profile badge.
+export const foundingInstructorCutoff = terms.bookings.foundingInstructorJoinedBefore;
+export const foundingInstructorYear = String(new Date(Date.parse(foundingInstructorCutoff) - 86_400_000).getUTCFullYear());
+
+export function isFoundingInstructor(createdAt: string | null | undefined): boolean {
+  if (!createdAt) return false;
+  const created = Date.parse(createdAt);
+  return Number.isFinite(created) && created < Date.parse(foundingInstructorCutoff);
+}

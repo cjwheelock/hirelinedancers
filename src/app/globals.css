@@ -693,13 +693,21 @@ main { display: block; }
   align-content: start;
 }
 .price-card.featured { border: 2px solid var(--sunset); box-shadow: var(--shadow); position: relative; }
-.price-card.featured::before {
-  content: "Founding instructor offer";
-  position: absolute; top: -13px; left: 28px;
-  background: var(--sunset); color: #fff;
-  font-size: 12px; font-weight: 700; letter-spacing: .04em;
-  padding: 5px 12px; border-radius: 0;
+.founding-badge {
+  display: inline-flex; align-items: center; gap: 7px;
+  width: fit-content;
+  padding: 6px 12px 6px 10px;
+  background: var(--ink); color: var(--gold);
+  border: 1.5px solid var(--gold);
+  box-shadow: 3px 3px 0 var(--sunset);
+  font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+  line-height: 1;
 }
+.founding-badge svg,
+.price-card .founding-badge svg { color: var(--gold); flex: 0 0 auto; }
+.price-card.featured > .founding-badge { position: absolute; top: -15px; left: 26px; }
+.price-card.featured > h2 { margin-top: 10px; }
+.founding-badge.compact { padding: 4px 9px 4px 8px; font-size: 10.5px; box-shadow: 2px 2px 0 var(--sunset); }
 .price-card svg { color: var(--sunset); }
 .price {
   display: flex;
