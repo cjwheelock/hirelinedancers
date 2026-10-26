@@ -706,7 +706,8 @@ main { display: block; }
 .founding-badge svg,
 .price-card .founding-badge svg { color: var(--gold); flex: 0 0 auto; }
 .price-card.featured > .founding-badge { position: absolute; top: -15px; left: 26px; }
-.price-card.featured > h2 { margin-top: 10px; }
+.price-card.featured > h2 { margin: 10px 0 0; }
+.price-card.featured > h2 + .check-list { margin-top: 6px; }
 .founding-badge.compact { padding: 4px 9px 4px 8px; font-size: 10.5px; box-shadow: 2px 2px 0 var(--sunset); }
 .price-card svg { color: var(--sunset); }
 .price {
