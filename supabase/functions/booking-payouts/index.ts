@@ -153,8 +153,15 @@ export default {
 
       return json({ ...status, hasAccount: true });
     } catch (error) {
-      console.error("Payout setup failed", stripeErrorMessage(error));
-      return json({ error: "Stripe could not open payout setup. Try again in a minute." }, 502);
+      const message = stripeErrorMessage(error);
+      console.error("Payout setup failed", message);
+      const connectMissing = /signed up for Connect|connect.*not.*enabled|platform profile|review the responsibilities/i.test(message);
+      return json({
+        error: connectMissing
+          ? "Payouts are not available yet because Stripe Connect still needs to be set up on the Hire Line Dancers Stripe account."
+          : `Stripe could not open payout setup: ${message}`,
+        code: connectMissing ? "connect_not_enabled" : "stripe_error",
+      }, 502);
     }
   }),
 };
