@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { ArrowRight, BadgeCheck, Banknote, ClipboardCheck, FileSignature, ShieldCheck, Sparkles, Users } from "lucide-react";
+import { ArrowRight, Award, Banknote, ClipboardCheck, FileSignature, ShieldCheck, Sparkles, Users } from "lucide-react";
 import {
   bookingExample,
-  clientFeePercent,
+  foundingInstructorDeadline,
   instructorFeePercent,
   payoutDelayLabel,
   problemReportWindowLabel
@@ -11,7 +11,7 @@ import { signInUrl } from "@/lib/marketplace";
 
 export const metadata = {
   title: "List Your Services as a Line Dance Instructor",
-  description: "Join Hire Line Dancers free. Get discovered by people planning weddings, corporate events, and private parties, send quotes, and get paid through the platform."
+  description: "Join Hire Line Dancers free and become a founding instructor. Get discovered by people planning weddings, corporate events, and private parties, send quotes, and get paid through the platform."
 };
 
 const example = bookingExample(40000);
@@ -77,16 +77,16 @@ export default function JoinPage() {
         <h2>Pricing</h2>
         <div className="pricing-grid">
           <article className="price-card featured">
-            <BadgeCheck size={28} />
+            <span className="founding-badge"><Award size={15} aria-hidden="true" /> Founding instructor</span>
             <h2>Free to join</h2>
-            <p className="price">{instructorFeePercent} <span>per paid booking</span></p>
             <ul className="check-list">
               <li>No monthly fee. You pay nothing until you get paid.</li>
-              <li>Hire Line Dancers keeps a {instructorFeePercent} platform fee from each booking paid through the platform. The client also pays a {clientFeePercent} service fee.</li>
-              <li>Example: on a {example.price} booking, the client pays {example.total} and you receive {example.payout}.</li>
+              <li>Hire Line Dancers keeps a {instructorFeePercent} platform fee from each booking paid through the platform.</li>
+              <li>Example: on a {example.price} booking, you receive {example.payout}.</li>
               <li>You set your rate, minimum hours, and cancellation policy on every quote.</li>
               <li>Your payout is sent {payoutDelayLabel} after the event unless the client reports a problem within {problemReportWindowLabel}.</li>
               <li>If you need insurance, you can attach your own certificate or note that you handle insurance outside the agreement.</li>
+              <li>Join by {foundingInstructorDeadline} to become a founding instructor and keep a Founding Instructor badge on your profile.</li>
             </ul>
             <p>See the <Link href="/legal/terms/">Terms of Service</Link> and <Link href="/legal/refund-policy/">booking cancellation and refund policy</Link>.</p>
             <Link className="button primary" href={signInUrl("/account/", "instructor")}>Apply for a profile</Link>

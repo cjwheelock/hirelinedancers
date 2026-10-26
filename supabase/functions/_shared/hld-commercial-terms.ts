@@ -53,7 +53,8 @@ export const HLD_COMMERCIAL_TERMS = {
         "minDaysBeforeEvent": 7,
         "refundPercent": 50
       }
-    ]
+    ],
+    "foundingInstructorJoinedBefore": "2027-02-01T05:00:00Z"
   },
   "database": {
     "invitationPolicyMigration": "202608070001_instructor_invitation_claim_lifecycle.sql",
