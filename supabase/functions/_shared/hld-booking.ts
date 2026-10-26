@@ -341,7 +341,7 @@ export function renderAgreement(
     "1. Parties",
     `Instructor: ${instructorParty} ("Instructor").`,
     `Client: ${organizerParty} ("Client").`,
-    `Hire Line Dancers is operated by ${parties.legalName} ("Hire Line Dancers"). Hire Line Dancers facilitates this booking and collects and holds payment, but is not a party to the performance of the services.`,
+    `Hire Line Dancers is operated by ${parties.legalName} ("Hire Line Dancers"). Hire Line Dancers provides the platform, this standard agreement, and the payment flow. Hire Line Dancers is not a party to this agreement and does not provide the services. Hire Line Dancers collects and holds payment as the Instructor's limited payment collection agent; payment to Hire Line Dancers counts as payment to the Instructor.`,
     "",
     "2. Event",
     `Date: ${displayDate(input.eventDate)}`,
@@ -370,7 +370,7 @@ export function renderAgreement(
     "Either party may propose a new date because of weather, venue closure, or emergency. If both agree in the Hire Line Dancers conversation, the payment carries over to the new date.",
     "",
     "6. Problems at the event",
-    `The Client may report a no-show or a material problem within ${BOOKING_TERMS.problemReportWindowHours} hours after the scheduled end of the event. A report pauses the Instructor payout while Hire Line Dancers reviews messages and other evidence from both parties. Hire Line Dancers decides how held funds are released or refunded. Without a timely report, the event is treated as completed.`,
+    `The Client may report a no-show or a material problem within ${BOOKING_TERMS.problemReportWindowHours} hours after the scheduled end of the event. A report pauses the Instructor payout while Hire Line Dancers reviews messages and other evidence from both parties. Hire Line Dancers decides how held funds are released or refunded. That decision covers only the funds Hire Line Dancers holds and does not make Hire Line Dancers responsible for the event. Without a timely report, the event is treated as completed.`,
     "",
     "7. Insurance",
     insurance,
@@ -381,8 +381,11 @@ export function renderAgreement(
     "9. Booking through Hire Line Dancers",
     "For 12 months after first connecting through Hire Line Dancers, the parties agree to book each other only through Hire Line Dancers, and to keep messages and payments on Hire Line Dancers.",
     "",
-    "10. Other terms",
-    "This agreement incorporates the Hire Line Dancers Terms of Service. Each party is responsible for claims arising from its own conduct at the event. Hire Line Dancers' liability is limited to the fees it received for this booking. Each party signs electronically by typing their name, and the electronic signatures have the same effect as handwritten signatures.",
+    "10. Disputes between the parties",
+    "The Client and the Instructor will resolve any disagreement about the services, the event, or each other's conduct directly with each other. Hire Line Dancers does not guarantee the quality or safety of the services, has no duty to mediate, and is not liable for disputes between the parties, the venue, or other vendors. Each party releases Hire Line Dancers and OMG Goals, Inc. from claims arising from those disputes, to the extent the law allows.",
+    "",
+    "11. Other terms",
+    "This agreement incorporates the Hire Line Dancers Terms of Service. Each party is responsible for claims arising from its own conduct, services, venue, guests, and equipment, and will indemnify Hire Line Dancers for those claims. Hire Line Dancers' liability is limited to the fees it kept for this booking. Each party signs electronically by typing their name, and the electronic signatures have the same effect as handwritten signatures.",
   ].join("\n");
 }
 

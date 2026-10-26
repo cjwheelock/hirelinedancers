@@ -97,7 +97,7 @@ as $$
     'total_cents', 42000,
     'platform_fee_cents', 6000,
     'instructor_payout_cents', 34000,
-    'agreement_version', '2026-10-26-booking-agreement-v1',
+    'agreement_version', '2026-10-26-booking-agreement-v2',
     'agreement_text', repeat('Booking agreement text. ', 20),
     'agreement_sha256', repeat('a', 64),
     'signature_name', 'Instructor One',
