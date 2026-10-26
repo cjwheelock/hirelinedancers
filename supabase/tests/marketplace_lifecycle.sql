@@ -4,6 +4,10 @@
 -- only standard PostgreSQL features and rolls back every fixture it creates.
 begin;
 
+-- These tests cover the legacy membership workflow, so new profiles in this
+-- transaction do not receive automatic commission (no-fee) access.
+select set_config('hire_line_dancers.commission_access', 'off', true);
+
 create or replace function pg_temp.test_assert(
   p_condition boolean,
   p_message text
@@ -1027,11 +1031,19 @@ select pg_temp.set_request(
 select public.report_booking_outcome(
   :'alice_inquiry_id'::uuid, 'not_booked', null, 'The client did not confirm'
 );
+-- Instructors cannot read inquiry rows directly until a booking is paid, so
+-- verify the stored outcome with table-owner access.
+select pg_temp.test_assert(
+  not exists (select 1 from public.inquiries where id = :'alice_inquiry_id'::uuid),
+  'instructors must not read unpaid inquiry rows directly'
+);
+reset role;
 select pg_temp.test_assert(
   (select booking_outcome = 'disputed' and outcome_next_ask_at is null
    from public.inquiries where id = :'alice_inquiry_id'::uuid),
   'instructor outcome must clear follow-up and preserve both parties evidence'
 );
+set local role authenticated;
 
 -- Due follow-ups enqueue only email. Submitting instructor feedback cancels the
 -- queued reminder and leaves a non-booked guarantee covered.

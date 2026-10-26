@@ -387,7 +387,7 @@ export function PublicProfile() {
             <li>Discuss music, accessibility, travel, sound, and venue requirements before the event.</li>
           </ul>
           <p className={styles.finePrint}>You can browse without an account. Sign in is required when you send an inquiry so you can track its status.</p>
-          <p className={styles.finePrint}>Hire Line Dancers does not handle instructor contracts or event payments. Confirm all terms directly before booking.</p>
+          <p className={styles.finePrint}>When you agree on the details, the instructor sends a booking agreement here. You sign and pay through Hire Line Dancers, and we hold the payment until after the event.</p>
           <p className={styles.response}><Clock size={15} aria-hidden="true" /> Preferred response window: about {profile.preferred_response_hours} hours</p>
         </aside>
       </div>

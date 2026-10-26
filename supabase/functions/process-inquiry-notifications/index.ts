@@ -4,6 +4,7 @@ import {
 } from "npm:@supabase/server@^1";
 import { BILLING_RECOVERY_GRACE_DAYS } from "../_shared/hld-commercial-terms.ts";
 import { supabaseServerOptions } from "../_shared/hld-supabase-admin.ts";
+import { maskContactDetails } from "../_shared/hld-booking.ts";
 
 type ReadOnlyTable<Row extends Record<string, unknown>> = {
   Row: Row;
@@ -161,7 +162,8 @@ type ThreadNotificationType =
   | "response_timeout_instructor"
   | "response_timeout_organizer"
   | "thread_declined"
-  | "fallback_routed_organizer";
+  | "fallback_routed_organizer"
+  | "booking_update";
 
 type ThreadNotificationJob = {
   job_id: number;
@@ -387,7 +389,7 @@ function emailText(job: NotificationJob, actionUrl: string | null = null): strin
     `Music requests: ${display(job.music_requests)}`,
     "",
     "Message:",
-    display(job.inquiry_message),
+    display(maskContactDetails(job.inquiry_message)),
     "",
     actionUrl ? `Open the conversation: ${actionUrl}` : "",
     "",
@@ -454,7 +456,7 @@ function emailHtml(job: NotificationJob, actionUrl: string | null = null): strin
           <table role="presentation" style="width:100%;border-collapse:collapse">${details}</table>
           <div style="margin-top:22px;padding:18px;background:#f1efe8">
             <strong>Organizer message</strong>
-            <p style="margin:8px 0 0;white-space:pre-wrap">${escapeHtml(display(job.inquiry_message))}</p>
+            <p style="margin:8px 0 0;white-space:pre-wrap">${escapeHtml(display(maskContactDetails(job.inquiry_message)))}</p>
           </div>
           ${actionUrl ? `<p style="margin:22px 0 0"><a href="${escapeHtml(actionUrl)}" style="display:inline-block;padding:14px 20px;background:#e7a33c;border:2px solid #1c2a44;color:#1c2a44;font-weight:700;text-decoration:none">Open conversation</a></p>` : ""}
           <p style="margin:22px 0 0"><strong>Reply within 72 hours</strong>, even if you are not available.</p>
@@ -536,6 +538,8 @@ function threadNotificationSubject(job: ThreadNotificationJob): string {
       return `${job.instructor_name} is unavailable for this inquiry`;
     case "fallback_routed_organizer":
       return `Your inquiry was sent to ${job.instructor_name}`;
+    case "booking_update":
+      return `Booking update: ${eventTypeLabel(job.event_type)}${job.event_date ? ` on ${job.event_date}` : ""}`;
   }
 }
 
@@ -605,6 +609,13 @@ function threadNotificationContent(job: ThreadNotificationJob): {
         heading: "Your inquiry was sent to another instructor",
         description: `Hire Line Dancers sent your event details to ${job.instructor_name}.`,
         instruction: "Open the conversation to follow the response.",
+      };
+    case "booking_update":
+      return {
+        recipientName: null,
+        heading: "Booking update",
+        description: job.message_body || "There is an update to your booking.",
+        instruction: "Open the conversation for the agreement, payment status, and next steps.",
       };
   }
 }

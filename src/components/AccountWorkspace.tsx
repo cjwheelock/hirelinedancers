@@ -29,6 +29,8 @@ import { useMarketplaceSession } from "@/hooks/useMarketplaceSession";
 import { ImageCropDialog } from "./ImageCropDialog";
 import { InquiryInbox } from "./InquiryInbox";
 import { MembershipCreditAdmin } from "./MembershipCreditAdmin";
+import { PayoutsCard } from "./PayoutsCard";
+import { AdminBookings } from "./AdminBookings";
 import {
   accountEntryRedirect,
   cleanAccountIntent,
@@ -71,7 +73,7 @@ type ProfileMedia = {
   sort_order: number;
 };
 
-type InstructorTab = "profile" | "inquiries" | "membership";
+type InstructorTab = "profile" | "inquiries" | "payouts" | "membership";
 
 type InstructorInvitationOfferStatus = Pick<
   InstructorInvitationLifecycle,
@@ -752,7 +754,7 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
       window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
       return;
     }
-    if (["profile", "inquiries", "membership"].includes(requestedTab ?? "")) {
+    if (["profile", "inquiries", "payouts", "membership"].includes(requestedTab ?? "")) {
       setTab(requestedTab as InstructorTab);
     }
   }, [account.id]);
@@ -1033,7 +1035,10 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
       ) : null}
 
       <div className={styles.tabs} role="tablist" aria-label="Instructor account sections">
-        {(["profile", "inquiries", "membership"] as const).map((name) => (
+        {(hasLifetimeAccess === false
+          ? ["profile", "inquiries", "payouts", "membership"] as const
+          : ["profile", "inquiries", "payouts"] as const
+        ).map((name) => (
           <button
             key={name}
             className={`${styles.tab} ${tab === name ? styles.activeTab : ""}`}
@@ -1070,6 +1075,9 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
           focusThreadId={focusThreadId}
           onDataChange={() => void load(true)}
         />
+      ) : null}
+      {!loading && profile && tab === "payouts" ? (
+        <PayoutsCard profileId={profile.id} settings={settings} onSaved={() => void load(true)} />
       ) : null}
       {!loading && profile && tab === "membership" && hasLifetimeAccess !== null ? (
         <MembershipCard
@@ -1290,7 +1298,6 @@ function InstructorProfileForm({
 
   const canEdit = ["draft", "approved", "published"].includes(profile.status);
   const canContinue = profile.status === "draft";
-  const selectedMarket = serviceMarkets.find((market) => market.city === form.city && market.state === form.region);
   const allEventTypesSelected = eventTypes.every((item) => form.event_types.includes(item.slug));
 
   function selectMarket(slug: string) {
@@ -1333,13 +1340,38 @@ function InstructorProfileForm({
 
       <div className={`${styles.grid} ${styles.alignedGrid}`}>
         <label className={styles.field}>
-          <span>City or metro area</span>
-          <select disabled={!canEdit} required value={selectedMarket?.slug ?? ""} onChange={(e) => selectMarket(e.target.value)}>
-            <option value="">Select a service market</option>
+          <span>City</span>
+          <input
+            disabled={!canEdit}
+            required
+            list="instructor-city-suggestions"
+            autoComplete="address-level2"
+            maxLength={120}
+            value={form.city}
+            onChange={(e) => {
+              const value = e.target.value;
+              const market = serviceMarkets.find((item) => `${item.city}, ${item.state}` === value);
+              if (market) selectMarket(market.slug);
+              else setValue("city", value);
+            }}
+          />
+          <datalist id="instructor-city-suggestions">
             {serviceMarkets.map((market) => (
-              <option key={market.slug} value={market.slug}>{market.city}, {market.state}</option>
+              <option key={market.slug} value={`${market.city}, ${market.state}`} />
             ))}
-          </select>
+          </datalist>
+        </label>
+        <label className={styles.field}>
+          <span>State</span>
+          <input
+            disabled={!canEdit}
+            required
+            autoComplete="address-level1"
+            maxLength={2}
+            placeholder="TX"
+            value={form.region}
+            onChange={(e) => setValue("region", e.target.value.toUpperCase().replace(/[^A-Z]/g, ""))}
+          />
         </label>
         <label className={styles.field}>
           <span>ZIP code</span>
@@ -1450,7 +1482,7 @@ function InstructorProfileForm({
           )}
         </div>
       ) : null}
-      {canContinue && hasLifetimeAccess ? <p className={styles.help}>Your complimentary lifetime access does not require a payment method. Continue to submit your completed profile for review.</p> : null}
+      {canContinue && hasLifetimeAccess ? <p className={styles.help}>Joining is free and does not require a payment method. Continue to submit your completed profile for review. You will set up payouts before sending your first quote.</p> : null}
       {canEdit ? (
         <div className={styles.buttonRow}>
           <button className={styles.secondaryButton} type="button" disabled={busy !== null} onClick={() => void save(false)}>
@@ -1733,10 +1765,10 @@ function MembershipCard({
     return (
       <div className={styles.card}>
         <p className={styles.eyebrow}>Instructor access</p>
-        <h2>Lifetime access</h2>
-        <p>Your instructor account has complimentary lifetime access. You will not be asked to enter payment details or activate a Stripe membership for this profile.</p>
-        <p><span className={styles.status}>Lifetime</span></p>
-        {profile.status === "draft" ? <p className={styles.notice}>Complete your profile and choose Continue to submit it for review. Lifetime access will publish it automatically after approval.</p> : null}
+        <h2>No membership fee</h2>
+        <p>Your instructor account has no membership fee. Hire Line Dancers is paid through a platform fee on bookings that clients pay through Hire Line Dancers.</p>
+        <p><span className={styles.status}>No fee</span></p>
+        {profile.status === "draft" ? <p className={styles.notice}>Complete your profile and choose Continue to submit it for review. It will be published automatically after approval.</p> : null}
         {profile.status === "pending_review" ? <p className={styles.notice}>Your profile is under review. It will go live automatically when approved.</p> : null}
         {profile.status === "approved" ? <p className={styles.notice}>Your profile is approved and is being prepared for the directory.</p> : null}
         {profile.status === "published" ? <p className={styles.success}>Your profile is live in the directory.</p> : null}
@@ -2600,7 +2632,7 @@ function MembershipGuaranteeAdmin({ isOwner }: { isOwner: boolean }) {
 }
 
 function AdminDashboard({ isOwner }: { isOwner: boolean }) {
-  const [tab, setTab] = useState<"overview" | "messages" | "profiles" | "memberships" | "invitations" | "delivery" | "access">("overview");
+  const [tab, setTab] = useState<"overview" | "messages" | "bookings" | "profiles" | "memberships" | "invitations" | "delivery" | "access">("overview");
   const [focusedProfileId, setFocusedProfileId] = useState<string | null>(null);
   const [focusedInquiryId, setFocusedInquiryId] = useState<string | null>(null);
   const [focusedThreadId, setFocusedThreadId] = useState<string | null>(null);
@@ -2748,7 +2780,7 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const requestedTab = params.get("tab");
-    if (["overview", "messages", "profiles", "memberships", "invitations", "delivery", "access"].includes(requestedTab ?? "")) {
+    if (["overview", "messages", "bookings", "profiles", "memberships", "invitations", "delivery", "access"].includes(requestedTab ?? "")) {
       setTab(requestedTab as typeof tab);
     }
     setFocusedProfileId(params.get("profile"));
@@ -3017,8 +3049,8 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
     <>
       <div className={styles.tabs} role="tablist" aria-label="Admin dashboard sections">
         {(isOwner
-          ? (["overview", "messages", "profiles", "memberships", "invitations", "delivery", "access"] as const)
-          : (["overview", "messages", "profiles", "memberships", "invitations", "delivery"] as const)
+          ? (["overview", "messages", "bookings", "profiles", "memberships", "invitations", "delivery", "access"] as const)
+          : (["overview", "messages", "bookings", "profiles", "memberships", "invitations", "delivery"] as const)
         ).map((name) => (
           <button key={name} className={`${styles.tab} ${tab === name ? styles.activeTab : ""}`} type="button" onClick={() => selectAdminTab(name)}>
             {name[0].toUpperCase() + name.slice(1)}
@@ -3028,6 +3060,8 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
       {message ? <p className={styles.success} role="status">{message}</p> : null}
       {loading ? <div className={styles.loading}>Loading marketplace operations...</div> : null}
+
+      {!loading && tab === "bookings" ? <AdminBookings /> : null}
 
       {!loading && tab === "messages" ? (
         <InquiryInbox

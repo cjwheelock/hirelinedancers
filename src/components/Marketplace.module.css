@@ -2237,3 +2237,221 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Booking panel in message threads */
+.bookingPanel {
+  display: grid;
+  gap: 14px;
+  padding: 18px 24px;
+  border-bottom: 1px solid #c6c8d0;
+  background: #fbfaf5;
+}
+
+.bookingHeader {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.bookingHeader h3 {
+  margin: 4px 0 0;
+  color: #1c2a44;
+  font-size: 1.2rem;
+}
+
+.bookingHeader .eyebrow {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  margin: 0;
+}
+
+.bookingNext {
+  margin: 6px 0 0;
+  color: #3f4b66;
+  font-weight: 700;
+}
+
+.bookingCallout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px;
+  border: 1.5px dashed #b5472b;
+  background: #fff;
+}
+
+.bookingCallout p {
+  margin: 0;
+  flex: 1 1 280px;
+  line-height: 1.45;
+}
+
+.bookingSummary {
+  display: grid;
+  gap: 10px;
+}
+
+.bookingFacts {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.bookingFacts > div {
+  display: grid;
+  grid-template-columns: minmax(110px, 160px) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.bookingFacts dt {
+  color: #57607a;
+  font: 700 0.72rem/1.5 "IBM Plex Mono", monospace;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.bookingFacts dd {
+  margin: 0;
+  color: #1c2a44;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.bookingContacts {
+  padding: 12px 14px;
+  border: 1px solid #2f6b4f;
+  background: #eef6f1;
+}
+
+.bookingContacts strong {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.bookingContacts p {
+  margin: 6px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.agreementText {
+  max-height: 320px;
+  margin: 0;
+  overflow: auto;
+  padding: 14px;
+  border: 1px solid #c6c8d0;
+  background: #fff;
+  color: #1c2a44;
+  font: 0.86rem/1.55 "IBM Plex Mono", monospace;
+  white-space: pre-wrap;
+}
+
+.linkButton {
+  width: fit-content;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #b5472b;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.bookingForm {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 2px solid #1c2a44;
+  background: #fff;
+}
+
+.bookingForm h4 {
+  margin: 0;
+  color: #1c2a44;
+  font-size: 1.1rem;
+}
+
+.bookingFormGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.bookingFieldset {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.bookingMoney {
+  margin: 0;
+  padding: 12px 14px;
+  background: #f1efe8;
+  line-height: 1.5;
+}
+
+.windowsEditor {
+  display: grid;
+  gap: 10px;
+}
+
+.windowRow {
+  display: grid;
+  grid-template-columns: minmax(90px, 140px) minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.booking_confirmed,
+.booking_completed,
+.booking_paid_out {
+  border-color: #2f6b4f;
+  background: #e3f1e8;
+  color: #1f4d37;
+}
+
+.booking_quote_sent,
+.booking_awaiting_payment,
+.booking_payment_processing {
+  border-color: #b5822b;
+  background: #fbf1dc;
+  color: #6b4a10;
+}
+
+.booking_cancelled,
+.booking_declined,
+.booking_expired,
+.booking_withdrawn,
+.booking_payment_failed {
+  border-color: #9298a8;
+  background: #eef0f4;
+  color: #4a5368;
+}
+
+.payoutStatus {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+@media (max-width: 720px) {
+  .bookingPanel {
+    padding: 16px;
+  }
+
+  .bookingHeader {
+    flex-direction: column;
+  }
+
+  .bookingFacts > div,
+  .windowRow {
+    grid-template-columns: 1fr;
+  }
+}

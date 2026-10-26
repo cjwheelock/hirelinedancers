@@ -34,6 +34,27 @@ verify_jwt = true
 [functions.send-instructor-invitation]
 verify_jwt = true
 
+[functions.booking-payouts]
+verify_jwt = true
+
+[functions.booking-quote]
+verify_jwt = true
+
+[functions.booking-checkout]
+verify_jwt = true
+
+[functions.booking-cancel]
+verify_jwt = true
+
+[functions.booking-admin]
+verify_jwt = true
+
+[functions.booking-stripe-webhook]
+verify_jwt = false
+
+[functions.booking-scheduler]
+verify_jwt = false
+
 [auth.email.template.magic_link]
 subject = "Sign in to Hire Line Dancers"
 content_path = "./supabase/templates/magic_link.html"

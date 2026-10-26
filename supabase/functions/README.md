@@ -395,3 +395,17 @@ limit 50;
 - Resend idempotency protects retries within its documented window.
 - `sent` means Resend accepted the request. Add a signed Resend status webhook before reporting true `delivered` or `bounced` states.
 - `verify-instructor-refund` verifies a refund that already exists in Stripe. It never creates a refund and never cancels a subscription.
+
+## Booking payment functions
+
+Bookings replace the monthly membership as the business model. See `SUPABASE_SETUP.md` section 7a for Stripe setup.
+
+- `booking-payouts`: instructor Stripe Connect Express onboarding, status refresh, and Express dashboard login links.
+- `booking-quote`: validates a quote, computes amounts from `config/commercial-terms.json`, renders the booking agreement, fingerprints it with SHA-256, and records the instructor signature.
+- `booking-checkout`: records the organizer signature against the exact agreement fingerprint and opens Stripe Checkout for the full amount. Bank transfer is offered only when the event is at least 5 business days away.
+- `booking-stripe-webhook`: confirms payments (including ACH that clears later), records disputes and refund updates, and syncs Connect accounts. It ignores membership events; `stripe-webhook` ignores booking events.
+- `booking-cancel`: organizer, instructor, or administrator cancellation. The database computes the refund from the agreement's cancellation policy.
+- `booking-admin`: administrator resolution of a reported problem (release the payout or refund part or all of the instructor price).
+- `booking-scheduler`: once-per-minute worker that expires quotes, posts reminders and event-ended notices, retries refunds, and transfers instructor payouts 24 hours after each event.
+
+Shared logic is in `_shared/hld-booking.ts` with tests in `_shared/hld-booking_test.ts` (`deno test supabase/functions/_shared/hld-booking_test.ts`).

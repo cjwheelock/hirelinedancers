@@ -49,6 +49,7 @@ type PublicMediaRow = {
 
 type PublicInstructorResultsProps = {
   citySlug?: string;
+  cityQuery?: string;
   eventSlug?: string;
   groupSize?: number;
   compact?: boolean;
@@ -122,6 +123,62 @@ function marketMatches(profile: Pick<PublicProfile, "city" | "region">, citySlug
   const profileCity = profile.city?.trim().toLowerCase();
   const marketCities = [market.city, ...market.serviceCities].map((item) => item.trim().toLowerCase());
   return Boolean(profileCity && marketCities.includes(profileCity));
+}
+
+const stateNames: Record<string, string> = {
+  alabama: "AL", alaska: "AK", arizona: "AZ", arkansas: "AR", california: "CA", colorado: "CO", connecticut: "CT",
+  delaware: "DE", "district of columbia": "DC", florida: "FL", georgia: "GA", hawaii: "HI", idaho: "ID", illinois: "IL",
+  indiana: "IN", iowa: "IA", kansas: "KS", kentucky: "KY", louisiana: "LA", maine: "ME", maryland: "MD",
+  massachusetts: "MA", michigan: "MI", minnesota: "MN", mississippi: "MS", missouri: "MO", montana: "MT",
+  nebraska: "NE", nevada: "NV", "new hampshire": "NH", "new jersey": "NJ", "new mexico": "NM", "new york": "NY",
+  "north carolina": "NC", "north dakota": "ND", ohio: "OH", oklahoma: "OK", oregon: "OR", pennsylvania: "PA",
+  "rhode island": "RI", "south carolina": "SC", "south dakota": "SD", tennessee: "TN", texas: "TX", utah: "UT",
+  vermont: "VT", virginia: "VA", washington: "WA", "west virginia": "WV", wisconsin: "WI", wyoming: "WY"
+};
+
+function normalizePlace(value: string | null | undefined) {
+  return (value ?? "").trim().toLowerCase().replace(/[.]/g, "").replace(/\s+/g, " ");
+}
+
+function normalizeRegion(value: string | null | undefined) {
+  const normalized = normalizePlace(value);
+  if (!normalized) return "";
+  return (stateNames[normalized] ?? normalized.toUpperCase()).toUpperCase();
+}
+
+// Parses "Tulsa, OK", "Tulsa Oklahoma", "Tulsa", or "OK".
+export function parseCityQuery(query: string): { city: string; region: string } {
+  const trimmed = query.trim();
+  if (!trimmed) return { city: "", region: "" };
+  const [cityPart, regionPart] = trimmed.split(",").map((part) => part.trim());
+  if (regionPart !== undefined) return { city: normalizePlace(cityPart), region: normalizeRegion(regionPart) };
+  const whole = normalizePlace(trimmed);
+  if (stateNames[whole] || /^[a-z]{2}$/.test(whole)) return { city: "", region: normalizeRegion(whole) };
+  for (const [name, code] of Object.entries(stateNames)) {
+    if (whole.endsWith(` ${name}`)) return { city: whole.slice(0, -name.length - 1), region: code };
+  }
+  const lastWord = whole.split(" ").at(-1) ?? "";
+  if (whole.includes(" ") && /^[a-z]{2}$/.test(lastWord) && Object.values(stateNames).includes(lastWord.toUpperCase())) {
+    return { city: whole.slice(0, -3), region: lastWord.toUpperCase() };
+  }
+  return { city: whole, region: "" };
+}
+
+export function marketForQuery(query: string) {
+  const { city, region } = parseCityQuery(query);
+  if (!city) return null;
+  return serviceMarkets.find((market) =>
+    normalizePlace(market.city) === city && (!region || normalizeRegion(market.state) === region)
+  ) ?? null;
+}
+
+function cityQueryScore(profile: Pick<PublicProfile, "city" | "region">, query: string) {
+  const { city, region } = parseCityQuery(query);
+  const profileCity = normalizePlace(profile.city);
+  const profileRegion = normalizeRegion(profile.region);
+  if (city && profileCity === city && (!region || profileRegion === region)) return 2;
+  if (region && profileRegion === region) return 1;
+  return 0;
 }
 
 function exampleMarketMatches(instructor: Instructor, citySlug?: string) {
@@ -241,6 +298,7 @@ function ExampleProfileCard({ instructor, compact = false }: { instructor: Instr
 
 export function PublicInstructorResults({
   citySlug,
+  cityQuery,
   eventSlug,
   groupSize = 0,
   compact = false,
@@ -325,6 +383,7 @@ export function PublicInstructorResults({
 
   const results = useMemo(() => profiles
     .filter((profile) => {
+      if (cityQuery && !citySlug) return cityQueryScore(profile, cityQuery) > 0;
       const cityMatch = marketMatches(profile, citySlug);
       const eventMatch = !eventSlug || profile.event_types.includes(eventSlug);
       const groupMatch = !groupSize || (profile.max_group_size ?? 0) >= groupSize;
@@ -334,9 +393,11 @@ export function PublicInstructorResults({
       return cityMatch && (citySlug ? true : eventMatch && groupMatch);
     })
     .sort((a, b) => (
+      cityQuery && !citySlug ? cityQueryScore(b, cityQuery) - cityQueryScore(a, cityQuery) : 0
+    ) || (
       preferenceScore(b.event_types, b.max_group_size, eventSlug, groupSize)
       - preferenceScore(a.event_types, a.max_group_size, eventSlug, groupSize)
-    ) || (b.years_teaching ?? 0) - (a.years_teaching ?? 0) || a.display_name.localeCompare(b.display_name)), [citySlug, eventSlug, groupSize, profiles]);
+    ) || (b.years_teaching ?? 0) - (a.years_teaching ?? 0) || a.display_name.localeCompare(b.display_name)), [cityQuery, citySlug, eventSlug, groupSize, profiles]);
 
   const exampleResults = useMemo(() => instructors
     .filter((instructor) => {
@@ -468,19 +529,29 @@ export function PublicInstructorResults({
 }
 
 export function InstructorDirectoryBrowser() {
-  const [city, setCity] = useState("");
+  const [cityInput, setCityInput] = useState("");
   const [event, setEvent] = useState("");
   const [resultCount, setResultCount] = useState<number | null>(null);
+  const trimmedCity = cityInput.trim();
+  const matchedMarket = trimmedCity ? marketForQuery(trimmedCity) : null;
+  const city = matchedMarket?.slug ?? "";
+  const freeCityQuery = trimmedCity && !matchedMarket ? trimmedCity : "";
 
   return (
     <div className="search-grid">
       <form className="search-form" onSubmit={(submitEvent) => submitEvent.preventDefault()}>
         <label>
-          <span><MapPin size={16} aria-hidden="true" /> Service market</span>
-          <select value={city} onChange={(changeEvent) => setCity(changeEvent.target.value)}>
-            <option value="">All service markets</option>
-            {serviceMarkets.map((item) => <option key={item.slug} value={item.slug}>{item.city}, {item.state}</option>)}
-          </select>
+          <span><MapPin size={16} aria-hidden="true" /> City</span>
+          <input
+            list="directory-city-suggestions"
+            value={cityInput}
+            onChange={(changeEvent) => setCityInput(changeEvent.target.value)}
+            placeholder="Any US city, for example Tulsa, OK"
+            autoComplete="address-level2"
+          />
+          <datalist id="directory-city-suggestions">
+            {serviceMarkets.map((item) => <option key={item.slug} value={`${item.city}, ${item.state}`} />)}
+          </datalist>
         </label>
         <label>
           <span><CalendarDays size={16} aria-hidden="true" /> Event or program</span>
@@ -497,8 +568,11 @@ export function InstructorDirectoryBrowser() {
       <div className="results-list" aria-live="polite">
         <PublicInstructorResults
           citySlug={city || undefined}
+          cityQuery={freeCityQuery || undefined}
           eventSlug={event || undefined}
-          suppressEmptyMessage={!city && !event}
+          suppressEmptyMessage={!trimmedCity && !event}
+          emptyTitle={freeCityQuery ? `No published instructors in ${freeCityQuery} yet.` : undefined}
+          emptyBody={freeCityQuery ? "Instructors are joining across the US. Try a nearby city or your state, or check back soon." : undefined}
           onCountChange={setResultCount}
         />
       </div>
