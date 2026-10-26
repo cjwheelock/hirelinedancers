@@ -6,11 +6,13 @@
 //   2. Posts quote-expiry reminders, event reminders, and event-ended notices.
 //   3. Retries refunds that have not reached Stripe yet.
 //   4. Transfers instructor payouts that are due.
+//   5. Creates the booking webhook endpoints in Stripe the first time.
 import { withSupabase } from "npm:@supabase/server@^1";
 import type Stripe from "npm:stripe@^22";
 import {
   bookingStripe,
   bookingStripeConfig,
+  ensureBookingWebhooks,
   stripeErrorMessage,
 } from "../_shared/hld-booking-stripe.ts";
 import { executeBookingRefund } from "../_shared/hld-booking-refunds.ts";
@@ -66,6 +68,13 @@ export default {
     } catch (error) {
       console.error("Booking payments are not configured", error instanceof Error ? error.message : error);
       return Response.json({ ...summary, payments: "not_configured" });
+    }
+
+    try {
+      summary.webhooks = await ensureBookingWebhooks(stripe, ctx.supabaseAdmin, config.expectedLivemode);
+    } catch (error) {
+      console.error("Unable to check booking webhooks", error instanceof Error ? error.message : error);
+      summary.webhooks = "unavailable";
     }
 
     // Refunds that failed or never reached Stripe. Stable idempotency keys

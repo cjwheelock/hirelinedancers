@@ -1,12 +1,10 @@
 // Signed Stripe webhook for booking payments and Connect payout accounts.
 //
-// Register this URL twice in Stripe:
-//   1. Events on your account: checkout.session.completed,
-//      checkout.session.async_payment_succeeded,
-//      checkout.session.async_payment_failed, charge.dispute.created,
-//      refund.updated. Secret: STRIPE_BOOKING_WEBHOOK_SECRET.
-//   2. Events on connected accounts: account.updated.
-//      Secret: STRIPE_CONNECT_WEBHOOK_SECRET.
+// booking-scheduler registers this URL in Stripe twice (events on the
+// platform account, and account.updated on connected accounts) and stores the
+// signing secrets in the database. STRIPE_BOOKING_WEBHOOK_SECRET and
+// STRIPE_CONNECT_WEBHOOK_SECRET are also accepted for manually created
+// endpoints.
 //
 // The membership webhook (stripe-webhook) ignores booking Checkout Sessions,
 // and this webhook ignores everything that is not a booking.
@@ -15,8 +13,8 @@ import Stripe from "npm:stripe@^22";
 import { validUuid } from "../_shared/hld-booking.ts";
 import {
   BOOKING_PRODUCT_LINE,
-  bookingRequiredEnv,
   bookingStripe,
+  loadWebhookConfig,
   bookingStripeConfig,
   stripeErrorMessage,
   stripeId,
@@ -35,12 +33,21 @@ const HANDLED = new Set([
   "account.updated",
 ]);
 
-async function verifiedEvent(stripe: Stripe, rawBody: string, signature: string): Promise<Stripe.Event | null> {
+async function verifiedEvent(
+  stripe: Stripe,
+  // deno-lint-ignore no-explicit-any
+  admin: any,
+  rawBody: string,
+  signature: string,
+): Promise<Stripe.Event | null> {
+  const config = await loadWebhookConfig(admin);
   const secrets = [
+    config.platform?.secret,
+    config.connect?.secret,
     Deno.env.get("STRIPE_BOOKING_WEBHOOK_SECRET")?.trim(),
     Deno.env.get("STRIPE_CONNECT_WEBHOOK_SECRET")?.trim(),
   ].filter((value): value is string => Boolean(value));
-  if (!secrets.length) bookingRequiredEnv("STRIPE_BOOKING_WEBHOOK_SECRET");
+  if (!secrets.length) throw new Error("No booking webhook signing secret is configured yet");
   for (const secret of secrets) {
     try {
       return await stripe.webhooks.constructEventAsync(rawBody, signature, secret, undefined, cryptoProvider);
@@ -84,9 +91,9 @@ export default {
     const rawBody = await req.text();
     let event: Stripe.Event | null;
     try {
-      event = await verifiedEvent(stripe, rawBody, signature);
+      event = await verifiedEvent(stripe, ctx.supabaseAdmin, rawBody, signature);
     } catch (error) {
-      console.error("Booking webhook secret is missing", error instanceof Error ? error.message : error);
+      console.error("Booking webhook secret is unavailable", error instanceof Error ? error.message : error);
       return new Response("Booking webhook is not configured", { status: 500 });
     }
     if (!event) return new Response("Invalid Stripe signature", { status: 400 });

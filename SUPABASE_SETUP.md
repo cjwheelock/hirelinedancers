@@ -228,13 +228,11 @@ How it works:
 3. In **Settings > Payment methods**, turn on Cards, Link, and ACH Direct Debit (US bank account). Checkout requests only the methods each booking allows; bank transfer is offered only when the event is at least 5 business days away.
 4. Set the account statement descriptor to `HIRELINEDANCERS` so organizers recognize the charge.
 5. In **Connect > Settings > Tax forms**, turn on 1099 delivery if you want Stripe to file instructor 1099 forms.
-6. Add two webhook endpoints pointing at `https://<project-ref>.supabase.co/functions/v1/booking-stripe-webhook`:
-   - Events on your account: `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, `charge.dispute.created`, `refund.updated`. Save its signing secret as `STRIPE_BOOKING_WEBHOOK_SECRET`.
-   - Events on connected accounts: `account.updated`. Save its signing secret as `STRIPE_CONNECT_WEBHOOK_SECRET`.
+6. Webhook endpoints are created automatically. On its first run, `booking-scheduler` uses `STRIPE_SECRET_KEY` to create two endpoints for `https://<project-ref>.supabase.co/functions/v1/booking-stripe-webhook` (platform payment events, and `account.updated` on connected accounts) and stores their signing secrets in Supabase Vault. You do not copy any signing secret by hand. `STRIPE_BOOKING_WEBHOOK_SECRET` and `STRIPE_CONNECT_WEBHOOK_SECRET` are still accepted if you create endpoints yourself.
 
 ### Booking secrets
 
-`booking-*` functions use `STRIPE_SECRET_KEY`, `STRIPE_EXPECTED_MODE`, and `APP_URL`, which already exist for memberships, plus `STRIPE_BOOKING_WEBHOOK_SECRET` and `STRIPE_CONNECT_WEBHOOK_SECRET`. They do not need the membership Product or Price.
+`booking-*` functions use `STRIPE_SECRET_KEY`, `STRIPE_EXPECTED_MODE`, and `APP_URL`, which already exist for memberships. They do not need the membership Product or Price.
 
 ### Deploy booking functions
 
@@ -250,7 +248,7 @@ supabase functions deploy booking-scheduler
 supabase functions deploy process-inquiry-notifications
 ```
 
-Schedule `booking-scheduler` once per minute with Supabase Cron, the same way as `process-inquiry-notifications`, using the `automations` secret key. It expires quotes, posts reminders, retries refunds, and sends payouts.
+The migration schedules `booking-scheduler` once per minute with Supabase Cron when the `hld_project_url` and `hld_notification_worker_key` Vault secrets used by `process-inquiry-notifications` exist. Otherwise schedule it the same way by hand. It expires quotes, posts reminders, retries refunds, sends payouts, and provisions the Stripe webhooks.
 
 ### Testing in Stripe test mode
 

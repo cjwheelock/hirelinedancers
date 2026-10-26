@@ -3127,3 +3127,170 @@ begin
   end if;
 end;
 $$;
+
+-- ---------------------------------------------------------------------------
+-- Stripe webhook endpoints, provisioned by booking-scheduler
+-- ---------------------------------------------------------------------------
+
+-- The scheduler creates the booking webhook endpoints in Stripe with the
+-- platform secret key and stores their signing secrets here, so no signing
+-- secret has to be copied by hand. Secrets are kept in Supabase Vault when
+-- it is available.
+create table private.booking_webhook_endpoints (
+  kind text primary key,
+  stripe_endpoint_id text not null,
+  url text not null,
+  livemode boolean not null,
+  vault_secret_name text,
+  signing_secret text,
+  created_at timestamptz not null default now(),
+  constraint booking_webhook_endpoints_kind_check check (kind in ('platform', 'connect')),
+  constraint booking_webhook_endpoints_id_check check (stripe_endpoint_id ~ '^we_[A-Za-z0-9]+$'),
+  constraint booking_webhook_endpoints_secret_check check (
+    (vault_secret_name is not null) <> (signing_secret is not null)
+  )
+);
+
+revoke all on private.booking_webhook_endpoints from public, anon, authenticated;
+
+create or replace function public.booking_save_webhook_endpoint(
+  p_kind text,
+  p_endpoint_id text,
+  p_url text,
+  p_livemode boolean,
+  p_signing_secret text
+)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  secret_name text := 'hld_booking_webhook_' || p_kind;
+  has_vault boolean := exists (select 1 from pg_namespace where nspname = 'vault');
+begin
+  perform private.require_service_role();
+  if p_signing_secret !~ '^whsec_[A-Za-z0-9]+$' then
+    raise exception 'Invalid webhook signing secret';
+  end if;
+  if has_vault then
+    if exists (select 1 from vault.secrets where name = secret_name) then
+      execute 'select vault.update_secret((select id from vault.secrets where name = $1), $2)'
+        using secret_name, p_signing_secret;
+    else
+      execute 'select vault.create_secret($1, $2, $3)'
+        using p_signing_secret, secret_name, 'Stripe signing secret for Hire Line Dancers booking webhooks';
+    end if;
+  end if;
+  insert into private.booking_webhook_endpoints (
+    kind, stripe_endpoint_id, url, livemode, vault_secret_name, signing_secret
+  ) values (
+    p_kind,
+    p_endpoint_id,
+    p_url,
+    p_livemode,
+    case when has_vault then secret_name end,
+    case when has_vault then null else p_signing_secret end
+  )
+  on conflict (kind) do update set
+    stripe_endpoint_id = excluded.stripe_endpoint_id,
+    url = excluded.url,
+    livemode = excluded.livemode,
+    vault_secret_name = excluded.vault_secret_name,
+    signing_secret = excluded.signing_secret,
+    created_at = now();
+end;
+$$;
+
+create or replace function public.booking_webhook_config()
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  result jsonb := '{}'::jsonb;
+  endpoint record;
+  secret text;
+begin
+  perform private.require_service_role();
+  for endpoint in select * from private.booking_webhook_endpoints
+  loop
+    secret := endpoint.signing_secret;
+    if endpoint.vault_secret_name is not null then
+      execute 'select decrypted_secret from vault.decrypted_secrets where name = $1'
+        into secret
+        using endpoint.vault_secret_name;
+    end if;
+    result := result || jsonb_build_object(
+      endpoint.kind,
+      jsonb_build_object(
+        'endpointId', endpoint.stripe_endpoint_id,
+        'url', endpoint.url,
+        'livemode', endpoint.livemode,
+        'secret', secret
+      )
+    );
+  end loop;
+  return result;
+end;
+$$;
+
+revoke all on function public.booking_save_webhook_endpoint(text, text, text, boolean, text) from public, anon, authenticated;
+grant execute on function public.booking_save_webhook_endpoint(text, text, text, boolean, text) to service_role;
+revoke all on function public.booking_webhook_config() from public, anon, authenticated;
+grant execute on function public.booking_webhook_config() to service_role;
+
+-- ---------------------------------------------------------------------------
+-- Run booking-scheduler every minute
+-- ---------------------------------------------------------------------------
+
+-- Reuses the Vault secrets that schedule process-inquiry-notifications. When
+-- they are missing (for example in local development), schedule the worker
+-- by hand as described in SUPABASE_SETUP.md.
+do $$
+declare
+  ready boolean := false;
+  vault_secret_count integer := 0;
+begin
+  if exists (select 1 from pg_extension where extname = 'pg_cron')
+    and exists (select 1 from pg_extension where extname = 'pg_net')
+    and exists (select 1 from pg_namespace where nspname = 'vault') then
+    execute $check$
+      select count(*) from vault.secrets
+      where name in ('hld_project_url', 'hld_notification_worker_key')
+    $check$ into vault_secret_count;
+    ready := vault_secret_count = 2;
+  end if;
+  if ready then
+    execute $unschedule$
+      select cron.unschedule(jobid) from cron.job where jobname = 'process-hld-bookings'
+    $unschedule$;
+    perform cron.schedule(
+      'process-hld-bookings',
+      '* * * * *',
+      $job$
+      select net.http_post(
+        url := (
+          select decrypted_secret
+          from vault.decrypted_secrets
+          where name = 'hld_project_url'
+        ) || '/functions/v1/booking-scheduler',
+        headers := jsonb_build_object(
+          'Content-Type', 'application/json',
+          'apikey', (
+            select decrypted_secret
+            from vault.decrypted_secrets
+            where name = 'hld_notification_worker_key'
+          )
+        ),
+        body := '{}'::jsonb,
+        timeout_milliseconds := 30000
+      );
+      $job$
+    );
+  else
+    raise notice 'booking-scheduler was not scheduled automatically. Schedule it with Supabase Cron.';
+  end if;
+end;
+$$;

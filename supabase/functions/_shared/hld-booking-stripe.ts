@@ -122,3 +122,82 @@ export function stripeErrorMessage(error: unknown): string {
   }
   return "Unknown Stripe error";
 }
+
+export type WebhookKind = "platform" | "connect";
+
+export const WEBHOOK_EVENTS: Record<WebhookKind, Stripe.WebhookEndpointCreateParams.EnabledEvent[]> = {
+  platform: [
+    "checkout.session.completed",
+    "checkout.session.async_payment_succeeded",
+    "checkout.session.async_payment_failed",
+    "charge.dispute.created",
+    "refund.updated",
+  ],
+  connect: ["account.updated"],
+};
+
+type WebhookConfig = Partial<Record<WebhookKind, { endpointId: string; url: string; livemode: boolean; secret: string | null }>>;
+
+// deno-lint-ignore no-explicit-any
+export async function loadWebhookConfig(admin: any): Promise<WebhookConfig> {
+  const { data, error } = await admin.rpc("booking_webhook_config");
+  if (error) throw new Error(`Unable to load webhook configuration: ${error.message}`);
+  return (data ?? {}) as WebhookConfig;
+}
+
+export function bookingWebhookUrl(): string {
+  const base = bookingRequiredEnv("SUPABASE_URL").replace(/\/$/, "");
+  return `${base}/functions/v1/booking-stripe-webhook`;
+}
+
+// Creates the booking webhook endpoints in Stripe the first time the worker
+// runs with a working secret key, and stores their signing secrets in the
+// database. Endpoints are recognized by metadata, so other endpoints on the
+// Stripe account are never touched.
+export async function ensureBookingWebhooks(
+  stripe: Stripe,
+  // deno-lint-ignore no-explicit-any
+  admin: any,
+  livemode: boolean,
+): Promise<Record<WebhookKind, string>> {
+  const url = bookingWebhookUrl();
+  const config = await loadWebhookConfig(admin);
+  const result = { platform: "ready", connect: "ready" } as Record<WebhookKind, string>;
+  let existing: Stripe.WebhookEndpoint[] | null = null;
+
+  for (const kind of ["platform", "connect"] as WebhookKind[]) {
+    const saved = config[kind];
+    if (saved?.secret && saved.url === url && saved.livemode === livemode) continue;
+    try {
+      existing ??= (await stripe.webhookEndpoints.list({ limit: 100 })).data;
+      for (const endpoint of existing.filter((item) =>
+        item.metadata?.hld_booking_webhook === kind && item.url === url
+      )) {
+        // Stripe shows a signing secret only at creation, so an endpoint we
+        // no longer have the secret for is replaced.
+        await stripe.webhookEndpoints.del(endpoint.id);
+      }
+      const created = await stripe.webhookEndpoints.create({
+        url,
+        enabled_events: WEBHOOK_EVENTS[kind],
+        connect: kind === "connect",
+        description: `Hire Line Dancers bookings (${kind === "connect" ? "connected accounts" : "payments"})`,
+        metadata: { hld_booking_webhook: kind, product_line: BOOKING_PRODUCT_LINE },
+      });
+      if (!created.secret) throw new Error("Stripe did not return a signing secret");
+      const { error } = await admin.rpc("booking_save_webhook_endpoint", {
+        p_kind: kind,
+        p_endpoint_id: created.id,
+        p_url: url,
+        p_livemode: created.livemode,
+        p_signing_secret: created.secret,
+      });
+      if (error) throw new Error(`Unable to save webhook endpoint: ${error.message}`);
+      result[kind] = "created";
+    } catch (error) {
+      result[kind] = `failed: ${stripeErrorMessage(error)}`;
+      console.error("Unable to provision booking webhook", kind, stripeErrorMessage(error));
+    }
+  }
+  return result;
+}
