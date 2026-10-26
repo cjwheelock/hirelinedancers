@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowRight, Award, Banknote, ClipboardCheck, FileSignature, ShieldCheck, Sparkles, Users } from "lucide-react";
 import {
   bookingExample,
-  foundingInstructorYear,
+  foundingInstructorDeadline,
   instructorFeePercent,
   payoutDelayLabel,
   problemReportWindowLabel
@@ -86,7 +86,7 @@ export default function JoinPage() {
               <li>You set your rate, minimum hours, and cancellation policy on every quote.</li>
               <li>Your payout is sent {payoutDelayLabel} after the event unless the client reports a problem within {problemReportWindowLabel}.</li>
               <li>If you need insurance, you can attach your own certificate or note that you handle insurance outside the agreement.</li>
-              <li>Instructors who join in {foundingInstructorYear} become founding instructors and keep a Founding Instructor badge on their profile.</li>
+              <li>Join by {foundingInstructorDeadline} to become a founding instructor and keep a Founding Instructor badge on your profile.</li>
             </ul>
             <p>See the <Link href="/legal/terms/">Terms of Service</Link> and <Link href="/legal/refund-policy/">booking cancellation and refund policy</Link>.</p>
             <Link className="button primary" href={signInUrl("/account/", "instructor")}>Apply for a profile</Link>

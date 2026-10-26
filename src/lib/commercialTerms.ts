@@ -73,10 +73,16 @@ export function bookingExample(priceCents: number) {
   };
 }
 
-// Instructors whose profile was created before this moment (midnight Eastern
-// on January 1, 2027) are founding instructors and get a profile badge.
+// Instructors whose profile is created before this moment (midnight Eastern
+// on February 1, 2027, the end of the three-month founding window that opens
+// November 1, 2026) are founding instructors and get a profile badge.
 export const foundingInstructorCutoff = terms.bookings.foundingInstructorJoinedBefore;
-export const foundingInstructorYear = String(new Date(Date.parse(foundingInstructorCutoff) - 86_400_000).getUTCFullYear());
+export const foundingInstructorDeadline = new Intl.DateTimeFormat("en-US", {
+  month: "long",
+  day: "numeric",
+  year: "numeric",
+  timeZone: "America/New_York"
+}).format(new Date(Date.parse(foundingInstructorCutoff) - 1));
 
 export function isFoundingInstructor(createdAt: string | null | undefined): boolean {
   if (!createdAt) return false;
