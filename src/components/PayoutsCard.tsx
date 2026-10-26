@@ -5,11 +5,7 @@ import { Banknote, ExternalLink } from "lucide-react";
 import {
   bookingTerms,
   cancellationLines,
-  clientFeeLabel,
-  instructorFeeLabel,
   invokeBookingFunction,
-  money,
-  previewAmounts,
   validCancellationWindows,
   type CancellationWindow
 } from "@/lib/booking";
@@ -86,15 +82,12 @@ export function PayoutsCard({
     }
   }
 
-  const example = previewAmounts(40000);
-
   return (
     <>
       <div className={styles.card}>
         <p className={styles.eyebrow}><Banknote aria-hidden="true" size={15} /> Payouts</p>
         <h2>Get paid for bookings</h2>
         <p>Joining Hire Line Dancers is free. Clients pay through Hire Line Dancers when they sign your quote. We hold the payment and send your share to your bank account {bookingTerms.payoutDelayHours} hours after the event.</p>
-        <p className={styles.help}>Example: on a {money(example.priceCents)} booking, the client pays {money(example.totalCents)} including a {clientFeeLabel} service fee, and you receive {money(example.instructorPayoutCents)} after the {instructorFeeLabel} platform fee.</p>
 
         <div className={styles.payoutStatus}>
           {loading ? <p className={styles.muted}>Checking payout setup...</p> : null}
