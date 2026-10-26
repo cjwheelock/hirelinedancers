@@ -1,28 +1,29 @@
 import Link from "next/link";
-import { ArrowRight, BadgeCheck, ClipboardCheck, CreditCard, ShieldCheck, Sparkles, Users } from "lucide-react";
+import { ArrowRight, BadgeCheck, Banknote, ClipboardCheck, FileSignature, ShieldCheck, Sparkles, Users } from "lucide-react";
 import {
-  capitalizePolicyText,
-  foundingOfferLabel,
-  freePeriod,
-  guaranteeCoverage,
-  monthlyPriceWithCurrency,
-  offerValue
+  bookingExample,
+  clientFeePercent,
+  instructorFeePercent,
+  payoutDelayLabel,
+  problemReportWindowLabel
 } from "@/lib/commercialTerms";
 import { signInUrl } from "@/lib/marketplace";
 
 export const metadata = {
   title: "List Your Services as a Line Dance Instructor",
-  description: "Get discovered by people planning weddings, corporate events, and private parties in your area. Apply to join Hire Line Dancers."
+  description: "Join Hire Line Dancers free. Get discovered by people planning weddings, corporate events, and private parties, send quotes, and get paid through the platform."
 };
+
+const example = bookingExample(40000);
 
 export default function JoinPage() {
   return (
     <section className="page-shell">
       <h1>Get booked by people planning events in your city.</h1>
-      <p className="lede">Hire Line Dancers helps event planners, couples, and companies find instructors who can get their guests dancing. Build a profile, appear in relevant local searches, and receive and reply to event inquiries through your account.</p>
+      <p className="lede">Hire Line Dancers helps event planners, couples, and companies find instructors who can get their guests dancing. Joining is free. Build a profile, reply to inquiries, send a quote, and get paid after the event.</p>
 
       <div className="hero-actions" style={{ marginTop: 28 }}>
-        <Link className="button primary" href={signInUrl("/account/", "instructor")}>Apply to get listed <ArrowRight size={18} /></Link>
+        <Link className="button primary" href={signInUrl("/account/", "instructor")}>Apply to get listed free <ArrowRight size={18} /></Link>
       </div>
 
       <div className="faq-block">
@@ -36,59 +37,62 @@ export default function JoinPage() {
           <article className="benefit-card">
             <div className="benefit-icon"><Users size={24} /></div>
             <h3>Local search placement</h3>
-            <p>Appear on your city and event pages so planners nearby find you first.</p>
+            <p>Planners anywhere in the US can search for instructors in their city and find you.</p>
           </article>
           <article className="benefit-card">
-            <div className="benefit-icon"><BadgeCheck size={24} /></div>
-            <h3>Direct inquiries</h3>
-            <p>Event leads come straight to you. You set your rates and book on your terms.</p>
+            <div className="benefit-icon"><FileSignature size={24} /></div>
+            <h3>Quotes clients can sign and pay</h3>
+            <p>Send a booking agreement with your own rate, minimum, and cancellation policy. The client signs and pays in full in one step.</p>
+          </article>
+          <article className="benefit-card">
+            <div className="benefit-icon"><Banknote size={24} /></div>
+            <h3>Guaranteed payment</h3>
+            <p>Clients pay before the event. We hold the money and send your share to your bank account {payoutDelayLabel} after the event.</p>
           </article>
         </div>
       </div>
 
-      {/* HOW JOINING WORKS: profile, payment setup, then review */}
       <div className="faq-block">
-        <h2>How joining works</h2>
+        <h2>How it works</h2>
         <div className="step-grid">
           <article className="step">
             <div className="step-num"><ClipboardCheck size={20} /></div>
             <h3>1. Build your profile</h3>
-            <p>Add your background, service area, and a headshot, plus photos or videos of you teaching or dancing.</p>
+            <p>Add your background, service area, and a headshot, plus photos or videos of you teaching or dancing. We personally review every profile.</p>
           </article>
           <article className="step">
-            <div className="step-num"><CreditCard size={20} /></div>
-            <h3>2. Save your payment method</h3>
-            <p>Continue to Stripe to save a card securely. We do not start a subscription or charge your card before your profile is approved.</p>
+            <div className="step-num"><Banknote size={20} /></div>
+            <h3>2. Set up payouts</h3>
+            <p>Connect your bank account through Stripe in about 5 minutes. Stripe verifies your identity and handles tax forms. We never see your bank details.</p>
           </article>
           <article className="step">
-            <div className="step-num"><ShieldCheck size={20} /></div>
-            <h3>3. Get reviewed and go live</h3>
-            <p>We personally review every profile. If approved, your membership starts automatically and we publish your profile.</p>
+            <div className="step-num"><FileSignature size={20} /></div>
+            <h3>3. Quote, get paid, get dancing</h3>
+            <p>Reply to inquiries, send a signed quote, and the client signs and pays. Every step shows up in your conversation so you always know what happens next.</p>
           </article>
         </div>
       </div>
 
-      {/* PRICING: only shown here, gated from buyers */}
       <div className="faq-block">
-        <h2>Instructor membership</h2>
+        <h2>Pricing</h2>
         <div className="pricing-grid">
           <article className="price-card featured">
             <BadgeCheck size={28} />
-            <h2>{capitalizePolicyText(freePeriod)} free</h2>
-            <p className="price">{monthlyPriceWithCurrency} <span>per month after offer</span></p>
+            <h2>Free to join</h2>
+            <p className="price">{instructorFeePercent} <span>per paid booking</span></p>
             <ul className="check-list">
-              <li>The {foundingOfferLabel} who complete payment setup receive their first {freePeriod} free (a {offerValue} value).</li>
-              <li>Stripe saves your card when you submit your profile, but no subscription starts and no charge is made before approval.</li>
-              <li>If approved, your membership starts automatically.</li>
-              <li>After the free period, it renews at {monthlyPriceWithCurrency} per month until canceled.</li>
-              <li>The founding instructor offer is in addition to our ongoing {guaranteeCoverage} money-back guarantee.</li>
-              <li>Your {guaranteeCoverage} guarantee begins when Stripe collects your first membership payment after the free period.</li>
+              <li>No monthly fee. You pay nothing until you get paid.</li>
+              <li>Hire Line Dancers keeps a {instructorFeePercent} platform fee from each booking paid through the platform. The client also pays a {clientFeePercent} service fee.</li>
+              <li>Example: on a {example.price} booking, the client pays {example.total} and you receive {example.payout}.</li>
+              <li>You set your rate, minimum hours, and cancellation policy on every quote.</li>
+              <li>Your payout is sent {payoutDelayLabel} after the event unless the client reports a problem within {problemReportWindowLabel}.</li>
+              <li>If you need insurance, you can attach your own certificate or note that you handle insurance outside the agreement.</li>
             </ul>
-            <p>See the <Link href="/legal/refund-policy/">full refund policy</Link>.</p>
+            <p>See the <Link href="/legal/terms/">Terms of Service</Link> and <Link href="/legal/refund-policy/">booking cancellation and refund policy</Link>.</p>
             <Link className="button primary" href={signInUrl("/account/", "instructor")}>Apply for a profile</Link>
           </article>
         </div>
-        <p style={{ marginTop: 16 }}>You set your rates and payment terms directly with each client. Hire Line Dancers does not take a commission or handle payment for your events.</p>
+        <p style={{ marginTop: 16 }}><ShieldCheck size={16} aria-hidden="true" /> Book and get paid through Hire Line Dancers to keep payment protection, guaranteed payouts, and support if something goes wrong.</p>
       </div>
     </section>
   );

@@ -5,6 +5,9 @@ and party planners find line dance instructors near them.
 
 ## What is included
 
+- Commission booking model: instructors join free; organizers sign and pay in full for a booking agreement in the conversation, with a 5% service fee for organizers and a 15% platform fee for instructors
+- Stripe Connect Express payouts sent 24 hours after each event, booking milestones in every conversation, cancellation policies, problem reports, and contact details hidden until a booking is paid
+- Organizer search for any US city, with the launch metro pages kept for SEO
 - Navy and gold buyer-focused homepage with benefits, process, and instructor discovery
 - Public database-backed instructor directory with 11 launch-market pages and 11 event-type pages
 - Google sign-in and email magic-link code through Supabase Auth

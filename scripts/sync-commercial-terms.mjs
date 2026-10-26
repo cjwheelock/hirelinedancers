@@ -58,6 +58,43 @@ export function validateCommercialTerms(terms) {
     throw new Error("The billing recovery eligibility rule must remain explicit");
   }
 
+  const bookings = terms.bookings;
+  if (bookings?.model !== "commission") throw new Error("bookings.model must be commission");
+  assertString(bookings.agreementVersion, "bookings.agreementVersion", /^[a-z0-9][a-z0-9-]+$/);
+  for (const key of [
+    "instructorFeeBps",
+    "clientFeeBps",
+    "minimumPriceCents",
+    "maximumPriceCents",
+    "payoutDelayHours",
+    "problemReportWindowHours",
+    "quoteExpiryDays",
+    "quoteExpiryReminderHours",
+    "eventReminderDays",
+    "achMinimumBusinessDays"
+  ]) {
+    assertInteger(bookings[key], `bookings.${key}`, key.endsWith("Bps") ? 0 : 1);
+  }
+  if (bookings.instructorFeeBps > 5000 || bookings.clientFeeBps > 5000) {
+    throw new Error("Booking fees must be 50 percent or less");
+  }
+  if (bookings.minimumPriceCents >= bookings.maximumPriceCents) {
+    throw new Error("bookings.minimumPriceCents must be below maximumPriceCents");
+  }
+  const windows = bookings.standardCancellationWindows;
+  if (!Array.isArray(windows) || windows.length < 1 || windows.length > 3) {
+    throw new Error("bookings.standardCancellationWindows must contain one to three windows");
+  }
+  windows.forEach((window, index) => {
+    assertInteger(window?.minDaysBeforeEvent, `bookings.standardCancellationWindows[${index}].minDaysBeforeEvent`, 0);
+    assertInteger(window?.refundPercent, `bookings.standardCancellationWindows[${index}].refundPercent`, 0);
+    if (window.refundPercent > 100) throw new Error("Refund percent cannot exceed 100");
+    const previous = windows[index - 1];
+    if (previous && (window.minDaysBeforeEvent >= previous.minDaysBeforeEvent || window.refundPercent > previous.refundPercent)) {
+      throw new Error("Cancellation windows must run from the earliest cancellation to the latest");
+    }
+  });
+
   for (const [key, value] of Object.entries(terms.database ?? {})) {
     assertString(value, `database.${key}`, /^\d{12}_[a-z0-9_]+\.sql$/);
   }
@@ -65,7 +102,8 @@ export function validateCommercialTerms(terms) {
     "invitationPolicyMigration",
     "guaranteePolicyMigration",
     "paymentSetupPolicyMigration",
-    "billingRecoveryPolicyMigration"
+    "billingRecoveryPolicyMigration",
+    "bookingPolicyMigration"
   ];
   for (const key of requiredMigrationKeys) {
     if (!terms.database?.[key]) throw new Error(`database.${key} is required`);
@@ -101,7 +139,9 @@ export function renderGeneratedTerms(terms) {
     `export const MEMBERSHIP_GUARANTEE_TERMS_VERSION = HLD_COMMERCIAL_TERMS.guarantee.termsVersion;\n` +
     `export const GUARANTEE_COVERAGE_DAYS = HLD_COMMERCIAL_TERMS.guarantee.coverageDays;\n` +
     `export const GUARANTEE_CLAIM_WINDOW_DAYS = HLD_COMMERCIAL_TERMS.guarantee.claimWindowDays;\n` +
-    `export const BILLING_RECOVERY_GRACE_DAYS = HLD_COMMERCIAL_TERMS.billingRecovery.graceDays;\n`;
+    `export const BILLING_RECOVERY_GRACE_DAYS = HLD_COMMERCIAL_TERMS.billingRecovery.graceDays;\n` +
+    `export const BOOKING_TERMS = HLD_COMMERCIAL_TERMS.bookings;\n` +
+    `export const BOOKING_AGREEMENT_VERSION = HLD_COMMERCIAL_TERMS.bookings.agreementVersion;\n`;
 }
 
 function main() {

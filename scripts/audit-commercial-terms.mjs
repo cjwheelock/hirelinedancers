@@ -106,6 +106,16 @@ requireText(guaranteeMigration, `interval '${terms.guarantee.coverageDays + term
 const recoveryMigration = `supabase/migrations/${migrations.billingRecoveryPolicyMigration}`;
 requireText(recoveryMigration, `interval '${terms.billingRecovery.graceDays} days'`, "billing recovery interval");
 
+const bookingMigration = `supabase/migrations/${migrations.bookingPolicyMigration}`;
+const bookingSql = read(bookingMigration);
+requireText(bookingMigration, `'instructor_fee_bps', ${terms.bookings.instructorFeeBps}`, "booking instructor fee in get_thread_booking");
+requireText(bookingMigration, `'client_fee_bps', ${terms.bookings.clientFeeBps}`, "booking client fee in get_thread_booking");
+requireText(bookingMigration, `ends_at + interval '${terms.bookings.payoutDelayHours} hours'`, "booking payout delay");
+requireText(bookingMigration, `least(now() + interval '${terms.bookings.quoteExpiryDays} days', starts_at)`, "booking quote expiry");
+requireText(bookingMigration, `[${terms.bookings.standardCancellationWindows.map((window) => `{"minDaysBeforeEvent": ${window.minDaysBeforeEvent}, "refundPercent": ${window.refundPercent}}`).join(", ")}]`, "standard cancellation windows");
+requireText(bookingMigration, `price_cents between ${terms.bookings.minimumPriceCents} and ${terms.bookings.maximumPriceCents}`, "booking price limits");
+if (!bookingSql.includes("booking_create_quote")) failures.push(`${bookingMigration}: missing booking_create_quote`);
+
 const freeMonthsWord = numberWord(terms.offer.freeBillingCycles);
 const docs = ["README.md", "SUPABASE_SETUP.md", "supabase/functions/README.md"];
 for (const file of docs) {

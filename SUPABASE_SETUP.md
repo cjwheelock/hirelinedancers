@@ -207,6 +207,55 @@ Migration `202608020010` creates the `instructor-media` bucket with:
 
 The bucket is public so approved profile media can render on the public directory. Do not use it for contracts, insurance documents, payment records, or any other private file.
 
+## 7a. Booking payments (commission model)
+
+Hire Line Dancers now earns a commission on bookings instead of the monthly instructor membership. The membership sections below remain for instructors who started a paid membership before October 26, 2026.
+
+How it works:
+
+1. Instructors join free. Migration `202610260001_booking_payments.sql` gives every instructor profile no-fee access (source `commission`) through the existing lifetime-access workflow, so submission, approval, and publishing no longer require Stripe billing. Profiles that already completed paid membership activation keep their membership; cancel those subscriptions in Stripe if you want to move them to the commission model.
+2. Instructors set up payouts with Stripe Connect Express from the account **Payouts** tab (`booking-payouts`).
+3. In a message thread, the instructor fills in the standard booking agreement and signs by typing their name (`booking-quote`). The organizer signs, then pays in full in Stripe Checkout (`booking-checkout`). The agreement takes effect only when payment succeeds.
+4. The organizer pays the instructor price plus a 5% service fee. The instructor receives the price minus a 15% platform fee. Rates live in `config/commercial-terms.json` under `bookings` and are re-checked by database constraints.
+5. Funds are held on the platform account and transferred to the instructor 24 hours after the event ends (`booking-scheduler`), unless the organizer reports a problem. Cancellations and problem resolutions refund through `booking-cancel` and `booking-admin`.
+6. Every milestone posts a system message in the thread and queues a `booking_update` email through `process-inquiry-notifications`.
+7. Phone numbers, emails, and social links in messages are hidden until a booking is paid. Originals are kept in `inquiry_message_originals` for administrators.
+
+### Stripe Dashboard setup
+
+1. Enable **Connect** on the OMG Goals Stripe account. Choose a platform or marketplace profile where the platform collects payments and pays out sellers, with **Express** connected accounts. Set the platform to handle pricing, and keep payouts on the default automatic schedule for connected accounts.
+2. Complete the Connect platform profile and branding (Hire Line Dancers name, icon, and support email), because Express onboarding shows them to instructors.
+3. In **Settings > Payment methods**, turn on Cards, Link, and ACH Direct Debit (US bank account). Checkout requests only the methods each booking allows; bank transfer is offered only when the event is at least 5 business days away.
+4. Set the account statement descriptor to `HIRELINEDANCERS` so organizers recognize the charge.
+5. In **Connect > Settings > Tax forms**, turn on 1099 delivery if you want Stripe to file instructor 1099 forms.
+6. Add two webhook endpoints pointing at `https://<project-ref>.supabase.co/functions/v1/booking-stripe-webhook`:
+   - Events on your account: `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, `charge.dispute.created`, `refund.updated`. Save its signing secret as `STRIPE_BOOKING_WEBHOOK_SECRET`.
+   - Events on connected accounts: `account.updated`. Save its signing secret as `STRIPE_CONNECT_WEBHOOK_SECRET`.
+
+### Booking secrets
+
+`booking-*` functions use `STRIPE_SECRET_KEY`, `STRIPE_EXPECTED_MODE`, and `APP_URL`, which already exist for memberships, plus `STRIPE_BOOKING_WEBHOOK_SECRET` and `STRIPE_CONNECT_WEBHOOK_SECRET`. They do not need the membership Product or Price.
+
+### Deploy booking functions
+
+```bash
+supabase db push
+supabase functions deploy booking-payouts
+supabase functions deploy booking-quote
+supabase functions deploy booking-checkout
+supabase functions deploy booking-cancel
+supabase functions deploy booking-admin
+supabase functions deploy booking-stripe-webhook
+supabase functions deploy booking-scheduler
+supabase functions deploy process-inquiry-notifications
+```
+
+Schedule `booking-scheduler` once per minute with Supabase Cron, the same way as `process-inquiry-notifications`, using the `automations` secret key. It expires quotes, posts reminders, retries refunds, and sends payouts.
+
+### Testing in Stripe test mode
+
+Use a test secret key with `STRIPE_EXPECTED_MODE=test`, complete Express onboarding with Stripe's test data, send a quote, and pay with card `4242 4242 4242 4242`. To exercise payouts without waiting, move the booking's `event_starts_at`, `event_ends_at`, and `payout_due_at` into the past in the SQL editor, then invoke `booking-scheduler`. `supabase/tests/booking_payments.sql` covers the database rules.
+
 ## 7. Stripe membership setup
 
 The server flow uses Stripe Checkout Sessions, not a Payment Link.
@@ -379,6 +428,9 @@ Keep that environment file outside Git. Hosted Edge Functions receive Supabase U
 - `send-instructor-invitation`: `verify_jwt = true`
 - `stripe-webhook`: `verify_jwt = false`, because Stripe authenticates with its signature
 - `process-inquiry-notifications`: `verify_jwt = false`, because the function requires the named `automations` Supabase secret key in `apikey`
+- `booking-payouts`, `booking-quote`, `booking-checkout`, `booking-cancel`, `booking-admin`: `verify_jwt = true`
+- `booking-stripe-webhook`: `verify_jwt = false`, because Stripe authenticates with its signature
+- `booking-scheduler`: `verify_jwt = false`, because the function requires the `automations` secret key
 
 After applying migrations and setting all production secrets, deploy the payment-setup reconciliation and review endpoints before the frontend that invokes them:
 

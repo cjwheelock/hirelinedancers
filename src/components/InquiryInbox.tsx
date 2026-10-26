@@ -4,6 +4,8 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "re
 import Link from "next/link";
 import { ChevronLeft, Clock3, Inbox, RefreshCw, Search, Send } from "lucide-react";
 import { eventTypes } from "@/data/site";
+import { BookingPanel } from "./BookingPanel";
+import { bookingStatusLabels, paidBookingStatuses, type ThreadBookingState } from "@/lib/booking";
 import {
   getMarketplaceClient,
   readableError,
@@ -104,6 +106,9 @@ export function InquiryInbox({
   const [adminNote, setAdminNote] = useState("");
   const [loadingCandidates, setLoadingCandidates] = useState(false);
   const [candidateSearchComplete, setCandidateSearchComplete] = useState(false);
+  const [bookingState, setBookingState] = useState<ThreadBookingState | null>(null);
+  const [loadingBooking, setLoadingBooking] = useState(false);
+  const bookingRequestRef = useRef(0);
   const messageEndRef = useRef<HTMLDivElement | null>(null);
   const detailRequestRef = useRef(0);
   const listRequestRef = useRef(0);
@@ -209,6 +214,17 @@ export function InquiryInbox({
     }
   }, [perspective]);
 
+  const loadBooking = useCallback(async (threadId: string) => {
+    const client = getMarketplaceClient();
+    if (!client) return;
+    const requestId = ++bookingRequestRef.current;
+    setLoadingBooking(true);
+    const { data, error: bookingError } = await client.rpc("get_thread_booking", { p_thread_id: threadId });
+    if (requestId !== bookingRequestRef.current) return;
+    setBookingState(!bookingError && data && typeof data === "object" ? data as ThreadBookingState : null);
+    setLoadingBooking(false);
+  }, []);
+
   useEffect(() => {
     void loadThreads();
   }, [loadThreads]);
@@ -223,8 +239,10 @@ export function InquiryInbox({
     setCandidateSearchComplete(false);
     setSelectedCandidateId("");
     setActionMessage(null);
+    setBookingState(null);
     void loadDetail(selectedThreadId);
-  }, [loadDetail, selectedThreadId]);
+    void loadBooking(selectedThreadId);
+  }, [loadBooking, loadDetail, selectedThreadId]);
 
   useEffect(() => {
     const client = getMarketplaceClient();
@@ -236,7 +254,10 @@ export function InquiryInbox({
         { event: "INSERT", schema: "public", table: "inquiry_messages" },
         (payload) => {
           const changedThreadId = (payload.new as { thread_id?: string }).thread_id;
-          if (selectedThreadId && changedThreadId === selectedThreadId) void loadDetail(selectedThreadId, true);
+          if (selectedThreadId && changedThreadId === selectedThreadId) {
+            void loadDetail(selectedThreadId, true);
+            void loadBooking(selectedThreadId);
+          }
           void loadThreads(true);
         }
       )
@@ -249,9 +270,17 @@ export function InquiryInbox({
           void loadThreads(true);
         }
       )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "bookings" },
+        (payload) => {
+          const changedThreadId = (payload.new as { thread_id?: string }).thread_id ?? (payload.old as { thread_id?: string }).thread_id;
+          if (selectedThreadId && changedThreadId === selectedThreadId) void loadBooking(selectedThreadId);
+        }
+      )
       .subscribe();
     return () => { void client.removeChannel(channel); };
-  }, [accountId, loadDetail, loadThreads, perspective, selectedThreadId]);
+  }, [accountId, loadBooking, loadDetail, loadThreads, perspective, selectedThreadId]);
 
   useEffect(() => {
     messageEndRef.current?.scrollIntoView({ block: "end" });
@@ -435,6 +464,9 @@ export function InquiryInbox({
     perspective !== "admin"
       || detail?.thread.assignment_source === "static_support"
   ) && !["declined", "timed_out", "withdrawn", "closed"].includes(threadStatus);
+  const activeBooking = bookingState?.booking ?? null;
+  const hasPaidBooking = Boolean(activeBooking && paidBookingStatuses.includes(activeBooking.status) && activeBooking.status !== "paid_out");
+  const hasPlatformBooking = Boolean(activeBooking?.paid_at);
   const canRouteFallback = perspective === "admin"
     && Boolean(detail?.inquiry.fallback_consent)
     && ["declined", "timed_out"].includes(threadStatus);
@@ -532,7 +564,7 @@ export function InquiryInbox({
                   <h2>{selectedRow?.counterparty_name || detail.inquiry.instructor_name || detail.inquiry.contact_name || "Conversation"}</h2>
                   <p>{[detail.inquiry.event_date ? formatDate(detail.inquiry.event_date) : null, detail.inquiry.event_city, detail.inquiry.event_region].filter(Boolean).join(" · ")}</p>
                 </div>
-                <span className={styles.status}>{statusLabel(threadStatus)}</span>
+                <span className={styles.status}>{activeBooking ? bookingStatusLabels[activeBooking.status] : statusLabel(threadStatus)}</span>
               </header>
 
               <div className={styles.threadBody}>
@@ -548,7 +580,7 @@ export function InquiryInbox({
                   {selectedRow?.counterparty_profile_slug && perspective !== "instructor" ? (
                     <Link href={`/profile/?instructor=${encodeURIComponent(selectedRow.counterparty_profile_slug)}`}>View instructor profile</Link>
                   ) : null}
-                  {perspective !== "instructor" || detail.thread.is_current_assignment === true ? (
+                  {!hasPlatformBooking && (perspective !== "instructor" || detail.thread.is_current_assignment === true) ? (
                     <InquiryOutcomeActions
                       inquiry={detail.inquiry}
                       perspective={perspective}
@@ -558,12 +590,12 @@ export function InquiryInbox({
                       }}
                     />
                   ) : null}
-                  {perspective === "instructor" && !["declined", "timed_out", "withdrawn", "closed"].includes(threadStatus) ? (
+                  {perspective === "instructor" && !hasPaidBooking && !["declined", "timed_out", "withdrawn", "closed"].includes(threadStatus) ? (
                     <button className={styles.dangerButton} disabled={busyAction !== null} type="button" onClick={() => void runThreadAction("decline")}>
                       {busyAction === "decline" ? "Updating..." : "Unavailable"}
                     </button>
                   ) : null}
-                  {perspective === "organizer" && !["withdrawn", "closed"].includes(threadStatus) ? (
+                  {perspective === "organizer" && !hasPaidBooking && !["withdrawn", "closed"].includes(threadStatus) ? (
                     <button className={styles.dangerButton} disabled={busyAction !== null} type="button" onClick={() => void runThreadAction("withdraw")}>
                       {busyAction === "withdraw" ? "Withdrawing..." : "Withdraw inquiry"}
                     </button>
@@ -571,6 +603,20 @@ export function InquiryInbox({
                 </aside>
 
                 <div className={styles.conversationColumn}>
+                  {openThreadId && (perspective !== "admin" || bookingState?.booking) ? (
+                    <BookingPanel
+                      threadId={openThreadId}
+                      state={bookingState}
+                      loading={loadingBooking}
+                      onChanged={async () => {
+                        if (openThreadId && selectedThreadRef.current === openThreadId) {
+                          await Promise.all([loadBooking(openThreadId), loadDetail(openThreadId, true)]);
+                        }
+                        void loadThreads(true);
+                        onDataChange?.();
+                      }}
+                    />
+                  ) : null}
                   <div className={styles.messageTimeline} aria-live="polite">
                     {detail.messages.map((message) => {
                       const ownMessage = Boolean(accountId && message.sender_account_id === accountId);

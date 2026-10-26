@@ -180,7 +180,7 @@ export function ContactInstructor() {
             ? "Our team received your inquiry and will confirm that this launch listing is available before connecting you."
             : "Your inquiry is in Messages, and we emailed the instructor a secure link to reply."}
         </p>
-        <p className={styles.subtitle}>Ask the instructor about availability, final pricing, contracts, insurance, payment terms, and any venue requirements.</p>
+        <p className={styles.subtitle}>Ask about availability, pricing, insurance, and venue needs. When you agree, the instructor sends a quote you can sign and pay in the conversation.</p>
         <div className={styles.buttonRow} style={{ marginTop: 26 }}>
           <a className={styles.button} href={successThreadId ? `/account/?tab=inquiries&inquiry=${encodeURIComponent(successId)}&thread=${encodeURIComponent(successThreadId)}` : "/account/?tab=inquiries"}>View messages</a>
           <Link className={styles.secondaryButton} href="/instructors/">Browse more instructors</Link>

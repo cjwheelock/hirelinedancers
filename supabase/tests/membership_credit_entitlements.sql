@@ -3,6 +3,10 @@
 -- Run after all migrations. Every fixture is rolled back.
 begin;
 
+-- These tests cover the legacy membership workflow, so new profiles in this
+-- transaction do not receive automatic commission (no-fee) access.
+select set_config('hire_line_dancers.commission_access', 'off', true);
+
 create or replace function pg_temp.credit_assert(
   p_condition boolean,
   p_message text
