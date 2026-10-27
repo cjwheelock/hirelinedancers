@@ -15,8 +15,8 @@ The inquiry update is reconciled with the October 26 booking and October 27 prof
 
 1. Review the cumulative content comparison against the deployed baseline and the complete candidate diff. The task explicitly authorizes process copy and notification wording. Preserve unrelated work already in the checkout.
 2. Confirm the intended release environment and permission to release. A push to `main` deploys the website through GitHub Pages.
-3. Check remote migration history again. Dry-run `20261027051333_inquiry_48h_booking_compatibility.sql` against the intended database before applying it. The migration combines the previously unshipped inquiry and SMS changes with the live booking privacy and payment rules.
-4. Apply the migration, deploy `process-inquiry-notifications`, `instructor-sms`, and `inquiry-notification-webhook`, then deploy the matching website build. The worker requires `claim_inquiry_thread_notification_jobs_v2`; the new UI requires the new recommendation and booking RPCs. Keep this sequence together. The migration preserves existing inquiry and message data.
+3. Check remote migration history again. Dry-run `20261027051333_inquiry_48h_booking_compatibility.sql` and `20261027054400_bay_area_service_market_matching.sql` against the intended database before applying them. The migration combines the previously unshipped inquiry and SMS changes with the live booking privacy and payment rules.
+4. Apply the migrations, deploy `process-inquiry-notifications`, `instructor-sms`, and `inquiry-notification-webhook`, then deploy the matching website build. The worker requires `claim_inquiry_thread_notification_jobs_v2`; the new UI requires the new recommendation and booking RPCs. Keep this sequence together. The migration preserves existing inquiry and message data.
 5. Preserve the existing one-minute scheduler and its authentication. Do not create a second dispatch worker.
 6. Verify new and legacy deadlines, queue processing, RLS, provider delivery, private conversations, and booking attribution on the released system. Run database security and performance advisors. Check migration history for remaining drift.
 
@@ -42,7 +42,7 @@ For email delivery receipts, configure `RESEND_WEBHOOK_SECRET` and subscribe the
 
 Resend signatures are verified before accepting callbacks. Delivery callbacks that arrive before the worker saves its send receipt are retained and reconciled. A Twilio request with uncertain acceptance is flagged for review instead of blindly resent.
 
-The live database currently has two published instructors and zero configured fallback-eligible instructors. Verify actual service coverage and configure the existing market mappings before expecting two recommendations. Do not manufacture coverage or availability.
+Two published instructors list the San Francisco Bay Area. The Bay Area market alias and matching profile mappings are added by the follow-up migration. Each may be considered as the other's alternative when the event details and capacity match. Do not manufacture coverage or availability.
 
 ## Validation
 
@@ -53,4 +53,4 @@ The live database currently has two published instructors and zero configured fa
 - Browser checks at 1280, 390, and 320 pixels, including explicit send, saved event details, no matches, and sign-in return paths. Browser responses are isolated test fixtures; they do not contact real instructors.
 - Recommendation email rendering at 700, 390, and 320 pixels, including photos, bios, and two Reach Out links.
 
-Provider registration, real SMS delivery, real email delivery callbacks, and production database deployment require the release setup above. Local verification does not establish that those external services are active.
+Provider registration, real SMS delivery, and real email delivery callbacks require the external setup above. Local verification does not establish that those external services are active.
