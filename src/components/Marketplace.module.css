@@ -198,6 +198,35 @@
   margin: 0;
 }
 
+.onboardingListingPrice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.onboardingListingPrice s {
+  color: #57607a;
+  font-size: 1.6875rem;
+  font-weight: 400;
+  text-decoration-thickness: 2px;
+}
+
+.onboardingListingPrice h2 {
+  font-size: 2rem;
+}
+
+.onboardingListingPriceLabel {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+@media (max-width: 540px) {
+  .onboardingListingPriceLabel {
+    font-size: 1.125rem;
+  }
+}
+
 .onboardingPricingNote {
   display: flex;
   align-items: flex-start;
