@@ -1376,6 +1376,8 @@ main { display: block; }
   grid-template-columns: 1.4fr 1fr 1fr 1fr;
   gap: 36px;
 }
+.footer-logo { margin-bottom: 20px; }
+.footer-logo svg { display: block; }
 .footer h2 { color: #fff; font-size: 22px; margin-bottom: 12px; }
 .footer .brand-name { color: #fff; }
 .footer .brand-wordmark { width: 240px; }

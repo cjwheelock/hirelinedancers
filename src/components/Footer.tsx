@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LogoWordmark } from "@/components/Logo";
+import { LogoMark, LogoWordmark } from "@/components/Logo";
 import { cities, eventTypes, site } from "@/data/site";
 import { marketplaceConfigured } from "@/lib/marketplace";
 
@@ -8,6 +8,7 @@ export function Footer() {
     <footer className="footer">
       <div className="footer-inner">
         <div>
+          <div className="footer-logo" aria-hidden="true"><LogoMark size={144} /></div>
           <h2><LogoWordmark /></h2>
           <p>A simple way to find a line dance instructor for your event and help more guests get moving together. No experience needed.</p>
         </div>
