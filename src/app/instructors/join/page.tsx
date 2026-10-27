@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { ArrowRight, Banknote, ClipboardCheck, FileSignature, Sparkles, Users } from "lucide-react";
-import { payoutDelayLabel } from "@/lib/commercialTerms";
 import { signInUrl } from "@/lib/marketplace";
 
 export const metadata = {
@@ -35,11 +34,6 @@ export default function JoinPage() {
             <div className="benefit-icon"><FileSignature size={24} /></div>
             <h3>Quotes clients can sign and pay</h3>
             <p>Send a booking agreement with your own rate, minimum, and cancellation policy. The client signs and pays in full in one step.</p>
-          </article>
-          <article className="benefit-card">
-            <div className="benefit-icon"><Banknote size={24} /></div>
-            <h3>Guaranteed payment</h3>
-            <p>Clients pay before the event. We hold the money and send your share to your bank account {payoutDelayLabel} after the event.</p>
           </article>
         </div>
       </div>
