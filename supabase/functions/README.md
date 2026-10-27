@@ -1,6 +1,6 @@
 # Hire Line Dancers server functions
 
-These functions implement pre-review Stripe card setup, approval-time membership activation, instructor invitations, manual refund verification, and inquiry notifications. They keep Stripe, Resend, and Supabase secret keys on the server. SMS is currently paused. The dormant Twilio implementation remains in the worker for possible future use.
+These functions implement pre-review Stripe card setup, approval-time membership activation, instructor invitations, manual refund verification, and inquiry notifications. They keep Stripe, Resend, and Supabase secret keys on the server. Verified SMS, delivery callbacks, and the 48-hour flow are described in `../../docs/inquiry-messaging-rollout.md`.
 
 ## Functions
 
@@ -210,18 +210,20 @@ For later positive invoice failures, the webhook starts a durable recovery. An i
 
 New inquiries create a private conversation thread for the organizer and the selected instructor. Resend email links open that exact thread and require the recipient to use their normal Hire Line Dancers sign-in. Inquiry and message email uses `SUPPORT_EMAIL` in `Reply-To`, with `hello@hirelinedancers.com` as the fallback. Participant replies stay inside Hire Line Dancers instead of leaving through email. Static-listing notifications open the exact thread in Admin Messages. An administrator can reply only in those static-support threads, and organizer email identifies that sender as Hire Line Dancers instead of exposing the administrator account name.
 
-After Resend accepts the initial thread email, the database starts a 72-hour response clock. It creates deterministic email jobs for 24-hour and 48-hour instructor reminders, plus 72-hour status notifications for the instructor and organizer. An instructor reply or unavailable action cancels pending response jobs atomically. At 72 hours the database locks and rechecks the thread, marks it timed out, and creates an administrator fallback review event. It never shares the organizer's inquiry with another instructor automatically. An administrator must select an eligible instructor through `admin_route_inquiry`, and the RPC refuses to route unless the organizer recorded fallback consent when submitting the inquiry.
+New inquiries start a 48-hour clock at submission. Email alerts are queued immediately, at 24 hours, and at 47 hours. At 48 hours, instructors receive a status update and organizers receive up to two suitable recommendations with photos, bios, and links to review their saved inquiry. The organizer explicitly sends each new inquiry. Separate private threads can remain open for the same event, and a late instructor reply is accepted while that event is open. Legacy threads retain their original 72-hour deadlines. A reply or unavailable action cancels pending response reminders. The organizer-selected conversation determines the booked instructor.
+
+The worker uses `claim_inquiry_thread_notification_jobs_v2` and rechecks sendability before each delivery. Due notices for events that are booked, withdrawn, or past are suppressed. Future timeout notices are retained until due. Administrator attention items cover missing matches, urgent events, static listings, and delivery failures.
 
 The same worker also queues two later booking and completion follow-ups through the legacy durable job system. Follow-up messages use `SUPPORT_EMAIL` in `Reply-To`:
 
 - Seven days after an unanswered inquiry, the instructor is asked whether it was booked: Yes, No, or In progress.
 - Two days after the confirmed date of a booked event, the instructor is asked whether the event happened: Yes or No.
 
-Follow-up links open the authenticated instructor inquiry page. Private comments are available only to the instructor and marketplace administrators. The email request uses a provider idempotency key. Each provider request has a 15-second timeout. Resend acceptance is recorded as `sent`. The existing `delivered` state is reserved for a future signed delivery webhook.
+Follow-up links open the authenticated instructor inquiry page. Private comments are available only to the instructor and marketplace administrators. The email request uses a provider idempotency key. Each provider request has a 15-second timeout. Resend acceptance is recorded as `sent`. The signed delivery webhook records delivery separately for thread notifications; the legacy booking and completion follow-up queue still records provider acceptance only.
 
-Thread and message notification jobs use their own durable queue so each participant message can have a unique delivery record. The worker claims both queues with `FOR UPDATE SKIP LOCKED`. The thread queue supports new-thread, new-message, 24-hour reminder, 48-hour reminder, 72-hour instructor status, 72-hour organizer status, and instructor-unavailable email. Before each provider call, the worker rechecks whether the job remains sendable. This suppresses a reminder that was claimed just before an instructor replied.
+Thread and message notification jobs use their own durable queue so each participant message can have a unique delivery record. The worker claims both queues with `FOR UPDATE SKIP LOCKED`. The thread queue supports new-thread, new-message, 24-hour reminder, 47-hour final warning, timeout status, and instructor-unavailable alerts. Historical 48-hour reminders remain supported for version 1 threads. Before each provider call, the worker rechecks whether the job remains sendable. This suppresses a reminder that was claimed just before an instructor replied.
 
-SMS is temporarily paused. Migration `202608040002_email_only_and_guarantee_refunds.sql` disables SMS preferences, cancels queued SMS work, and creates email-only recipients and jobs. The worker also rejects any SMS job that reaches it while the pause is active. The Twilio sender and consent checks remain in source so a future reviewed implementation can reuse them.
+Historical SMS preferences remain disabled. The new thread queue creates SMS jobs only for freshly verified and explicitly consenting instructors. `instructor-sms` manages verification and preferences; `inquiry-notification-webhook` validates provider signatures and records opt-outs and delivery events. Live sending requires `HLD_SMS_ENABLED=true` and the configured Twilio services. Legacy queue SMS remains disabled. See `../../docs/inquiry-messaging-rollout.md`.
 
 Database submission limits reduce notification abuse: five inquiries per organizer per hour, 20 per organizer per day, a 10-minute duplicate cooldown for the same event and instructor, and 30 inquiries per instructor target per hour. Configure Resend spend alerts and account-level caps as an additional control.
 
@@ -249,7 +251,7 @@ SUPPORT_EMAIL=hello@hirelinedancers.com
 
 `SUPPORT_EMAIL` receives replies to booking and completion follow-ups and is the reply address for profile-submission alerts. If it is omitted, the worker uses `hello@hirelinedancers.com`. Resend handles outbound sending only, so configure an inbound mailbox or forwarding rule separately for that address.
 
-SMS is paused, so no Twilio secrets are required. These names remain reserved for a future reviewed SMS launch:
+Optional SMS requires the following server-only configuration plus `HLD_SMS_ENABLED=true` and `TWILIO_VERIFY_SERVICE_SID`:
 
 ```text
 TWILIO_ACCOUNT_SID=AC...
@@ -390,10 +392,10 @@ limit 50;
 - Configure Stripe Customer Portal for payment-method updates, invoice history, and subscription cancellation before showing the production Manage membership button.
 - Configure Stripe to send the listed events to `/functions/v1/stripe-webhook` and copy that endpoint's signing secret into Supabase.
 - Verify the Resend sending domain before using the production From address.
-- SMS is paused at both the database and worker layers. Do not describe or expose SMS controls until a compliant sender, consent flow, policy update, and reviewed release restore the feature.
+- SMS controls appear only when the authenticated readiness endpoint confirms the sender and verification configuration. Check opt-outs again immediately before sending.
 - Use the named `automations` Supabase secret key for Cron. The default or a differently named secret key will not satisfy this worker's authentication mode.
 - Resend idempotency protects retries within its documented window.
-- `sent` means Resend accepted the request. Add a signed Resend status webhook before reporting true `delivered` or `bounced` states.
+- `sent` means Resend accepted the request. Configure the signed Resend status webhook described in the rollout guide to receive `delivered` and `bounced` events for thread notifications.
 - `verify-instructor-refund` verifies a refund that already exists in Stripe. It never creates a refund and never cancels a subscription.
 
 ## Booking payment functions

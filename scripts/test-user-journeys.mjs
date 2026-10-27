@@ -90,7 +90,7 @@ function harness(component = "inbox", props = {}) {
       if (specifier === "@/lib/commercialTerms") return load("src/lib/commercialTerms.ts");
       if (specifier === "@/data/site") return load("src/data/site.ts");
       if (specifier === "@/lib/videoLinks") return load("src/lib/videoLinks.ts");
-      if (specifier === "./ProfileEditor" || specifier === "./ProfileMediaManager") return load(`src/components/${specifier.slice(2)}.tsx`);
+      if (specifier === "./ProfileEditor" || specifier === "./ProfileMediaManager" || specifier === "./InquiryRecommendations") return load(`src/components/${specifier.slice(2)}.tsx`);
       if (specifier.includes("commercial-terms.json")) return JSON.parse(readFileSync(new URL("config/commercial-terms.json", root), "utf8"));
       if (specifier.endsWith(".css")) return { __esModule: true, default: new Proxy({}, { get: (_target, key) => String(key) }) };
       return new Proxy({}, { get: (_target, key) => key === "__esModule" ? true : () => null });
@@ -205,4 +205,28 @@ test("directory count excludes featured suggestions when no published profile ma
 });
 test("directory counts matching published profiles without the featured suggestion", async () => {
   const app = harness("directory", { citySlug: "austin-tx" }); await app.render(); assert.equal(app.counts.at(-1), 1);
+});
+
+test("recommendations remain bound to their conversation during rapid switches", async () => {
+  const app = harness();
+  const recommendation = name => ({ instructor_profile_id: name, display_name: name, city: "Austin", region: "TX", bio: null, headshot_path: null, headshot_url: null });
+  const withRecommendations = id => ({ ...detail(id), thread: { id, thread_status: "timed_out", can_recommend: true }, inquiry: { ...detail(id).inquiry, message: "Saved event" } });
+  app.queue("get_inquiry_thread", async () => ({ data: withRecommendations(a), error: null }));
+  app.queue("get_inquiry_recommendations", async () => ({ data: [recommendation("First instructor")], error: null }));
+  await app.render();
+  assert.ok(app.text().includes("First instructor"));
+  const pending = deferred();
+  app.queue("get_inquiry_thread", async () => ({ data: withRecommendations(b), error: null }));
+  app.queue("get_inquiry_recommendations", () => pending.promise);
+  app.choose(b); await app.render();
+  assert.ok(app.text().includes(`Details ${b}`));
+  assert.ok(app.text().includes("Finding instructors..."));
+  assert.ok(!app.text().includes("First instructor"));
+  app.queue("get_inquiry_thread", async () => ({ data: withRecommendations(a), error: null }));
+  app.queue("get_inquiry_recommendations", async () => ({ data: [recommendation("Current instructor")], error: null }));
+  app.choose(a); await app.render();
+  pending.resolve({ data: [recommendation("Stale instructor")], error: null });
+  await app.render();
+  assert.ok(app.text().includes("Current instructor"));
+  assert.ok(!app.text().includes("Stale instructor"));
 });

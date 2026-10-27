@@ -119,6 +119,13 @@ export type MarketplaceInquiry = {
   company_name: string | null;
   event_type: string | null;
   event_date: string | null;
+  event_start_time?: string | null;
+  venue_name?: string | null;
+  event_postal_code?: string | null;
+  budget_range?: string | null;
+  music_requests?: string | null;
+  venue_has_speakers?: boolean | null;
+  venue_has_microphone?: boolean | null;
   event_city: string | null;
   event_region: string | null;
   guest_count: number | null;

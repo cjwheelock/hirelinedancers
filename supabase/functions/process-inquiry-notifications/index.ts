@@ -49,6 +49,14 @@ type WorkerDatabase = {
     };
     Views: Record<string, never>;
     Functions: {
+      get_inquiry_recommendations: {
+        Args: { p_thread_id: string };
+        Returns: InquiryRecommendation[];
+      };
+      get_inquiry_sms_destination: {
+        Args: { p_job_id: number };
+        Returns: string | null;
+      };
       complete_inquiry_notification_job: {
         Args: CompletionArgs;
         Returns: string;
@@ -105,7 +113,7 @@ type WorkerDatabase = {
         Args: ClaimArgs;
         Returns: NotificationJob[];
       };
-      claim_inquiry_thread_notification_jobs: {
+      claim_inquiry_thread_notification_jobs_v2: {
         Args: ClaimArgs;
         Returns: ThreadNotificationJob[];
       };
@@ -154,10 +162,11 @@ type NotificationJob = {
   thread_id: string | null;
 };
 
-type ThreadNotificationType =
+export type ThreadNotificationType =
   | "new_thread"
   | "new_message"
   | "response_reminder_24"
+  | "response_reminder_47"
   | "response_reminder_48"
   | "response_timeout_instructor"
   | "response_timeout_organizer"
@@ -165,10 +174,15 @@ type ThreadNotificationType =
   | "fallback_routed_organizer"
   | "booking_update";
 
-type ThreadNotificationJob = {
+export type ThreadNotificationJob = {
   job_id: number;
   notification_type: ThreadNotificationType;
-  channel: "email";
+  channel: "email" | "sms";
+  response_policy_version: number;
+  delivered_to_phone_e164: string | null;
+  inquiry_recipient_id: string | null;
+  recommendations?: InquiryRecommendation[];
+  provider_message_id?: string | null;
   attempt_number: number;
   recipient_account_id: string | null;
   delivered_to_email: string;
@@ -190,6 +204,17 @@ type ThreadNotificationJob = {
   sender_name: string | null;
   response_due_at: string | null;
   fallback_consent: boolean;
+};
+
+export type InquiryRecommendation = {
+  instructor_profile_id: string;
+  display_name: string;
+  slug: string | null;
+  bio: string | null;
+  city: string | null;
+  region: string | null;
+  headshot_path: string | null;
+  headshot_url: string | null;
 };
 
 type ProfileSubmissionJob = {
@@ -520,7 +545,7 @@ function configuredAppUrl(): URL {
   return url;
 }
 
-function threadNotificationSubject(job: ThreadNotificationJob): string {
+export function threadNotificationSubject(job: ThreadNotificationJob): string {
   switch (job.notification_type) {
     case "new_thread":
       return `New inquiry from ${job.organizer_name}`;
@@ -528,6 +553,8 @@ function threadNotificationSubject(job: ThreadNotificationJob): string {
       return "New message in your Hire Line Dancers inquiry";
     case "response_reminder_24":
       return `Reminder: respond to ${job.organizer_name}'s inquiry`;
+    case "response_reminder_47":
+      return "One hour left to respond to your event inquiry";
     case "response_reminder_48":
       return `Second reminder: respond to ${job.organizer_name}'s inquiry`;
     case "response_timeout_instructor":
@@ -543,7 +570,7 @@ function threadNotificationSubject(job: ThreadNotificationJob): string {
   }
 }
 
-function threadNotificationContent(job: ThreadNotificationJob): {
+export function threadNotificationContent(job: ThreadNotificationJob): {
   recipientName: string | null;
   heading: string;
   description: string;
@@ -555,7 +582,7 @@ function threadNotificationContent(job: ThreadNotificationJob): {
         recipientName: job.instructor_name,
         heading: "You have a new event inquiry",
         description: `${job.organizer_name} sent an inquiry through Hire Line Dancers.`,
-        instruction: "Please reply within 72 hours, even if you are not available.",
+        instruction: job.response_policy_version === 1 ? "Please reply within 72 hours, even if you are not available." : "Please reply on Hire Line Dancers within 48 hours, even if you are unavailable.",
       };
     case "new_message":
       return {
@@ -571,6 +598,13 @@ function threadNotificationContent(job: ThreadNotificationJob): {
         description: `${job.organizer_name}'s inquiry has been waiting for 24 hours.`,
         instruction: "Open the conversation to reply or mark that you are unavailable.",
       };
+    case "response_reminder_47":
+      return {
+        recipientName: job.instructor_name,
+        heading: "One hour left to respond",
+        description: "This inquiry has been waiting for 47 hours.",
+        instruction: "Please reply within the next hour, even if you are unavailable. Otherwise, we will recommend other instructors to the organizer. You can still reply afterward while the event remains open.",
+      };
     case "response_reminder_48":
       return {
         recipientName: job.instructor_name,
@@ -582,26 +616,30 @@ function threadNotificationContent(job: ThreadNotificationJob): {
       return {
         recipientName: job.instructor_name,
         heading: "The response window has ended",
-        description: "The 72-hour response window for this inquiry has ended.",
-        instruction: "Open the conversation to review its current status.",
+        description: `The ${job.response_policy_version === 1 ? 72 : 48}-hour response window for this inquiry has ended.`,
+        instruction: job.response_policy_version === 1 ? "Open the conversation to review its current status." : "We are helping the organizer explore other instructors. You can still reply while the event remains open, but they may book someone else.",
       };
     case "response_timeout_organizer":
       return {
         recipientName: job.organizer_name,
         heading: `${job.instructor_name} has not responded`,
-        description: "The instructor has not responded within 72 hours.",
-        instruction: job.fallback_consent
-          ? "Hire Line Dancers has flagged this inquiry for administrator fallback review."
-          : "Open the conversation to review the inquiry status.",
+        description: job.response_policy_version === 1 ? "The instructor has not responded within 72 hours." : `${job.instructor_name} has not replied within 48 hours and may be busy.`,
+        instruction: job.response_policy_version === 1
+          ? (job.fallback_consent ? "Hire Line Dancers has flagged this inquiry for administrator fallback review." : "Open the conversation to review the inquiry status.")
+          : job.recommendations?.length
+          ? "Here are other instructors to consider. Choose Reach Out to review and send your saved event details. Each instructor will confirm availability."
+          : "We could not find another suitable instructor to recommend yet. Your request has been flagged for our team. You can review your conversation or contact support.",
       };
     case "thread_declined":
       return {
         recipientName: job.organizer_name,
         heading: `${job.instructor_name} is unavailable`,
         description: "The instructor marked that they are unavailable for this inquiry.",
-        instruction: job.fallback_consent
-          ? "Hire Line Dancers can review another eligible instructor."
-          : "Open the conversation to review the inquiry status.",
+        instruction: job.response_policy_version === 1
+          ? (job.fallback_consent ? "Hire Line Dancers can review another eligible instructor." : "Open the conversation to review the inquiry status.")
+          : job.recommendations?.length
+          ? "Consider these other instructors. Your event details are saved and ready to send."
+          : "We could not find another suitable instructor to recommend yet. Your request has been flagged for our team.",
       };
     case "fallback_routed_organizer":
       return {
@@ -620,7 +658,7 @@ function threadNotificationContent(job: ThreadNotificationJob): {
   }
 }
 
-function threadNotificationText(
+export function threadNotificationText(
   job: ThreadNotificationJob,
   actionUrl: string,
 ): string {
@@ -637,11 +675,15 @@ function threadNotificationText(
     `Event date: ${display(job.event_date)}`,
     `Location: ${display(job.event_location)}`,
     "",
-    `Open the conversation: ${actionUrl}`,
+    `${job.response_policy_version === 1 || job.notification_type === "booking_update" ? "Open the conversation" : "Read and reply on Hire Line Dancers"}: ${actionUrl}`,
+    ...(job.recommendations ?? []).flatMap((candidate) => [
+      "", candidate.display_name, [candidate.city, candidate.region].filter(Boolean).join(", "),
+      candidate.bio || "", `Reach Out: ${recommendationUrl(actionUrl, candidate.instructor_profile_id)}`,
+    ]),
   ].filter((line, index, lines) => line !== "" || lines[index - 1] !== "").join("\n");
 }
 
-function threadNotificationHtml(
+export function threadNotificationHtml(
   job: ThreadNotificationJob,
   actionUrl: string,
 ): string {
@@ -660,11 +702,72 @@ function threadNotificationHtml(
             <tr><th align="left" style="padding:7px 12px 7px 0;color:#57607a">Event date</th><td style="padding:7px 0">${escapeHtml(display(job.event_date))}</td></tr>
             <tr><th align="left" style="padding:7px 12px 7px 0;color:#57607a">Location</th><td style="padding:7px 0">${escapeHtml(display(job.event_location))}</td></tr>
           </table>
-          <a href="${escapeHtml(actionUrl)}" style="display:inline-block;padding:14px 20px;background:#e7a33c;border:2px solid #1c2a44;color:#1c2a44;font-weight:700;text-decoration:none">Open conversation</a>
+          ${(job.recommendations ?? []).map((candidate) => recommendationHtml(candidate, actionUrl)).join("")}
+          <a href="${escapeHtml(actionUrl)}" style="display:inline-block;padding:14px 20px;background:#e7a33c;border:2px solid #1c2a44;color:#1c2a44;font-weight:700;text-decoration:none">${job.response_policy_version === 1 || job.notification_type === "booking_update" ? "Open conversation" : "Read and reply"}</a>
+          ${job.response_policy_version !== 1 && job.notification_type !== "booking_update" ? `<p style="font-size:13px;color:#57607a">Please reply on Hire Line Dancers so your response reaches the conversation.</p>` : ""}
         </div>
       </div>
     </body>
   </html>`;
+}
+
+export function recommendationUrl(actionUrl: string, instructorId: string): string {
+  const url = new URL(actionUrl);
+  url.searchParams.set("recommend", instructorId);
+  return url.toString();
+}
+
+function recommendationHtml(candidate: InquiryRecommendation, actionUrl: string): string {
+  const storageBase = Deno.env.get("SUPABASE_URL");
+  const photo = candidate.headshot_path && storageBase
+    ? `${storageBase}/storage/v1/object/public/instructor-media/${candidate.headshot_path.split("/").map(encodeURIComponent).join("/")}`
+    : candidate.headshot_url?.startsWith("https://") ? candidate.headshot_url : null;
+  return `<div style="border:1px solid #ddd8cc;border-radius:12px;margin:20px 0;padding:20px">
+    ${photo ? `<img src="${escapeHtml(photo)}" alt="${escapeHtml(candidate.display_name)}" width="80" height="80" style="border-radius:50%;object-fit:cover" />` : ""}
+    <h2 style="font-size:20px;margin:12px 0 4px">${escapeHtml(candidate.display_name)}</h2>
+    <p>${escapeHtml([candidate.city,candidate.region].filter(Boolean).join(", "))}</p>
+    ${candidate.bio ? `<p>${escapeHtml(candidate.bio)}</p>` : ""}
+    <a href="${escapeHtml(recommendationUrl(actionUrl,candidate.instructor_profile_id))}" style="display:inline-block;padding:12px 18px;background:#e7a33c;color:#1c2a44;font-weight:bold;text-decoration:none">Reach Out</a>
+  </div>`;
+}
+
+export function threadNotificationSms(job: ThreadNotificationJob, actionUrl: string): string {
+  const prefix = "Hire Line Dancers: ";
+  switch(job.notification_type) {
+    case "new_thread": return `${prefix}You have a new event inquiry. Read and reply within 48 hours: ${actionUrl} Reply STOP to opt out.`;
+    case "response_reminder_24": return `${prefix}Your event inquiry is waiting for a reply. Read and reply: ${actionUrl}`;
+    case "response_reminder_47": return `${prefix}Please reply within 1 hour before we recommend other instructors: ${actionUrl}`;
+    case "response_timeout_instructor": return `${prefix}We are helping the organizer explore other instructors. You can still reply while the event is open: ${actionUrl}`;
+    default: return `${prefix}You have a new message. Read and reply: ${actionUrl}`;
+  }
+}
+
+async function sendThreadSms(admin: AdminClient, job: ThreadNotificationJob): Promise<string> {
+  if (Deno.env.get("HLD_SMS_ENABLED") !== "true") throw new ConfigurationError("SMS is not enabled");
+  const {data: phone, error} = await admin.rpc("get_inquiry_sms_destination", {p_job_id:job.job_id});
+  if (error) throw new ProviderError("Unable to verify current SMS consent", true);
+  if (!phone || phone !== job.delivered_to_phone_e164) throw new ProviderError("SMS consent is no longer active", false);
+  const accountSid=requiredEnv("TWILIO_ACCOUNT_SID");
+  const authToken=requiredEnv("TWILIO_AUTH_TOKEN");
+  const serviceSid=requiredEnv("TWILIO_MESSAGING_SERVICE_SID");
+  const callback=new URL(`${requiredEnv("SUPABASE_URL")}/functions/v1/inquiry-notification-webhook`);
+  callback.searchParams.set("provider","twilio");
+  callback.searchParams.set("job",String(job.job_id));
+  const body=new URLSearchParams({To:phone,MessagingServiceSid:serviceSid,
+    Body:threadNotificationSms(job,inquiryThreadDirectUrl(job.thread_id,job.recipient_account_id)),StatusCallback:callback.toString()});
+  let response: Response;
+  try {
+    response=await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,{
+      method:"POST",signal:AbortSignal.timeout(15000),headers:{Authorization:`Basic ${btoa(`${accountSid}:${authToken}`)}`,
+      "Content-Type":"application/x-www-form-urlencoded"},body});
+  } catch {
+    // Twilio may have accepted an ambiguous request. A callback can reconcile it;
+    // an automatic resend risks sending duplicate texts.
+    throw new ProviderError("SMS acceptance is uncertain; review delivery before retrying",false);
+  }
+  const payload=await response.json().catch(()=>({})) as {sid?:string;message?:string};
+  if (!response.ok || !payload.sid) throw new ProviderError(`Twilio returned ${response.status}`,response.status===429);
+  return payload.sid;
 }
 
 async function sendThreadNotificationEmail(
@@ -1299,6 +1402,7 @@ async function processThreadNotificationJob(
   admin: AdminClient,
   job: ThreadNotificationJob,
 ): Promise<string> {
+  let smsAccepted = false;
   try {
     const { data: sendable, error: sendableError } = await admin.rpc(
       "inquiry_thread_notification_job_is_sendable",
@@ -1326,12 +1430,22 @@ async function processThreadNotificationJob(
       return String(data);
     }
 
-    const providerMessageId = await sendThreadNotificationEmail(job);
+    if (job.response_policy_version !== 1 && ["response_timeout_organizer","thread_declined"].includes(job.notification_type)) {
+      const {data, error} = await admin.rpc("get_inquiry_recommendations", {p_thread_id:job.thread_id});
+      if (error) throw new ProviderError("Unable to load inquiry recommendations",true);
+      job.recommendations=data ?? [];
+    }
+    const providerMessageId = job.channel === "sms" ? (job.provider_message_id || await sendThreadSms(admin,job)) : await sendThreadNotificationEmail(job);
+    smsAccepted = job.channel === "sms";
     return await finishThreadNotificationJob(admin, job, {
       success: true,
       providerMessageId,
     });
   } catch (error) {
+    if (smsAccepted) {
+      console.error("SMS accepted but its receipt could not be recorded", job.job_id);
+      return "worker_error";
+    }
     if (error instanceof ConfigurationError) {
       console.error(
         "Thread notification provider is not configured",
@@ -1570,7 +1684,7 @@ export default {
 
     const jobs = (data ?? []) as NotificationJob[];
     const { data: threadData, error: threadError } = await ctx.supabaseAdmin.rpc(
-      "claim_inquiry_thread_notification_jobs",
+      "claim_inquiry_thread_notification_jobs_v2",
       { p_limit: limit, p_lock_timeout: "10 minutes" },
     );
     if (threadError) {

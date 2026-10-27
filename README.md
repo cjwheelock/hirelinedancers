@@ -23,7 +23,7 @@ and party planners find line dance instructors near them.
 - Legal pages, buyer cost guide, blog, RSS feed, `sitemap.xml`, `robots.txt`, `llms.txt`, schema markup, and `CNAME`
 - Auto-deploy to GitHub Pages via GitHub Actions
 
-The browser UI, database migrations, and Edge Function source are in the repository. Real accounts, payments, and email require the external services and secrets described in `SUPABASE_SETUP.md`. SMS notifications are currently paused. The Twilio implementation remains in the notification worker for a possible future launch, but the current product does not create or send SMS jobs.
+The browser UI, database migrations, and Edge Function source are in the repository. Real accounts, payments, and email require the external services and secrets described in `SUPABASE_SETUP.md`. The 48-hour inquiry flow includes optional verified SMS alerts. SMS remains disabled until Twilio sender setup, credentials, and `HLD_SMS_ENABLED` are configured. See `docs/inquiry-messaging-rollout.md` for migrations, rollout order, and external setup.
 
 ## Commercial terms contract
 

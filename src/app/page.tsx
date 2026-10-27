@@ -66,7 +66,7 @@ export default function Home() {
         </div>
         <div className="hero-content">
           <h1>Live entertainment that gets the whole room moving.</h1>
-          <p className="lede">Hire Line Dancers is an online directory that helps event planners find and contact line dance instructors for weddings, parties, and company events. Instructors can create profiles, manage their listings, and receive event inquiries.</p>
+          <p className="lede">Book a local instructor who teaches your guests a line dance on the spot. No experience or partner needed, and nobody stuck on the sidelines.</p>
           <div className="hero-actions">
             <Link className="button primary" href="/instructors/">Find an instructor near you <ArrowRight size={18} /></Link>
             <Link className="button ghost-light" href="#how-it-works">See how it works</Link>
@@ -124,7 +124,7 @@ export default function Home() {
           <article className="step">
             <div className="step-num">3</div>
             <h3>Send an event inquiry</h3>
-            <p>Share the date and key details. The instructor can reply in your Hire Line Dancers conversation with availability, rates, and next steps.</p>
+            <p>Share the date and key details, then read and reply in your Hire Line Dancers inbox. No reply within 48 hours? We will follow up and help you connect with other instructors. Your event details stay saved, so reaching out again is easy.</p>
           </article>
         </div>
       </section>

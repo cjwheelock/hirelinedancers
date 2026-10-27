@@ -18,7 +18,6 @@ export function ContactInstructor() {
   const [error, setError] = useState<string | null>(null);
   const [successId, setSuccessId] = useState<string | null>(null);
   const [successThreadId, setSuccessThreadId] = useState<string | null>(null);
-  const [fallbackConsent, setFallbackConsent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({
     eventType: "corporate-events",
@@ -116,7 +115,7 @@ export function ContactInstructor() {
         p_venue_has_speakers: booleanOrNull(form.venueHasSpeakers),
         p_venue_has_microphone: booleanOrNull(form.venueHasMicrophone),
         p_message: form.message || null,
-        p_fallback_consent: fallbackConsent
+        p_fallback_consent: false
       });
       if (submitError) throw submitError;
       const inquiryId = String(data);
@@ -185,9 +184,10 @@ export function ContactInstructor() {
         <p className={styles.success}>
           {profile?.isStaticListing
             ? "Our team received your inquiry and will confirm that this launch listing is available before connecting you."
-            : "Your inquiry is in Messages, and we emailed the instructor a secure link to reply."}
+            : "Your inquiry is saved in Messages. We will notify the instructor with a link to read and reply."}
         </p>
         <p className={styles.subtitle}>Ask about availability, pricing, insurance, and venue needs. When you agree, the instructor sends a quote you can sign and pay in the conversation.</p>
+        <p className={styles.subtitle}>No reply within 48 hours? We will follow up and help you connect with other instructors. Your event details stay saved, so reaching out again is easy.</p>
         <div className={styles.buttonRow} style={{ marginTop: 26 }}>
           <a className={styles.button} href={successThreadId ? `/account/?tab=inquiries&inquiry=${encodeURIComponent(successId)}&thread=${encodeURIComponent(successThreadId)}` : "/account/?tab=inquiries"}>View messages</a>
           <Link className={styles.secondaryButton} href="/instructors/">Browse more instructors</Link>
@@ -200,7 +200,7 @@ export function ContactInstructor() {
     <section className={`${styles.shell} ${styles.narrow}`}>
       <p className={styles.eyebrow}>Contact {profile?.display_name}</p>
       <h1 className={styles.title}>Tell the instructor about your event</h1>
-      <p className={styles.subtitle}>This is an inquiry, not a booking. The instructor will confirm availability, rates, and terms through Hire Line Dancers.</p>
+      <p className={styles.subtitle}>Send your event details and message through Hire Line Dancers. The instructor will confirm availability, rates, and terms. If they have not replied within 48 hours, we will help you explore other instructors.</p>
       <form className={`${styles.card} ${styles.stack}`} onSubmit={submit}>
         <div className={styles.grid}>
           <label className={styles.field}>
@@ -272,10 +272,7 @@ export function ContactInstructor() {
           <span>Anything else the instructor should know?</span>
           <textarea maxLength={3000} value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} />
         </label>
-        <label className={styles.check}>
-          <input required type="checkbox" checked={fallbackConsent} onChange={(event) => setFallbackConsent(event.target.checked)} />
-          <span>If this instructor does not respond within 72 hours, Hire Line Dancers may share this inquiry and your contact details with one qualified instructor at a time.</span>
-        </label>
+        <p className={styles.help}>Your inquiry goes to this instructor. If we recommend alternatives, you choose who receives your saved event details. Sending an inquiry does not confirm a booking.</p>
         <p className={styles.help}>Messages are handled through Hire Line Dancers. Authorized administrators can view them to support the inquiry.</p>
         {error ? <p className={styles.error}>{error}</p> : null}
         <button className={styles.button} disabled={busy} type="submit">{busy ? "Sending inquiry..." : "Send inquiry"}</button>

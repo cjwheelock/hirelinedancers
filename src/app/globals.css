@@ -156,6 +156,13 @@ main { display: block; }
   margin: 0 auto;
 }
 .brand { display: inline-flex; align-items: center; gap: 11px; }
+.brand-wordmark {
+  display: block;
+  width: 200px;
+  height: auto;
+  filter: brightness(0) invert(1);
+}
+.brand-wordmark-compact { display: none; }
 .brand-name {
   font-family: var(--font-sans);
   font-weight: 900;
@@ -186,6 +193,8 @@ main { display: block; }
 /* ---------- Buttons ---------- */
 .button, button.btn {
   display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
   align-items: center;
   justify-content: center;
   gap: 9px;
@@ -196,6 +205,8 @@ main { display: block; }
   font-family: var(--font-sans);
   font-weight: 900;
   font-size: 16px;
+  overflow-wrap: anywhere;
+  text-align: center;
   cursor: pointer;
   transition: transform .2s ease, color .2s ease, background .2s ease, border-color .2s ease;
 }
@@ -435,6 +446,7 @@ main { display: block; }
 }
 .instructor-card {
   display: flex;
+  min-width: 0;
   flex-direction: column;
   gap: 16px;
   background: var(--panel);
@@ -447,7 +459,7 @@ main { display: block; }
 .instructor-card:hover { transform: translateY(-3px); border-color: var(--gold); box-shadow: none; }
 .instructor-card.compact { border-radius: 0; padding: 20px; }
 .instructor-card > .button { margin-top: auto; }
-.card-top { display: flex; align-items: center; gap: 14px; }
+.card-top { display: flex; min-width: 0; align-items: center; gap: 14px; }
 .avatar {
   flex: none;
   display: grid;
@@ -463,9 +475,14 @@ main { display: block; }
 }
 .avatar img { width: 100%; height: 100%; object-fit: cover; }
 .avatar.large { width: 108px; height: 108px; font-size: 36px; }
-.card-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; width: 100%; }
+.card-title-row { display: flex; min-width: 0; align-items: flex-start; justify-content: space-between; gap: 10px; width: 100%; }
+.card-title-row > div { min-width: 0; }
 .instructor-card h3 { line-height: 1.1; }
 .instructor-card h3 a:hover { color: var(--sunset); }
+.instructor-card h3,
+.instructor-card .card-sub,
+.instructor-card .bio,
+.tag-row span { overflow-wrap: anywhere; }
 .instructor-card .card-sub { color: var(--muted); font-size: 14px; margin-top: 2px; }
 .muted { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 14px; }
 .rating { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; font-size: 14px; color: var(--ink-2); }
@@ -482,6 +499,8 @@ main { display: block; }
 }
 .pill {
   display: inline-flex; align-items: center; gap: 6px;
+  min-width: 0;
+  overflow-wrap: anywhere;
   font-size: 12px; font-weight: 700;
   padding: 5px 9px; border-radius: 0;
   background: var(--gold); color: var(--ink);
@@ -806,6 +825,7 @@ main { display: block; }
 .profile-bottom-cta .button { flex: 0 0 auto; }
 .favorite-song {
   display: grid;
+  min-width: 0;
   gap: 14px;
   margin-top: 24px;
   padding: 22px;
@@ -815,7 +835,8 @@ main { display: block; }
   background: var(--pine-soft);
   box-shadow: var(--shadow-sm);
 }
-.favorite-song-intro { display: flex; align-items: center; gap: 13px; }
+.favorite-song-intro { display: flex; min-width: 0; align-items: center; gap: 13px; }
+.favorite-song-intro > div { min-width: 0; }
 .favorite-song-icon {
   display: grid;
   flex: 0 0 auto;
@@ -833,8 +854,8 @@ main { display: block; }
   letter-spacing: .08em;
   text-transform: uppercase;
 }
-.favorite-song h2 { margin-top: 2px; font-size: clamp(21px, 2vw, 26px); line-height: 1.2; }
-.favorite-song-note { color: var(--ink-2); font-size: 15px; }
+.favorite-song h2 { margin-top: 2px; overflow-wrap: anywhere; font-size: clamp(21px, 2vw, 26px); line-height: 1.2; }
+.favorite-song-note { overflow-wrap: anywhere; color: var(--ink-2); font-size: 15px; }
 .spotify-player { display: block; width: 100%; max-width: 100%; border: 0; border-radius: 12px; }
 .spotify-link {
   display: inline-flex;
@@ -1357,6 +1378,7 @@ main { display: block; }
 }
 .footer h2 { color: #fff; font-size: 22px; margin-bottom: 12px; }
 .footer .brand-name { color: #fff; }
+.footer .brand-wordmark { width: 240px; }
 .footer p { font-size: 14.5px; max-width: 34ch; }
 .footer h3 { font-family: var(--font-sans); color: #fff; font-size: 13px; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 14px; }
 .footer ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 9px; }
@@ -1427,6 +1449,7 @@ button:disabled { opacity: 0.7; cursor: progress; }
   .site-header-inner { gap: 8px; min-height: 64px; }
   .brand { gap: 8px; }
   .brand > svg { width: 34px; height: 34px; }
+  .site-header .brand-wordmark { width: 150px; }
   .brand-name { font-size: 14px; white-space: nowrap; }
   .site-header nav .is-cta { min-height: 44px; padding: 8px 12px; font-size: 13px; white-space: nowrap; }
   .site-header nav .is-account { padding: 8px; font-size: 13px; white-space: nowrap; }
@@ -1451,6 +1474,9 @@ button:disabled { opacity: 0.7; cursor: progress; }
   .benefit-grid, .link-grid { grid-template-columns: 1fr; }
   .stat-grid { grid-template-columns: 1fr; }
   .profile-specialty-grid, .profile-detail-grid { grid-template-columns: 1fr; }
+  .card-top { align-items: flex-start; }
+  .card-title-row { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .card-title-row .pill { justify-self: start; }
   .profile-top-contact, .profile-bottom-cta .button { width: 100%; }
   .profile-bottom-cta { align-items: stretch; padding: 24px 22px; }
   .benefit-card { padding: 28px 24px 32px; }
@@ -1482,8 +1508,9 @@ button:disabled { opacity: 0.7; cursor: progress; }
   .resource-template .copy-template { margin: 12px; padding: 18px; }
 }
 
-@media (max-width: 340px) {
-  .site-header .brand-name { display: none; }
+@media (max-width: 375px) {
+  .site-header .brand-wordmark-full { display: none; }
+  .site-header .brand-wordmark-compact { display: block; width: 80px; }
 }
 
 @media (max-width: 540px) and (orientation: portrait) {

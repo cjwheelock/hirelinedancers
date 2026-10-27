@@ -15,6 +15,8 @@ import {
   type InquiryThreadMessage,
   type MarketplaceInquiry
 } from "@/lib/marketplace";
+import { InquiryAttention } from "./InquiryAttention";
+import { InquiryRecommendations } from "./InquiryRecommendations";
 import styles from "./Marketplace.module.css";
 
 type InboxPerspective = "organizer" | "instructor" | "admin";
@@ -463,7 +465,7 @@ export function InquiryInbox({
   const canReply = (
     perspective !== "admin"
       || detail?.thread.assignment_source === "static_support"
-  ) && !["declined", "timed_out", "withdrawn", "closed"].includes(threadStatus);
+  ) && (detail?.thread.can_reply === true || (!Object.hasOwn(detail?.thread ?? {}, "can_reply") && !["declined", "timed_out", "withdrawn", "closed"].includes(threadStatus)));
   const activeBooking = bookingState?.booking ?? null;
   const hasPaidBooking = Boolean(activeBooking && paidBookingStatuses.includes(activeBooking.status) && activeBooking.status !== "paid_out");
   const hasPlatformBooking = Boolean(activeBooking?.paid_at);
@@ -473,6 +475,7 @@ export function InquiryInbox({
 
   return (
     <section className={styles.inboxSection} aria-label="Messages">
+      {perspective === "admin" ? <InquiryAttention onOpen={setSelectedThreadId} /> : null}
       <div className={styles.inboxToolbar}>
         <label className={styles.inboxSearch}>
           <Search aria-hidden="true" size={18} />
@@ -582,6 +585,7 @@ export function InquiryInbox({
                   ) : null}
                   {!hasPlatformBooking && (perspective !== "instructor" || detail.thread.is_current_assignment === true) ? (
                     <InquiryOutcomeActions
+                      threadId={openThreadId!}
                       inquiry={detail.inquiry}
                       perspective={perspective}
                       onChanged={async () => {
@@ -616,6 +620,14 @@ export function InquiryInbox({
                         onDataChange?.();
                       }}
                     />
+                  ) : null}
+                  {threadStatus === "timed_out" && canReply ? <p className={styles.notice}>The response window has ended. Other instructors may be contacted, and you can still reply while the event is open.</p> : null}
+                  {perspective === "organizer" && detail.thread.can_recommend === true && openThreadId ? (
+                    <InquiryRecommendations threadId={openThreadId} inquiry={detail.inquiry} onSent={(threadId) => {
+                      setSelectedThreadId(threadId);
+                      void loadThreads(true);
+                      onDataChange?.();
+                    }} />
                   ) : null}
                   <div className={styles.messageTimeline} aria-live="polite">
                     {detail.messages.map((message) => {
@@ -694,10 +706,12 @@ export function InquiryInbox({
 }
 
 function InquiryOutcomeActions({
+  threadId,
   inquiry,
   perspective,
   onChanged
 }: {
+  threadId: string;
   inquiry: MarketplaceInquiry;
   perspective: InboxPerspective;
   onChanged: () => void | Promise<void>;
@@ -717,11 +731,9 @@ function InquiryOutcomeActions({
     if (!client) return;
     setBusy(outcome);
     setError(null);
-    const { error: outcomeError } = await client.rpc("report_booking_outcome", {
-      p_inquiry_id: inquiry.id,
-      p_outcome: outcome,
-      p_booking_value_cents: null,
-      p_note: null
+    const { error: outcomeError } = await client.rpc("report_thread_booking_outcome", {
+      p_thread_id: threadId,
+      p_outcome: outcome
     });
     if (outcomeError) setError(outcomeError.message);
     else await onChanged();

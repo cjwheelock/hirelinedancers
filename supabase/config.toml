@@ -58,3 +58,9 @@ verify_jwt = false
 [auth.email.template.magic_link]
 subject = "Sign in to Hire Line Dancers"
 content_path = "./supabase/templates/magic_link.html"
+
+[functions.instructor-sms]
+verify_jwt = true
+
+[functions.inquiry-notification-webhook]
+verify_jwt = false

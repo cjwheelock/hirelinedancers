@@ -1,8 +1,10 @@
+> The inquiry changes add a reconciled migration, a versioned 48-hour clock, organizer-selected alternatives, and optional verified SMS. Use [the inquiry rollout guide](docs/inquiry-messaging-rollout.md) for the coordinated release. Historical migration descriptions below document prior behavior.
+
 # Backend setup
 
 Hire Line Dancers uses Supabase Auth, Postgres, Storage, and Edge Functions. The browser can display public instructor profiles, but profile management, inquiries, and membership activation require a signed-in user.
 
-The migrations and Edge Function source are in this repository. Creating or changing Supabase, Google, Stripe, and Resend resources is an external account action and is not completed by the code alone. SMS notifications are paused. The Twilio implementation is retained for possible future use, but Twilio is not required for the current product.
+The migrations and Edge Function source are in this repository. Creating or changing Supabase, Google, Stripe, and Resend resources is an external account action and is not completed by the code alone. Twilio is optional and remains unconfigured until the SMS setup in the inquiry rollout guide is completed.
 
 ## Architecture
 
@@ -393,7 +395,7 @@ SUPPORT_EMAIL=hello@hirelinedancers.com
 
 The dedicated Customer Portal configuration is required in production and optional for local or sandbox use. Valid Terms, Privacy, and support URLs are configured in Stripe Public details, and production uses `STRIPE_REQUIRE_TERMS_CONSENT=true`. Production Checkout fails closed when this setting is missing, invalid, or false. The live Stripe secrets are installed in Supabase. On August 12, 2026, the configured instructor-offer coupon and matching `STRIPE_INSTRUCTOR_OFFER_COUPON_ID` secret were verified in the live Hire Line Dancers account as valid, bound through server-verified metadata to the $14.99 monthly instructor membership Product, 100 percent off for exactly 2 months, without an expiration or redemption cap, and without a promotion code. The approval function additionally enforces one subscription item on that exact Product and Price.
 
-SMS is currently paused, so no Twilio secrets are required. The following names are reserved for a future reviewed SMS launch:
+SMS remains off until sender registration and verification setup are complete. Optional SMS uses `HLD_SMS_ENABLED`, `TWILIO_VERIFY_SERVICE_SID`, and these provider secrets:
 
 ```text
 TWILIO_ACCOUNT_SID=AC...

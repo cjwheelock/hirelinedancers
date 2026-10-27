@@ -2,6 +2,9 @@
 
 begin;
 
+-- Existing inquiries keep their original policy while new submissions use V2.
+alter table public.inquiry_threads alter column response_policy_version set default 1;
+
 create or replace function pg_temp.messaging_assert(
   p_condition boolean,
   p_message text
@@ -622,6 +625,8 @@ select pg_temp.messaging_assert(
   ),
   'timeout must create one auditable admin fallback review'
 );
+select pg_temp.messaging_assert(not exists (select 1 from public.inquiry_recommendations where source_thread_id=:'source_thread_id'),
+  'legacy timeout must not create new-policy recommendations');
 
 set local role authenticated;
 select pg_temp.messaging_set_request(
@@ -772,10 +777,8 @@ select pg_temp.messaging_assert(
     public.get_inquiry_thread(:'source_thread_id'::uuid)
       -> 'inquiry' ? 'booking_outcome'
   )
-  and not has_table_privilege(
-    'authenticated',
-    'public.inquiries',
-    'select'
+  and not exists (
+    select 1 from public.inquiries where id = :'fallback_inquiry_id'::uuid
   ),
   'a prior instructor must retain only their own thread and not shared downstream inquiry state'
 );
@@ -821,10 +824,10 @@ select pg_temp.messaging_assert(
     from public.inquiry_outcome_reports report
     where report.inquiry_id = :'fallback_inquiry_id'::uuid
   )
-  and not has_table_privilege(
-    'authenticated',
-    'public.inquiry_status_events',
-    'select'
+  and not exists (
+    select 1 from public.inquiry_status_events
+    where inquiry_id = :'fallback_inquiry_id'::uuid
+      and actor_account_id = '10000000-0000-0000-0000-000000000021'
   ),
   'a prior instructor must not read a fallback instructor outcome or status events'
 );

@@ -27,6 +27,7 @@ import {
 } from "@/lib/commercialTerms";
 import { useMarketplaceSession } from "@/hooks/useMarketplaceSession";
 import { ProfileEditor } from "./ProfileEditor";
+import { InstructorSmsSettings } from "./InstructorSmsSettings";
 import { InstructorOnboardingPricing } from "./InstructorOnboardingPricing";
 import { InquiryInbox } from "./InquiryInbox";
 import { MembershipCreditAdmin } from "./MembershipCreditAdmin";
@@ -1060,6 +1061,11 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
       {profile ? (
         <div hidden={tab !== "profile"}>
           <ProfileEditor key={profile.id} profile={profile} settings={settings} hasLifetimeAccess={hasLifetimeAccess} onSaved={() => void load(true)} describeEdgeError={edgeFunctionError} />
+          <div className={styles.card}>
+            <h3>Inquiry response window</h3>
+            <p>Reply within 48 hours, even if you are unavailable. We send reminders after 24 and 47 hours, then help the organizer consider other instructors.</p>
+          </div>
+          <InstructorSmsSettings />
         </div>
       ) : null}
       {!loading && tab === "inquiries" ? (
@@ -2700,7 +2706,7 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
                         <aside className={styles.previewBookingPanel}>
                           <p className={styles.previewLabel}>Booking details</p>
                           <h4>Plan your line dance experience</h4>
-                          <p>Preferred response window: about {profile.preferred_response_hours} hours</p>
+                          <p>New inquiry response window: 48 hours</p>
                           <p>Speakers: {profile.provides_speakers ? "Instructor can provide" : "Confirm with instructor"}</p>
                           <p>Microphone: {profile.provides_microphone ? "Instructor can provide" : "Confirm with instructor"}</p>
                           <p>Music playback: {profile.provides_music_playback ? "Instructor can provide" : "Confirm with instructor"}</p>
@@ -2752,7 +2758,7 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
                         <ProfileReviewField label="Provides microphone" value={profile.provides_microphone === null ? null : profile.provides_microphone ? "Yes" : "No"} />
                         <ProfileReviewField label="Provides music playback" value={profile.provides_music_playback === null ? null : profile.provides_music_playback ? "Yes" : "No"} />
                         <ProfileReviewField label="Liability insurance" value={statusLabel(profile.liability_insurance_status)} />
-                        <ProfileReviewField label="Typical response time" value={`${profile.preferred_response_hours} hours`} />
+                        <ProfileReviewField label="Typical response time" value="48 hours for new inquiries" />
                         <ProfileReviewField label="Inquiry email (private)" value={privateSettings?.inquiry_email} />
                         <ProfileReviewField label="Typical minimum rate (private)" value={privateSettings?.minimum_rate_cents == null ? null : money(privateSettings.minimum_rate_cents)} />
                         <ProfileReviewField label="Minimum booking (private)" value={privateSettings?.minimum_hours == null ? null : `${privateSettings.minimum_hours} hours`} />

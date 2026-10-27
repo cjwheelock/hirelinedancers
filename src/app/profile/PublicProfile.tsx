@@ -559,7 +559,7 @@ export function PublicProfile() {
           </ul>
           <p className={styles.finePrint}>You can browse without an account. Sign in is required when you send an inquiry so you can track its status.</p>
           <p className={styles.finePrint}>When you agree on the details, the instructor sends a booking agreement here. You sign and pay through Hire Line Dancers, and we hold the payment until after the event.</p>
-          <p className={styles.response}><Clock size={15} aria-hidden="true" /> Preferred response window: about {profile.preferred_response_hours} hours</p>
+          <p className={styles.response}><Clock size={15} aria-hidden="true" /> No reply within 48 hours? We will help you explore other instructors.</p>
         </aside>
       </div>
 

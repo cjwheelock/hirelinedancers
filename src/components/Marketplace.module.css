@@ -2495,3 +2495,16 @@
     grid-template-columns: 1fr;
   }
 }
+
+.recommendations { border: 1px solid var(--line, #ddd8cc); border-radius: 16px; padding: 20px; margin-bottom: 24px; background: #fbfaf5; }
+.recommendations h3, .recommendations h4 { margin: 0 0 8px; overflow-wrap: anywhere; }
+.recommendationGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 16px; margin: 18px 0; }
+.recommendationCard { min-width: 0; padding: 20px; border-radius: 12px; border: 1px solid #ddd8cc; background: white; display: flex; flex-direction: column; align-items: flex-start; }
+.recommendationCard img { border-radius: 50%; object-fit: cover; margin-bottom: 12px; }
+.recommendationCard p { overflow-wrap: anywhere; }
+.recommendationCard button { margin-top: auto; }
+.savedEventDetails { margin: 0; display: grid; gap: 10px; }
+.savedEventDetails div { display: grid; grid-template-columns: minmax(90px, 1fr) 2fr; gap: 12px; }
+.savedEventDetails dt { color: #57607a; }
+.savedEventDetails dd { margin: 0; overflow-wrap: anywhere; }
+@media (max-width: 480px) { .recommendations { padding: 14px; } .savedEventDetails div { grid-template-columns: 1fr; gap: 3px; } }
