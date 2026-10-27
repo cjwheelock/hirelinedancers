@@ -183,6 +183,7 @@ export function ProfileEditor({
 
   const checklist = useMemo(() => [
     { label: "Headshot", done: headshotReady, step: "media" as StepId, required: true },
+    { label: "Inquiry email", done: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.inquiry_email.trim()), step: "links" as StepId, required: true },
     { label: "Name, location, and event types", done: Boolean(form.display_name.trim() && form.city.trim() && form.region.trim() && form.event_types.length), step: "services" as StepId, required: true },
     { label: "About you (at least 150 characters)", done: form.bio.trim().length >= 150, step: "basics" as StepId, required: false },
     { label: "Headline", done: Boolean(form.headline.trim()), step: "basics" as StepId, required: false },
@@ -228,8 +229,14 @@ export function ProfileEditor({
       setError("Add your public name, an About you section, your location, and at least one event type before continuing.");
       return false;
     }
-    if (continueToSubmission && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.inquiry_email.trim())) {
-      setError("A valid inquiry email is required before continuing.");
+    const inquiryEmail = form.inquiry_email.trim().toLowerCase();
+    const inquiryEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inquiryEmail);
+    if (inquiryEmail && !inquiryEmailValid) {
+      setError("Enter a valid inquiry email in Links & pricing, or leave it blank for now.");
+      return false;
+    }
+    if (continueToSubmission && !inquiryEmailValid) {
+      setError("Add the email where you want inquiry alerts in Links & pricing before continuing.");
       return false;
     }
     if (continueToSubmission && !headshotReady) {
@@ -276,9 +283,11 @@ export function ProfileEditor({
       status: profile.status
     };
 
-    const { error: settingsError } = await client.from("instructor_private_settings").upsert({
+    // Private settings need an inquiry email, so a draft without one saves
+    // its public profile only until the instructor adds it.
+    const { error: settingsError } = !inquiryEmailValid ? { error: null } : await client.from("instructor_private_settings").upsert({
       instructor_profile_id: profile.id,
-      inquiry_email: form.inquiry_email.trim(),
+      inquiry_email: inquiryEmail,
       inquiry_phone_e164: null,
       sms_notifications_enabled: false,
       minimum_rate_cents: form.minimum_rate ? Math.round(Number(form.minimum_rate) * 100) : null,
@@ -303,9 +312,12 @@ export function ProfileEditor({
       return false;
     }
 
+    const emailChanged = inquiryEmailValid && inquiryEmail !== (settings?.inquiry_email ?? "").toLowerCase();
     if (!continueToSubmission) {
       setBusy(null);
-      setMessage(quiet ? "Saved." : "Your profile changes are saved.");
+      setMessage(emailChanged
+        ? `Saved. We sent a confirmation to ${inquiryEmail} so you know inquiry alerts will arrive there.`
+        : quiet ? "Saved." : "Your profile changes are saved.");
       onSaved();
       return true;
     }
@@ -704,8 +716,8 @@ export function ProfileEditor({
               </label>
               <label className={styles.field}>
                 <span>Inquiry email</span>
-                <input disabled type="email" value={form.inquiry_email} />
-                <small>New inquiries go to the email you signed in with.</small>
+                <input type="email" required autoComplete="email" placeholder="you@example.com" value={form.inquiry_email} onChange={(e) => setValue("inquiry_email", e.target.value)} />
+                <small>Where we send new inquiries and booking alerts. We&rsquo;ll email this address to confirm it works.</small>
               </label>
             </div>
           </section>

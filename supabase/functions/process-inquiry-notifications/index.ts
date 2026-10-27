@@ -234,7 +234,8 @@ type InstructorServiceNotificationType =
   | "profile_approved"
   | "activation_payment_failed"
   | "billing_grace_started"
-  | "billing_access_paused";
+  | "billing_access_paused"
+  | "inquiry_email_confirmation";
 
 type InstructorServiceJob = {
   job_id: number;
@@ -1132,6 +1133,39 @@ function billingRecoveryEmailHtml(
   </html>`;
 }
 
+function inquiryEmailConfirmationText(job: InstructorServiceJob, accountUrl: string): string {
+  return [
+    `Hi ${job.display_name},`,
+    "",
+    `This confirms that new inquiry and booking alerts from Hire Line Dancers will be sent to ${job.delivered_to_email}.`,
+    "",
+    "If you did not make this change, sign in and update your inquiry email, or reply to this email.",
+    "",
+    `Manage your profile: ${accountUrl}`,
+    "",
+    "Thank you,",
+    "CJ",
+  ].join("\n");
+}
+
+function inquiryEmailConfirmationHtml(job: InstructorServiceJob, accountUrl: string): string {
+  return `<!doctype html>
+  <html lang="en">
+    <body style="margin:0;background:#fbfaf5;color:#1c2a44;font-family:Arial,sans-serif;line-height:1.55">
+      <div style="max-width:640px;margin:0 auto;padding:32px 20px">
+        <div style="border-top:8px solid #e7a33c;background:#ffffff;padding:30px">
+          <p style="margin:0 0 18px">Hi ${escapeHtml(job.display_name)},</p>
+          <h1 style="margin:0 0 16px;font-size:28px;line-height:1.15">Your inquiry alerts are set up</h1>
+          <p style="margin:0 0 16px">New inquiry and booking alerts from Hire Line Dancers will be sent to <strong>${escapeHtml(job.delivered_to_email)}</strong>.</p>
+          <p style="margin:0 0 24px">If you did not make this change, sign in and update your inquiry email, or reply to this email.</p>
+          <a href="${escapeHtml(accountUrl)}" style="display:inline-block;padding:14px 20px;background:#e7a33c;border:2px solid #1c2a44;color:#1c2a44;font-weight:700;text-decoration:none">Manage your profile</a>
+          <p style="margin:24px 0 0">Thank you,<br>CJ</p>
+        </div>
+      </div>
+    </body>
+  </html>`;
+}
+
 async function sendInstructorServiceEmail(
   admin: AdminClient,
   job: InstructorServiceJob,
@@ -1141,24 +1175,33 @@ async function sendInstructorServiceEmail(
   const supportEmail = Deno.env.get("SUPPORT_EMAIL")?.trim() ||
     "hello@hirelinedancers.com";
   const isApproval = job.notification_type === "profile_approved";
+  const isEmailConfirmation = job.notification_type === "inquiry_email_confirmation";
   const isActivationFailure =
     job.notification_type === "activation_payment_failed";
   const destinationUrl = isApproval
     ? liveProfileUrl(job)
+    : isEmailConfirmation
+    ? new URL("account/?tab=profile", configuredAppUrl()).toString()
     : await instructorServiceMagicLink(admin, job);
-  const subject = isApproval
+  const subject = isEmailConfirmation
+    ? "Your Hire Line Dancers inquiry alerts are set up"
+    : isApproval
     ? "Your Hire Line Dancers profile has been approved"
     : isActivationFailure
     ? "Action needed: save a new Hire Line Dancers payment method"
     : job.notification_type === "billing_grace_started"
     ? "Action needed: update your Hire Line Dancers payment method"
     : "Action needed: your Hire Line Dancers membership payment failed";
-  const text = isApproval
+  const text = isEmailConfirmation
+    ? inquiryEmailConfirmationText(job, destinationUrl)
+    : isApproval
     ? approvalEmailText(job, destinationUrl)
     : isActivationFailure
     ? activationPaymentFailureEmailText(job, destinationUrl)
     : billingRecoveryEmailText(job, destinationUrl);
-  const html = isApproval
+  const html = isEmailConfirmation
+    ? inquiryEmailConfirmationHtml(job, destinationUrl)
+    : isApproval
     ? approvalEmailHtml(job, destinationUrl)
     : isActivationFailure
     ? activationPaymentFailureEmailHtml(job, destinationUrl)
