@@ -228,7 +228,16 @@ export function ProfileEditor({
       setError("Add your public name, an About you section, your location, and at least one event type before continuing.");
       return false;
     }
-    if (continueToSubmission && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.inquiry_email.trim())) {
+    // Inquiry alerts go to the sign-in email when none has been saved yet.
+    const inquiryEmail = form.inquiry_email.trim()
+      || (await client.auth.getSession()).data.session?.user.email?.trim()
+      || "";
+    if (inquiryEmail && inquiryEmail !== form.inquiry_email) setValue("inquiry_email", inquiryEmail);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inquiryEmail)) {
+      if (!continueToSubmission && !inquiryEmail) {
+        setError("We could not find your sign-in email. Sign out and back in, then try again.");
+        return false;
+      }
       setError("A valid inquiry email is required before continuing.");
       return false;
     }
@@ -278,7 +287,7 @@ export function ProfileEditor({
 
     const { error: settingsError } = await client.from("instructor_private_settings").upsert({
       instructor_profile_id: profile.id,
-      inquiry_email: form.inquiry_email.trim(),
+      inquiry_email: inquiryEmail,
       inquiry_phone_e164: null,
       sms_notifications_enabled: false,
       minimum_rate_cents: form.minimum_rate ? Math.round(Number(form.minimum_rate) * 100) : null,
