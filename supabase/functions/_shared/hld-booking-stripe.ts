@@ -150,6 +150,37 @@ export function bookingWebhookUrl(): string {
   return `${base}/functions/v1/booking-stripe-webhook`;
 }
 
+// Bump a generation to replace an endpoint that was created with the wrong
+// settings. Connect generation 2 replaces an endpoint created before Connect
+// was enabled on the account, which only received the platform's own events.
+const WEBHOOK_GENERATION: Record<WebhookKind, string> = { platform: "1", connect: "2" };
+
+// Endpoint ids already confirmed as current in this worker instance, so the
+// per-minute scheduler checks Stripe at most once per cold start.
+const verifiedEndpointIds = new Set<string>();
+
+async function savedEndpointIsCurrent(
+  stripe: Stripe,
+  kind: WebhookKind,
+  endpointId: string | undefined,
+): Promise<boolean> {
+  if (!endpointId) return false;
+  if (verifiedEndpointIds.has(endpointId)) return true;
+  try {
+    const endpoint = await stripe.webhookEndpoints.retrieve(endpointId);
+    const generation = endpoint.metadata?.hld_webhook_generation ?? "1";
+    if (generation !== WEBHOOK_GENERATION[kind] || endpoint.status !== "enabled") return false;
+    verifiedEndpointIds.add(endpointId);
+    return true;
+  } catch (error) {
+    // A missing endpoint is replaced; any other error keeps the saved one.
+    const status = (error as { statusCode?: number })?.statusCode;
+    if (status === 404) return false;
+    console.error("Unable to verify booking webhook", kind, stripeErrorMessage(error));
+    return true;
+  }
+}
+
 // Creates the booking webhook endpoints in Stripe the first time the worker
 // runs with a working secret key, and stores their signing secrets in the
 // database. Endpoints are recognized by metadata, so other endpoints on the
@@ -167,7 +198,10 @@ export async function ensureBookingWebhooks(
 
   for (const kind of ["platform", "connect"] as WebhookKind[]) {
     const saved = config[kind];
-    if (saved?.secret && saved.url === url && saved.livemode === livemode) continue;
+    if (
+      saved?.secret && saved.url === url && saved.livemode === livemode &&
+      await savedEndpointIsCurrent(stripe, kind, saved.endpointId)
+    ) continue;
     try {
       existing ??= (await stripe.webhookEndpoints.list({ limit: 100 })).data;
       for (const endpoint of existing.filter((item) =>
@@ -182,7 +216,11 @@ export async function ensureBookingWebhooks(
         enabled_events: WEBHOOK_EVENTS[kind],
         connect: kind === "connect",
         description: `Hire Line Dancers bookings (${kind === "connect" ? "connected accounts" : "payments"})`,
-        metadata: { hld_booking_webhook: kind, product_line: BOOKING_PRODUCT_LINE },
+        metadata: {
+          hld_booking_webhook: kind,
+          hld_webhook_generation: WEBHOOK_GENERATION[kind],
+          product_line: BOOKING_PRODUCT_LINE,
+        },
       });
       if (!created.secret) throw new Error("Stripe did not return a signing secret");
       const { error } = await admin.rpc("booking_save_webhook_endpoint", {
