@@ -1,0 +1,88 @@
+.dialog { position: fixed; inset: 0; z-index: 1000; overflow: auto; color: #1c2a44; background: #f1efe8; font: 14px/1.5 "Lato", sans-serif; overscroll-behavior: contain; }
+.dialog * { box-sizing: border-box; }
+.dialog h1, .dialog h2, .dialog h3, .dialog p { margin: 0; }
+.dialog button, .dialog input, .dialog select { font: inherit; }
+.dialog button { cursor: pointer; }
+.dialog button:disabled { cursor: default; opacity: .5; }
+.dialog button:focus-visible, .dialog input:focus-visible, .dialog select:focus-visible, .dialog a:focus-visible { outline: 3px solid #e7a33c; outline-offset: 3px; }
+.brand { padding: 20px 32px; background: #1c2a44; border-bottom: 3px solid #e7a33c; color: #fff; font: 700 20px/1.3 Georgia, serif; letter-spacing: .035em; }
+.header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 18px; padding: 18px 32px; border-bottom: 1px solid #d8d9dc; background: #fff; }
+.header h1 { color: #1c2a44; font: 700 18px/1.4 "Lato", sans-serif; letter-spacing: -.02em; text-transform: none; }
+.back { display: inline-flex; align-items: center; gap: 7px; border: 0; padding: 5px 0 8px; background: none; color: #59647a; font-size: 12px !important; }
+.steps { display: flex; align-items: center; gap: 22px; padding: 0; margin: 0; list-style: none; color: #6d7488; font-size: 12px; }
+.steps li { display: flex; align-items: center; gap: 7px; }
+.steps span { display: grid; width: 24px; height: 24px; place-items: center; border: 1px solid #d8d9dc; border-radius: 50%; font-size: 11px; }
+.steps [aria-current] { color: #1c2a44; font-weight: 700; }
+.steps [aria-current] span { border-color: #1c2a44; background: #1c2a44; color: #fff; }
+.layout { display: grid; grid-template-columns: minmax(0, 790px) 290px; align-items: start; justify-content: center; gap: 28px; max-width: 1240px; margin: auto; padding: 24px 32px 48px; }
+.document { min-width: 0; }
+.toolbar, .tools, .pagination, .pageControls { display: flex; align-items: center; gap: 10px; }
+.toolbar { justify-content: space-between; flex-wrap: wrap; margin-bottom: 12px; color: #59647a; font-size: 12px; }
+.tools { flex-wrap: wrap; }
+.toolbar button, .pagination button, .error button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 1px solid #c9cbd0; border-radius: 2px; padding: 7px 10px; background: #fff; color: #1c2a44; font-size: 12px; }
+.pagination { justify-content: space-between; margin-bottom: 14px; color: #59647a; font-size: 12px; }
+.pagination label { display: flex; align-items: center; gap: 7px; }
+.pagination select { min-width: 90px; border: 1px solid #c9cbd0; background: #fff; padding: 6px; color: #1c2a44; }
+.pageControls { flex: 0 0 auto; }
+.pageControls span { min-width: 52px; text-align: center; }
+.viewport { overflow-x: auto; padding: 1px; }
+.viewport[hidden] { display: none; }
+.paper { position: relative; min-width: 100%; aspect-ratio: 612 / 792; border: 1px solid #d8d9dc; background: #fff; box-shadow: 0 4px 18px #1c2a4410; }
+.canvas { display: block; width: 100%; height: auto; }
+.pendingCanvas { display: none; }
+.placeholder { padding: clamp(22px, 5vw, 46px); overflow-wrap: anywhere; }
+.paperBrand { margin-bottom: 24px !important; padding-bottom: 16px; border-bottom: 2px solid #1c2a44; font-size: 10px; font-weight: 700; letter-spacing: .1em; }
+.placeholder h2, .textPaper h2 { margin-bottom: 20px; font: 400 30px/1.2 Georgia, serif; text-transform: none; }
+.placeholder p { margin: 20px 0; }
+.placeholderTotal { font-size: 28px; }
+.placeholder > p:not(.paperBrand):not(.preparing) { max-height: 120px; overflow: hidden; }
+.preparing { display: flex; align-items: center; gap: 8px; color: #59647a; font-size: 12px; }
+.textPaper { padding: 32px; border: 1px solid #d8d9dc; background: #fff; }
+.agreementContent { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; line-height: 1.8; }
+.textPaper h3 { margin: 25px 0 12px; }
+.textPaper > p { margin: 15px 0; overflow-wrap: anywhere; }
+.signCard { position: sticky; top: 24px; min-width: 0; margin-top: 88px; padding: 23px; border: 1px solid #d8d9dc; background: #fff; }
+.eyebrow { color: #59647a; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; }
+.signCard h2 { margin: 5px 0 12px; font: 700 21px/1.3 "Lato", sans-serif; letter-spacing: -.03em; text-transform: none; }
+.help { color: #59647a; font-size: 12px; line-height: 1.65; }
+.signaturePage { display: inline-flex; align-items: center; gap: 7px; margin: 10px 0 6px; border: 0; padding: 4px 0; background: none; color: #59647a; font-size: 12px !important; }
+.nameLabel { display: block; margin: 18px 0 7px; font-size: 12px; font-weight: 700; }
+.signCard input[type="text"], .signCard input:not([type]) { width: 100%; border: 1px solid #c3c7cf; border-radius: 2px; padding: 11px; color: #1c2a44; background: #fff; }
+.signaturePreview { display: flex; align-items: center; min-height: 82px; margin: 0 0 18px; padding: 8px 0; border-bottom: 1px solid #d8d9dc; font: italic 29px/1.5 "Brush Script MT", "Segoe Script", cursive; overflow-wrap: anywhere; }
+.signaturePreview span { color: #6d7488; font: 12px/1.5 "Lato", sans-serif; }
+.check { display: flex; align-items: flex-start; gap: 8px; margin: 14px 0; font-size: 12px; line-height: 1.65; }
+.check input { flex: 0 0 auto; width: 16px; height: 16px; margin: 3px 0 0; accent-color: #1c2a44; }
+.check a { text-decoration: underline; }
+.total { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-top: 22px; padding-top: 17px; border-top: 1px solid #d8d9dc; }
+.total span { color: #59647a; font-size: 12px; }
+.total strong { font-size: 25px; font-weight: 700; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.submit { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; margin: 12px 0; padding: 13px 12px; border: 1px solid #e7a33c; border-radius: 2px; background: #e7a33c; color: #1c2a44; font-size: 13px !important; font-weight: 700 !important; text-align: center; }
+.submit svg { flex: 0 0 auto; }
+.savedSignature { margin: 22px 0; overflow-wrap: anywhere; }
+.savedSignature p { color: #59647a; font-size: 12px; }
+.savedSignature strong { display: block; margin: 7px 0; font-size: 19px; }
+.error { margin: 12px 0; padding: 12px; background: #fff3ed; color: #8e341f; font-size: 13px; }
+.error p { margin-bottom: 10px; }
+@media (max-width: 900px) {
+  .layout { grid-template-columns: minmax(0, 1fr) 260px; gap: 18px; padding: 20px 18px 40px; }
+  .header { padding: 16px 18px; }
+  .brand { padding: 18px; }
+  .signCard { padding: 19px; margin-top: 130px; }
+}
+@media (max-width: 680px) {
+  .layout { grid-template-columns: minmax(0, 1fr); padding: 16px 12px 32px; }
+  .signCard { position: static; margin-top: 0; padding: 22px; }
+  .header { align-items: flex-start; gap: 12px; }
+  .header h1 { font-size: 17px; }
+  .steps { gap: 18px; }
+  .toolbar { gap: 8px; }
+  .toolbar > span { width: 100%; }
+  .toolbar button, .pagination button { min-height: 44px; }
+  .pagination button { min-width: 44px; padding: 5px; }
+  .pagination select { min-height: 44px; }
+  .pageControls { gap: 5px; }
+  .pageControls span { min-width: 45px; }
+  .pagination label { gap: 5px; font-size: 11px; }
+  .textPaper { padding: 22px 18px; }
+  .signCard input:not([type]) { font-size: 16px; }
+}

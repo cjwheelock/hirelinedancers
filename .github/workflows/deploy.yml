@@ -21,7 +21,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - run: npm ci
       - name: Audit commercial terms
@@ -34,6 +34,8 @@ jobs:
         run: npm run test:auth
       - name: Test instructor and organizer journeys
         run: npm run test:journeys
+      - name: Test booking agreement PDFs
+        run: npm run test:booking-document
       - name: Build static export
         run: npm run build
         env:

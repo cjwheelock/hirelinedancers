@@ -12,12 +12,15 @@
     "audit:static": "node scripts/audit-static-site.mjs",
     "test:approval": "node --test scripts/test-approval-flow.mjs",
     "test:auth": "node --test scripts/test-auth-routing.mjs",
-    "test:journeys": "node --test scripts/test-user-journeys.mjs"
+    "test:journeys": "node --test scripts/test-user-journeys.mjs",
+    "test:booking-document": "node --test scripts/test-booking-document.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.2",
+    "jspdf": "4.2.1",
     "lucide-react": "^0.468.0",
     "next": "^15.5.25",
+    "pdfjs-dist": "6.4.299",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },

@@ -1688,7 +1688,7 @@
 .inboxLayout {
   display: grid;
   min-height: 660px;
-  grid-template-columns: minmax(280px, 350px) minmax(0, 1fr);
+  grid-template-columns: minmax(220px, 270px) minmax(0, 1fr);
   overflow: hidden;
   border: 2px solid #1c2a44;
   background: #fff;
@@ -1836,23 +1836,26 @@
 .threadBody {
   display: grid;
   min-height: 590px;
-  grid-template-columns: minmax(205px, 250px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .eventSummary {
-  padding: 20px;
-  border-right: 1px solid #c6c8d0;
+  min-width: 0;
+  padding: 16px 24px;
+  border-bottom: 1px solid #c6c8d0;
   background: #fbfaf5;
 }
 
 .eventSummary h3 {
-  margin: 0 0 14px;
+  margin: 0 0 12px;
+  font-size: 0.8rem;
 }
 
 .eventSummary dl {
   display: grid;
-  gap: 12px;
-  margin: 0 0 18px;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px 20px;
+  margin: 0;
 }
 
 .eventSummary dl > div {
@@ -1869,11 +1872,17 @@
 
 .eventSummary dd {
   margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .eventSummary > .dangerButton {
-  width: 100%;
-  margin-top: 18px;
+  width: auto;
+  margin-top: 12px;
+}
+
+.eventSummary > a {
+  display: inline-flex;
+  margin: 12px 18px 0 0;
 }
 
 .conversationColumn {
@@ -2283,7 +2292,10 @@
     padding: 18px;
   }
 
-  .eventSummary dl,
+  .eventSummary dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .adminThreadTools {
     grid-template-columns: 1fr;
   }
@@ -2537,3 +2549,24 @@
 .savedEventDetails dt { color: #57607a; }
 .savedEventDetails dd { margin: 0; overflow-wrap: anywhere; }
 @media (max-width: 480px) { .recommendations { padding: 14px; } .savedEventDetails div { grid-template-columns: 1fr; gap: 3px; } }
+
+
+/* Organizer quote summary, with the agreement opened in its own document view. */
+.organizerQuote { margin: 24px; border: 1px solid #d8d9dc; border-top: 3px solid #1c2a44; background: #fff; }
+.organizerQuote .bookingHeader h3 { font: 400 25px/1.25 Georgia, serif; }
+.bookingHeaderAside { display: grid; justify-items: end; gap: 4px; }
+.bookingHeaderAside > .muted { font-size: 12px; }
+.quoteTotal { font-size: 30px; line-height: 1.2; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+.quoteDescription { margin: 0; color: #3f4b66; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.quoteWhen { margin: 0; color: #59647a; font-size: 12px; }
+.quoteFacts { display: flex; flex-wrap: wrap; gap: 16px 28px; margin: 10px 0 0; padding: 16px 0; border-top: 1px solid #d8d9dc; border-bottom: 1px solid #d8d9dc; }
+.quoteFacts dt { margin-bottom: 5px; color: #59647a; font-size: 12px; }
+.quoteFacts dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; }
+.quoteReviewButton { border-color: #e7a33c; background: #e7a33c; color: #1c2a44; }
+.quoteReviewButton:hover:not(:disabled) { border-color: #d99630; background: #d99630; color: #1c2a44; }
+@media (max-width: 720px) {
+  .organizerQuote { margin: 16px; }
+  .organizerQuote .bookingHeader { flex-direction: row; flex-wrap: wrap; }
+  .bookingHeaderAside { justify-items: start; }
+  .eventSummary { padding: 16px; }
+}

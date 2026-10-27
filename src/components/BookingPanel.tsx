@@ -25,6 +25,7 @@ import {
   type ThreadBookingState
 } from "@/lib/booking";
 import { getMarketplaceClient, type InstructorSocialLinks, type ProfilePackage } from "@/lib/marketplace";
+import { BookingAgreementReview } from "./BookingAgreementReview";
 import styles from "./Marketplace.module.css";
 
 const timeZones = [
@@ -141,6 +142,7 @@ export function BookingPanel({
 
   const booking = state.booking;
   const role = state.role;
+  const compactQuote = role === "organizer" && booking && ["quote_sent", "awaiting_payment"].includes(booking.status);
   const open = booking ? openBookingStatuses.includes(booking.status) : false;
   const canQuote = role === "instructor"
     && state.is_current_assignment
@@ -149,14 +151,14 @@ export function BookingPanel({
   const nextStep = nextStepText(state);
 
   return (
-    <section className={styles.bookingPanel} aria-label="Booking">
+    <section className={`${styles.bookingPanel} ${compactQuote ? styles.organizerQuote : ""}`} aria-label="Booking">
       <header className={styles.bookingHeader}>
         <div>
           <p className={styles.eyebrow}><CalendarCheck aria-hidden="true" size={15} /> Booking</p>
-          <h3>{booking ? `${money(booking.total_cents)} · ${displayDate(booking.event_date)}` : "No quote yet"}</h3>
+          <h3>{compactQuote ? "Booking agreement" : booking ? `${money(booking.total_cents)} · ${displayDate(booking.event_date)}` : "No quote yet"}</h3>
           {nextStep ? <p className={styles.bookingNext}>{nextStep}</p> : null}
         </div>
-        {booking ? <span className={`${styles.status} ${styles[`booking_${booking.status}`] ?? ""}`}>{bookingStatusLabels[booking.status]}</span> : null}
+        {booking ? <div className={styles.bookingHeaderAside}>{compactQuote ? <><span className={styles.muted}>Total</span><strong className={styles.quoteTotal}>{money(booking.total_cents)}</strong></> : null}<span className={`${styles.status} ${styles[`booking_${booking.status}`] ?? ""}`}>{bookingStatusLabels[booking.status]}</span></div> : null}
       </header>
 
       {confirmingPayment ? <p className={styles.notice} role="status">Payment received by Stripe. Confirming your booking...</p> : null}
@@ -172,6 +174,7 @@ export function BookingPanel({
 
       {booking ? <BookingSummary booking={booking} role={role} showAgreement={showAgreement} onToggleAgreement={() => setShowAgreement((value) => !value)} /> : null}
       {booking?.paid_at && role === "organizer" ? <InstructorLinks threadId={threadId} /> : null}
+      {showAgreement && booking && panel !== "review" ? <BookingAgreementReview booking={booking} onClose={() => setShowAgreement(false)} /> : null}
 
       <div className={styles.buttonRow}>
         {canQuote && state.payouts_ready ? (
@@ -188,7 +191,7 @@ export function BookingPanel({
         ) : null}
         {role === "organizer" && booking?.status === "quote_sent" ? (
           <>
-            <button className={styles.button} type="button" disabled={busy !== null} onClick={() => setPanel(panel === "review" ? "none" : "review")}>
+            <button className={`${styles.button} ${styles.quoteReviewButton}`} type="button" disabled={busy !== null} onClick={() => setPanel("review")}>
               <FileSignature aria-hidden="true" size={17} /> Review, sign, and pay
             </button>
             <button className={styles.dangerButton} type="button" disabled={busy !== null} onClick={() => void run("decline", async () => {
@@ -238,10 +241,11 @@ export function BookingPanel({
       ) : null}
 
       {panel === "review" && booking ? (
-        <SignForm
+        <BookingAgreementReview
           booking={booking}
           busy={busy === "sign"}
-          onCancel={() => setPanel("none")}
+          error={error}
+          onClose={() => setPanel("none")}
           onSubmit={(typedName) => void run("sign", async () => {
             const result = await invokeBookingFunction<{ url?: string }>("booking-checkout", {
               bookingId: booking.id,
@@ -304,11 +308,20 @@ function BookingSummary({
   showAgreement: boolean;
   onToggleAgreement: () => void;
 }) {
+  const compact = role === "organizer" && ["quote_sent", "awaiting_payment"].includes(booking.status);
   const instructorSignature = booking.signatures.find((signature) => signature.party_role === "instructor");
   const organizerSignature = booking.signatures.find((signature) => signature.party_role === "organizer");
   return (
     <div className={styles.bookingSummary}>
-      <dl className={styles.bookingFacts}>
+      {compact ? <>
+        <p className={styles.quoteDescription}>{booking.service_description}</p>
+        <p className={styles.quoteWhen}>{displayDate(booking.event_date)}, {displayTime(booking.start_time)} to {displayTime(booking.end_time)} ({booking.time_zone})</p>
+        <dl className={styles.quoteFacts}>
+          <div><dt>Instructor price</dt><dd>{money(booking.price_cents)}</dd></div>
+          <div><dt>Service fee ({clientFeeLabel})</dt><dd>{money(booking.client_fee_cents)}</dd></div>
+          <div><dt>Cancellation</dt><dd>{booking.cancellation_policy === "standard" ? "Standard" : "Custom"}</dd></div>
+        </dl>
+      </> : <dl className={styles.bookingFacts}>
         <div><dt>When</dt><dd>{displayDate(booking.event_date)}, {displayTime(booking.start_time)} to {displayTime(booking.end_time)}</dd></div>
         <div><dt>Where</dt><dd>{booking.venue_name ? `${booking.venue_name}, ` : ""}{booking.venue_address}</dd></div>
         <div><dt>Services</dt><dd>{booking.service_description}</dd></div>
@@ -333,7 +346,7 @@ function BookingSummary({
         {booking.refund_cents ? <div><dt>Refund</dt><dd>{money(booking.refund_cents)} ({booking.refund_status === "succeeded" ? "issued" : booking.refund_status === "failed" ? "retrying" : "processing"})</dd></div> : null}
         {booking.problem_details ? <div><dt>Reported problem</dt><dd>{booking.problem_details}</dd></div> : null}
         {booking.close_reason && ["declined", "cancelled"].includes(booking.status) ? <div><dt>Reason</dt><dd>{booking.close_reason}</dd></div> : null}
-      </dl>
+      </dl>}
 
       {booking.contacts ? (
         <div className={styles.bookingContacts}>
@@ -349,7 +362,6 @@ function BookingSummary({
         {!booking.paid_at && organizerSignature ? "The agreement takes effect when payment succeeds." : ""}
       </p>
       <button className={styles.linkButton} type="button" onClick={onToggleAgreement}>{showAgreement ? "Hide the full agreement" : "Read the full agreement"}</button>
-      {showAgreement ? <pre className={styles.agreementText}>{booking.agreement_text}</pre> : null}
     </div>
   );
 }
@@ -591,32 +603,6 @@ export function WindowsEditor({ windows, onChange }: { windows: CancellationWind
       ) : null}
       <p className={styles.help}>{validCancellationWindows(windows) ? `Preview: ${cancellationLines(windows).join("; ")}.` : "List windows from the earliest cancellation to the latest. Refunds can stay the same or go down, never up."}</p>
     </div>
-  );
-}
-
-function SignForm({ booking, busy, onCancel, onSubmit }: { booking: Booking; busy: boolean; onCancel: () => void; onSubmit: (typedName: string) => void }) {
-  const [typedName, setTypedName] = useState("");
-  const [agreed, setAgreed] = useState(false);
-  const [reviewed, setReviewed] = useState(false);
-  return (
-    <form className={styles.bookingForm} onSubmit={(event) => { event.preventDefault(); if (agreed && reviewed) onSubmit(typedName); }}>
-      <h4>Review, sign, and pay</h4>
-      <p className={styles.help}>Read the agreement below. When you sign, you go straight to secure payment of <strong>{money(booking.total_cents)}</strong>. The agreement takes effect only when the payment succeeds.</p>
-      <pre className={styles.agreementText} onScroll={(event) => {
-        const target = event.currentTarget;
-        if (target.scrollTop + target.clientHeight >= target.scrollHeight - 24) setReviewed(true);
-      }}>{booking.agreement_text}</pre>
-      {!reviewed ? (
-        <button className={styles.linkButton} type="button" onClick={() => setReviewed(true)}>I have read the agreement</button>
-      ) : null}
-      <label className={styles.field}><span>Type your full name to sign</span><input required minLength={2} maxLength={120} autoComplete="name" value={typedName} onChange={(event) => setTypedName(event.target.value)} /></label>
-      <label className={styles.check}><input type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} /> <span>I agree to this booking agreement and the <a href="/legal/terms/" target="_blank" rel="noreferrer">Terms of Service</a>, and I am signing electronically.</span></label>
-      <p className={styles.help}>Bank transfer is offered when the event is at least {bookingTerms.achMinimumBusinessDays} business days away. Closer events are card only.</p>
-      <div className={styles.buttonRow}>
-        <button className={styles.button} type="submit" disabled={busy || !agreed || !reviewed || typedName.trim().length < 2}>{busy ? "Opening payment..." : `Sign and pay ${money(booking.total_cents)}`}</button>
-        <button className={styles.secondaryButton} type="button" onClick={onCancel} disabled={busy}>Not now</button>
-      </div>
-    </form>
   );
 }
 
