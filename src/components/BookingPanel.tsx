@@ -534,9 +534,6 @@ function QuoteForm({
           )}
           <label className={styles.field}><span>Travel fee ($, optional)</span><input type="number" min="0" max="2000" step="0.01" value={form.travelFee} onChange={(event) => set("travelFee", event.target.value)} /></label>
         </div>
-        {amounts ? (
-          <p className={styles.bookingMoney}>The organizer pays <strong>{money(amounts.totalCents)}</strong> ({money(amounts.priceCents)} plus a {clientFeeLabel} service fee). You receive <strong>{money(amounts.instructorPayoutCents)}</strong> after the {instructorFeeLabel} platform fee, {bookingTerms.payoutDelayHours} hours after the event.</p>
-        ) : null}
         {defaults.minimum_hours && form.pricingMode === "hourly" && Number(form.hours) < defaults.minimum_hours ? (
           <p className={styles.help}>This is below your usual {defaults.minimum_hours}-hour minimum.</p>
         ) : null}
