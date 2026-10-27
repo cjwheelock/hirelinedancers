@@ -1,9 +1,9 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { AlertCircle, CheckCircle2, LoaderCircle, Mail, MailCheck, RotateCcw } from "lucide-react";
-import { eventTypes, serviceMarkets } from "@/data/site";
+import { eventTypes } from "@/data/site";
 import {
   approvalEmailNeedsAttention,
   approvalEmailStatusCopy,
@@ -26,7 +26,7 @@ import {
   profileSubmissionWindow
 } from "@/lib/commercialTerms";
 import { useMarketplaceSession } from "@/hooks/useMarketplaceSession";
-import { ImageCropDialog } from "./ImageCropDialog";
+import { ProfileEditor } from "./ProfileEditor";
 import { InquiryInbox } from "./InquiryInbox";
 import { MembershipCreditAdmin } from "./MembershipCreditAdmin";
 import { PayoutsCard } from "./PayoutsCard";
@@ -51,15 +51,6 @@ import {
 } from "@/lib/marketplace";
 import styles from "./Marketplace.module.css";
 
-const danceStyles = [
-  "Country line dancing",
-  "Country swing",
-  "Soul line dancing",
-  "Pop line dancing",
-  "Latin line dancing",
-  "Beginner group instruction"
-];
-
 type ProfileMedia = {
   id: string;
   instructor_profile_id: string;
@@ -71,6 +62,7 @@ type ProfileMedia = {
   alt_text: string | null;
   status: string;
   sort_order: number;
+  embed_provider?: string | null;
 };
 
 type InstructorTab = "profile" | "inquiries" | "payouts" | "membership";
@@ -1064,7 +1056,7 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
       ) : null}
       {profile ? (
         <div hidden={tab !== "profile"}>
-          <InstructorProfileForm key={profile.id} profile={profile} settings={settings} hasLifetimeAccess={hasLifetimeAccess} onSaved={() => void load(true)} />
+          <ProfileEditor key={profile.id} profile={profile} settings={settings} hasLifetimeAccess={hasLifetimeAccess} onSaved={() => void load(true)} describeEdgeError={edgeFunctionError} />
         </div>
       ) : null}
       {!loading && tab === "inquiries" ? (
@@ -1099,594 +1091,6 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
         </div>
       ) : null}
     </>
-  );
-}
-
-function InstructorProfileForm({
-  profile,
-  settings,
-  hasLifetimeAccess,
-  onSaved
-}: {
-  profile: InstructorProfile;
-  settings: InstructorPrivateSettings | null;
-  hasLifetimeAccess: boolean | null;
-  onSaved: () => void;
-}) {
-  const [form, setForm] = useState({
-    display_name: profile.display_name,
-    business_name: profile.business_name ?? "",
-    headline: profile.headline ?? "",
-    bio: profile.bio ?? "",
-    city: profile.city ?? "",
-    region: profile.region ?? "",
-    postal_code: profile.postal_code ?? "",
-    travel_radius_miles: profile.travel_radius_miles?.toString() ?? "",
-    years_teaching: profile.years_teaching?.toString() ?? "",
-    max_group_size: profile.max_group_size?.toString() ?? "",
-    styles: profile.styles,
-    event_types: profile.event_types,
-    favorite_song_name: profile.favorite_song_name ?? "",
-    favorite_song_spotify_url: profile.favorite_song_spotify_url ?? "",
-    provides_speakers: profile.provides_speakers ?? false,
-    provides_microphone: profile.provides_microphone ?? false,
-    provides_music_playback: profile.provides_music_playback ?? false,
-    liability_insurance_status: profile.liability_insurance_status,
-    preferred_response_hours: profile.preferred_response_hours.toString(),
-    inquiry_email: settings?.inquiry_email ?? "",
-    minimum_rate: settings?.minimum_rate_cents ? (settings.minimum_rate_cents / 100).toString() : "",
-    minimum_hours: settings?.minimum_hours?.toString() ?? ""
-  });
-  const [busy, setBusy] = useState<"save" | "continue" | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const paymentSetupRequestKey = useRef<string | null>(null);
-
-  function setValue<Key extends keyof typeof form>(key: Key, value: (typeof form)[Key]) {
-    setForm((current) => ({ ...current, [key]: value }));
-  }
-
-  function toggleArray(key: "styles" | "event_types", value: string) {
-    setForm((current) => ({
-      ...current,
-      [key]: current[key].includes(value)
-        ? current[key].filter((item) => item !== value)
-        : [...current[key], value]
-    }));
-  }
-
-  async function save(continueToSubmission: boolean) {
-    const client = getMarketplaceClient();
-    if (!client) return;
-    if (continueToSubmission && (!form.display_name.trim() || !form.bio.trim() || !form.city.trim() || !form.region.trim() || !form.event_types.length)) {
-      setError("Add your public name, bio, location, and at least one event type before continuing.");
-      return;
-    }
-    if (continueToSubmission && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.inquiry_email.trim())) {
-      setError("A valid inquiry email is required before continuing.");
-      return;
-    }
-
-    setBusy(continueToSubmission ? "continue" : "save");
-    setError(null);
-    setMessage(null);
-
-    if (continueToSubmission) {
-      const { data: readyHeadshots, error: headshotError } = await client
-        .from("profile_media")
-        .select("id")
-        .eq("instructor_profile_id", profile.id)
-        .eq("media_type", "headshot")
-        .eq("status", "ready")
-        .limit(1);
-      if (headshotError) {
-        setError(headshotError.message);
-        setBusy(null);
-        return;
-      }
-      if (!readyHeadshots?.length) {
-        setError("Upload a main headshot and wait for it to be ready before continuing.");
-        setBusy(null);
-        return;
-      }
-    }
-
-    const profilePayload = {
-      display_name: form.display_name.trim(),
-      business_name: form.business_name.trim() || null,
-      headline: form.headline.trim() || null,
-      bio: form.bio.trim() || null,
-      city: form.city.trim() || null,
-      region: form.region.trim().toUpperCase() || null,
-      postal_code: form.postal_code.trim() || null,
-      travel_radius_miles: form.travel_radius_miles ? Number(form.travel_radius_miles) : null,
-      years_teaching: form.years_teaching ? Number(form.years_teaching) : null,
-      max_group_size: form.max_group_size ? Number(form.max_group_size) : null,
-      styles: form.styles,
-      event_types: form.event_types,
-      favorite_song_name: form.favorite_song_name.trim() || null,
-      favorite_song_spotify_url: form.favorite_song_spotify_url.trim() || null,
-      provides_speakers: form.provides_speakers,
-      provides_microphone: form.provides_microphone,
-      provides_music_playback: form.provides_music_playback,
-      liability_insurance_status: form.liability_insurance_status,
-      preferred_response_hours: Number(form.preferred_response_hours),
-      status: profile.status
-    };
-
-    const { error: settingsError } = await client.from("instructor_private_settings").upsert({
-      instructor_profile_id: profile.id,
-      inquiry_email: form.inquiry_email.trim(),
-      inquiry_phone_e164: null,
-      sms_notifications_enabled: false,
-      minimum_rate_cents: form.minimum_rate ? Math.round(Number(form.minimum_rate) * 100) : null,
-      minimum_hours: form.minimum_hours ? Number(form.minimum_hours) : null
-    });
-    if (settingsError) {
-      setError(settingsError.message);
-      setBusy(null);
-      return;
-    }
-
-    const { error: profileError } = await client.from("instructor_profiles").update(profilePayload).eq("id", profile.id);
-    if (profileError) {
-      setError(profileError.message);
-      setBusy(null);
-      return;
-    }
-
-    if (!continueToSubmission) {
-      setBusy(null);
-      setMessage("Your profile changes are saved.");
-      onSaved();
-      return;
-    }
-
-    if (hasLifetimeAccess === null) {
-      setBusy(null);
-      setError("We could not verify your instructor access. Refresh the page before continuing.");
-      return;
-    }
-
-    if (hasLifetimeAccess) {
-      const { error: submissionError } = await client.rpc("submit_lifetime_instructor_profile_for_review");
-      setBusy(null);
-      if (submissionError) {
-        setError(submissionError.message);
-        return;
-      }
-      setMessage("Your profile was submitted. We’ll review it ASAP.");
-      onSaved();
-      return;
-    }
-
-    if (settings?.payment_setup_completed_at) {
-      const { data: resubmissionData, error: resubmissionError } = await client.rpc("resubmit_instructor_profile_after_payment_setup");
-      setBusy(null);
-      if (resubmissionError) {
-        setError(resubmissionError.message.includes("A verified payment setup is required before resubmitting")
-          ? "We could not verify your saved payment method. Refresh the page and try again. If this continues, contact support. You will not be asked to enter your card again unless a replacement is required."
-          : resubmissionError.message);
-        return;
-      }
-      if (resubmissionData?.profileStatus !== "pending_review") {
-        setError("Your updated profile could not be resubmitted for review. Refresh the page and try again.");
-        return;
-      }
-      setMessage("Your saved payment method is confirmed. Your updated profile was resubmitted. We’ll review it ASAP.");
-      onSaved();
-      return;
-    }
-
-    paymentSetupRequestKey.current ??= crypto.randomUUID();
-    const { data, error: setupError } = await client.functions.invoke("create-instructor-payment-setup", {
-      body: { instructorProfileId: profile.id },
-      headers: { "Idempotency-Key": paymentSetupRequestKey.current }
-    });
-    if (setupError) {
-      setBusy(null);
-      setError(await edgeFunctionError(setupError));
-      return;
-    }
-    if (!data?.url || typeof data.url !== "string") {
-      setBusy(null);
-      setError("Stripe payment setup did not return a secure link.");
-      return;
-    }
-    window.location.assign(data.url);
-  }
-
-  const canEdit = ["draft", "approved", "published"].includes(profile.status);
-  const canContinue = profile.status === "draft";
-  const allEventTypesSelected = eventTypes.every((item) => form.event_types.includes(item.slug));
-
-  function selectMarket(slug: string) {
-    const market = serviceMarkets.find((item) => item.slug === slug);
-    if (!market) return;
-    setForm((current) => ({ ...current, city: market.city, region: market.state }));
-  }
-
-  function toggleAllEventTypes() {
-    setForm((current) => ({
-      ...current,
-      event_types: allEventTypesSelected ? [] : eventTypes.map((item) => item.slug)
-    }));
-  }
-
-  return (
-    <div className={`${styles.card} ${styles.stack}`}>
-      <div className={styles.buttonRow}>
-        <span className={styles.status}>{profile.status.replace("_", " ")}</span>
-        {profile.status === "pending_review" ? <span className={styles.muted}>Your profile is under review.</span> : null}
-      </div>
-      {!canEdit ? <p className={styles.notice}>Editing is paused while your profile is in review or suspended.</p> : null}
-
-      <div className={`${styles.grid} ${styles.alignedGrid}`}>
-        <label className={styles.field}>
-          <span>Public name</span>
-          <input disabled={!canEdit} required value={form.display_name} onChange={(e) => setValue("display_name", e.target.value)} />
-        </label>
-        <label className={styles.field}>
-          <span>Business name</span>
-          <input disabled={!canEdit} value={form.business_name} onChange={(e) => setValue("business_name", e.target.value)} />
-        </label>
-      </div>
-      <label className={styles.field}>
-        <span>About you</span>
-        <textarea disabled={!canEdit} maxLength={2000} value={form.bio} onChange={(e) => setValue("bio", e.target.value)} />
-      </label>
-
-      <ProfileMediaManager profile={profile} />
-
-      <div className={`${styles.grid} ${styles.alignedGrid}`}>
-        <label className={styles.field}>
-          <span>City</span>
-          <input
-            disabled={!canEdit}
-            required
-            list="instructor-city-suggestions"
-            autoComplete="address-level2"
-            maxLength={120}
-            value={form.city}
-            onChange={(e) => {
-              const value = e.target.value;
-              const market = serviceMarkets.find((item) => `${item.city}, ${item.state}` === value);
-              if (market) selectMarket(market.slug);
-              else setValue("city", value);
-            }}
-          />
-          <datalist id="instructor-city-suggestions">
-            {serviceMarkets.map((market) => (
-              <option key={market.slug} value={`${market.city}, ${market.state}`} />
-            ))}
-          </datalist>
-        </label>
-        <label className={styles.field}>
-          <span>State</span>
-          <input
-            disabled={!canEdit}
-            required
-            autoComplete="address-level1"
-            maxLength={2}
-            placeholder="TX"
-            value={form.region}
-            onChange={(e) => setValue("region", e.target.value.toUpperCase().replace(/[^A-Z]/g, ""))}
-          />
-        </label>
-        <label className={styles.field}>
-          <span>ZIP code</span>
-          <input disabled={!canEdit} value={form.postal_code} onChange={(e) => setValue("postal_code", e.target.value)} />
-        </label>
-        <label className={styles.field}>
-          <span>Travel radius in miles</span>
-          <input disabled={!canEdit} type="number" min="0" max="1000" value={form.travel_radius_miles} onChange={(e) => setValue("travel_radius_miles", e.target.value)} />
-        </label>
-      </div>
-
-      <fieldset className={styles.stack} disabled={!canEdit}>
-        <legend className={styles.legend}>What do you teach?</legend>
-        <div className={styles.checkGrid}>
-          {danceStyles.map((item) => (
-            <label className={styles.check} key={item}>
-              <input type="checkbox" checked={form.styles.includes(item)} onChange={() => toggleArray("styles", item)} />
-              <span>{item}</span>
-            </label>
-          ))}
-        </div>
-      </fieldset>
-
-      <fieldset className={styles.stack} disabled={!canEdit}>
-        <legend className={styles.legend}>Events you accept</legend>
-        <div className={styles.checkGrid}>
-          <label className={`${styles.check} ${styles.selectAllCheck}`}>
-            <input type="checkbox" checked={allEventTypesSelected} onChange={toggleAllEventTypes} />
-            <span>Select all event types</span>
-          </label>
-          {eventTypes.map((item) => (
-            <label className={styles.check} key={item.slug}>
-              <input type="checkbox" checked={form.event_types.includes(item.slug)} onChange={() => toggleArray("event_types", item.slug)} />
-              <span>{item.label}</span>
-            </label>
-          ))}
-        </div>
-      </fieldset>
-
-      <div className={`${styles.grid} ${styles.alignedGrid}`}>
-        <label className={styles.field}>
-          <span>Favorite line dance song</span>
-          <input disabled={!canEdit} value={form.favorite_song_name} onChange={(e) => setValue("favorite_song_name", e.target.value)} />
-        </label>
-        <label className={styles.field}>
-          <span>Spotify track link</span>
-          <input disabled={!canEdit} type="url" value={form.favorite_song_spotify_url} onChange={(e) => setValue("favorite_song_spotify_url", e.target.value)} placeholder="https://open.spotify.com/track/..." />
-        </label>
-      </div>
-
-      <fieldset className={styles.stack} disabled={!canEdit}>
-        <legend className={styles.legend}>Equipment you can provide</legend>
-        <div className={styles.checkGrid}>
-          <label className={styles.check}><input type="checkbox" checked={form.provides_speakers} onChange={(e) => setValue("provides_speakers", e.target.checked)} /><span>Speakers</span></label>
-          <label className={styles.check}><input type="checkbox" checked={form.provides_microphone} onChange={(e) => setValue("provides_microphone", e.target.checked)} /><span>Microphone</span></label>
-          <label className={styles.check}><input type="checkbox" checked={form.provides_music_playback} onChange={(e) => setValue("provides_music_playback", e.target.checked)} /><span>Music playback setup (iPhone, laptop, etc.)</span></label>
-        </div>
-      </fieldset>
-
-      <div className={`${styles.grid} ${styles.alignedGrid}`}>
-        <label className={styles.field}>
-          <span>Liability insurance</span>
-          <select disabled={!canEdit} value={form.liability_insurance_status} onChange={(e) => setValue("liability_insurance_status", e.target.value as typeof form.liability_insurance_status)}>
-            <option value="not_provided">Not currently available</option>
-            <option value="available">I can provide a certificate</option>
-            <option value="required_per_event">I arrange it when required</option>
-          </select>
-        </label>
-        <label className={styles.field}>
-          <span>Typical response time</span>
-          <select disabled={!canEdit} value={form.preferred_response_hours} onChange={(e) => setValue("preferred_response_hours", e.target.value)}>
-            <option value="24">Within 24 hours</option>
-            <option value="48">Within 48 hours</option>
-            <option value="72">Within 72 hours</option>
-          </select>
-        </label>
-      </div>
-
-      <h3>Private inquiry and pricing settings</h3>
-      <p className={styles.help}>These details are not displayed on your public profile.</p>
-      <div className={`${styles.grid} ${styles.alignedGrid}`}>
-        <label className={styles.field}>
-          <span>Verified inquiry email</span>
-          <input disabled type="email" value={form.inquiry_email} />
-          <small>Inquiry alerts go to the email verified through your account sign-in.</small>
-        </label>
-        <label className={styles.field}>
-          <span>Typical minimum rate in dollars</span>
-          <input disabled={!canEdit} type="number" min="0" step="1" value={form.minimum_rate} onChange={(e) => setValue("minimum_rate", e.target.value)} />
-        </label>
-        <label className={styles.field}>
-          <span>Minimum booking hours</span>
-          <input disabled={!canEdit} type="number" min="0.5" max="24" step="0.5" value={form.minimum_hours} onChange={(e) => setValue("minimum_hours", e.target.value)} />
-        </label>
-      </div>
-
-      {message ? <p className={styles.success}>{message}</p> : null}
-      {error ? <p className={styles.error}>{error}</p> : null}
-      {canContinue && hasLifetimeAccess === false ? (
-        <div className={styles.stack}>
-          {settings?.payment_setup_completed_at ? (
-            <p className={styles.help}>Your payment method is already saved securely. Choose Continue to resubmit your updated profile without entering your card again. No subscription will start and your card will not be charged while your profile is under review. If approved, your membership starts automatically.</p>
-          ) : (
-            <>
-              <p className={styles.help}>Stripe will save your card securely. No subscription will start and your card will not be charged before your profile is approved. If approved, your membership starts automatically. The {foundingOfferLabel} who complete payment setup receive {freePeriod} free, then the membership renews at {monthlyPriceWithCurrency} per month until canceled. The {guaranteeCoverage} money-back guarantee begins when Stripe collects your first membership payment.</p>
-              <p className={styles.muted}>By continuing, you agree to the <a href="/legal/terms/">Terms of Service</a>, acknowledge the <a href="/legal/privacy/">Privacy Policy</a> and <a href="/legal/refund-policy/">Refund Policy</a>, and authorize Hire Line Dancers to start your membership automatically only if your profile is approved.</p>
-            </>
-          )}
-        </div>
-      ) : null}
-      {canContinue && hasLifetimeAccess ? <p className={styles.help}>Joining is free and does not require a payment method. Continue to submit your completed profile for review. You will set up payouts before sending your first quote.</p> : null}
-      {canEdit ? (
-        <div className={styles.buttonRow}>
-          <button className={styles.secondaryButton} type="button" disabled={busy !== null} onClick={() => void save(false)}>
-            {busy === "save" ? "Saving..." : profile.status === "draft" ? "Save draft" : "Save changes"}
-          </button>
-          {canContinue ? (
-            <button className={styles.button} type="button" disabled={busy !== null || hasLifetimeAccess === null} onClick={() => void save(true)}>
-              {busy === "continue" ? hasLifetimeAccess || settings?.payment_setup_completed_at ? "Submitting..." : "Opening secure payment setup..." : "Continue"}
-            </button>
-          ) : null}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function ProfileMediaManager({ profile }: { profile: InstructorProfile }) {
-  const [media, setMedia] = useState<ProfileMedia[]>([]);
-  const [uploadType, setUploadType] = useState<ProfileMedia["media_type"]>("headshot");
-  const [pendingCrop, setPendingCrop] = useState<{ file: File; mediaType: "headshot" | "image" } | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  async function load() {
-    const client = getMarketplaceClient();
-    if (!client) return;
-    const { data, error: loadError } = await client
-      .from("profile_media")
-      .select("id,media_type,storage_path,external_url,caption,status,sort_order")
-      .eq("instructor_profile_id", profile.id)
-      .order("sort_order");
-    if (loadError) setError(loadError.message);
-    setMedia((data as ProfileMedia[] | null) ?? []);
-  }
-
-  useEffect(() => {
-    void load();
-  }, [profile.id]);
-
-  async function uploadFile(file: File, mediaType: ProfileMedia["media_type"]) {
-    const client = getMarketplaceClient();
-    if (!client) return "Uploads are unavailable right now.";
-
-    setBusy(true);
-    setError(null);
-    const safeName = file.name.toLowerCase().replace(/[^a-z0-9.]+/g, "-");
-    const path = `${profile.account_id}/${profile.id}/${crypto.randomUUID()}-${safeName}`;
-    const { error: uploadError } = await client.storage.from("instructor-media").upload(path, file, {
-      cacheControl: "3600",
-      contentType: file.type,
-      upsert: false
-    });
-    if (uploadError) {
-      setError(uploadError.message);
-      setBusy(false);
-      return uploadError.message;
-    }
-
-    const { error: metadataError } = await client.from("profile_media").insert({
-      instructor_profile_id: profile.id,
-      media_type: mediaType,
-      storage_path: path,
-      mime_type: file.type,
-      status: "ready",
-      sort_order: media.length
-    });
-    if (metadataError) {
-      await client.storage.from("instructor-media").remove([path]);
-      setError(metadataError.message);
-      setBusy(false);
-      return metadataError.message;
-    }
-    setBusy(false);
-    await load();
-    return null;
-  }
-
-  async function chooseFile(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    const isVideo = uploadType === "video" || uploadType === "welcome_video";
-    const allowedTypes = isVideo ? ["video/mp4", "video/webm"] : ["image/jpeg", "image/png", "image/webp"];
-    const maximumBytes = isVideo ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
-    if (file.size > maximumBytes) {
-      setError(isVideo ? "Videos must be 50 MB or smaller." : "Images must be 10 MB or smaller.");
-      event.target.value = "";
-      return;
-    }
-    if (!allowedTypes.includes(file.type)) {
-      setError(isVideo ? "Choose an MP4 or WebM video." : "Choose a JPG, PNG, or WebP image.");
-      event.target.value = "";
-      return;
-    }
-
-    setError(null);
-    if (!isVideo) {
-      setPendingCrop({ file, mediaType: uploadType });
-      return;
-    }
-
-    event.target.value = "";
-    await uploadFile(file, uploadType);
-  }
-
-  function cancelCrop() {
-    setPendingCrop(null);
-    if (fileInputRef.current) fileInputRef.current.value = "";
-    requestAnimationFrame(() => fileInputRef.current?.focus());
-  }
-
-  async function uploadCrop(file: File) {
-    if (!pendingCrop) return;
-    const uploadError = await uploadFile(file, pendingCrop.mediaType);
-    if (uploadError) throw new Error(uploadError);
-    setPendingCrop(null);
-    if (fileInputRef.current) fileInputRef.current.value = "";
-    requestAnimationFrame(() => fileInputRef.current?.focus());
-  }
-
-  async function remove(item: ProfileMedia) {
-    const client = getMarketplaceClient();
-    if (!client) return;
-    setBusy(true);
-    setError(null);
-    if (item.storage_path) {
-      const { error: storageError } = await client.storage.from("instructor-media").remove([item.storage_path]);
-      if (storageError) {
-        setError(storageError.message);
-        setBusy(false);
-        return;
-      }
-    }
-    const { error: metadataError } = await client.from("profile_media").delete().eq("id", item.id);
-    if (metadataError) setError(metadataError.message);
-    setBusy(false);
-    await load();
-  }
-
-  function mediaUrl(item: ProfileMedia) {
-    if (item.external_url) return item.external_url;
-    const client = getMarketplaceClient();
-    if (!client || !item.storage_path) return "";
-    return client.storage.from("instructor-media").getPublicUrl(item.storage_path).data.publicUrl;
-  }
-
-  return (
-    <section className={`${styles.profileMediaSection} ${styles.stack}`} aria-labelledby="profile-media-heading">
-      <div>
-        <h2 id="profile-media-heading">Profile photos and videos</h2>
-        <p className={styles.muted}>Add one headshot, up to three teaching photos, one welcome video, and up to three additional videos.</p>
-      </div>
-      <div className={styles.grid}>
-        <label className={styles.field}>
-          <span>Media type</span>
-          <select value={uploadType} onChange={(event) => setUploadType(event.target.value as ProfileMedia["media_type"])}>
-            <option value="headshot">Main headshot</option>
-            <option value="image">Teaching photo</option>
-            <option value="welcome_video">Welcome video</option>
-            <option value="video">Dancing or teaching video</option>
-          </select>
-        </label>
-        <label className={styles.field}>
-          <span>{busy ? "Uploading..." : "Choose a file"}</span>
-          <input
-            ref={fileInputRef}
-            type="file"
-            disabled={busy || !["draft", "approved", "published"].includes(profile.status)}
-            accept={uploadType === "video" || uploadType === "welcome_video" ? "video/mp4,video/webm" : "image/jpeg,image/png,image/webp"}
-            onChange={(event) => void chooseFile(event)}
-          />
-          <small>{uploadType === "headshot" ? "You will crop this to a square before uploading." : uploadType === "image" ? "You will crop this to a 4:3 frame before uploading." : "MP4 or WebM, up to 50 MB."}</small>
-        </label>
-      </div>
-      {profile.status === "pending_review" ? <p className={styles.notice}>Media is locked while your profile is in review.</p> : null}
-      {error ? <p className={styles.error}>{error}</p> : null}
-      <div className={styles.mediaGrid}>
-        {media.map((item) => (
-          <article className={styles.mediaItem} key={item.id}>
-            {item.media_type === "video" || item.media_type === "welcome_video" ? (
-              <video className={styles.mediaPreview} src={mediaUrl(item)} controls preload="metadata" />
-            ) : (
-              // Uploaded user content has a runtime URL that Next Image cannot optimize during static export.
-              // eslint-disable-next-line @next/next/no-img-element
-              <img className={styles.mediaPreview} src={mediaUrl(item)} alt={item.caption || item.media_type} />
-            )}
-            <span className={styles.status}>{item.media_type.replace("_", " ")}</span>
-            {["draft", "approved", "published"].includes(profile.status) ? (
-              <button className={styles.dangerButton} type="button" disabled={busy} onClick={() => void remove(item)}>Remove</button>
-            ) : null}
-          </article>
-        ))}
-      </div>
-      {pendingCrop ? (
-        <ImageCropDialog
-          file={pendingCrop.file}
-          aspectRatio={pendingCrop.mediaType === "headshot" ? 1 : 4 / 3}
-          title={pendingCrop.mediaType === "headshot" ? "Crop your headshot" : "Crop your teaching photo"}
-          outputWidth={pendingCrop.mediaType === "headshot" ? 1200 : 1600}
-          onCancel={cancelCrop}
-          onConfirm={uploadCrop}
-        />
-      ) : null}
-    </section>
   );
 }
 
@@ -3303,7 +2707,9 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
                       {galleryMedia.length ? (
                         <div className={styles.reviewMediaGrid}>{galleryMedia.map((item) => (
                           <figure className={styles.reviewMediaItem} key={item.id}>
-                            {item.media_type === "video" || item.media_type === "welcome_video" ? (
+                            {item.embed_provider && item.external_url ? (
+                              <a className={styles.mediaPreview} href={item.external_url} target="_blank" rel="noopener noreferrer">Open {item.embed_provider} video</a>
+                            ) : item.media_type === "video" || item.media_type === "welcome_video" ? (
                               <video className={styles.mediaPreview} src={mediaUrl(item)} controls preload="metadata" />
                             ) : (
                               // Uploaded user content has a runtime URL that Next Image cannot optimize during static export.
@@ -3335,6 +2741,8 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
                         <ProfileReviewField label="Events accepted" value={eventLabels.join(", ") || null} />
                         <ProfileReviewField label="Age groups" value={profileListValue(profile.age_groups)} />
                         <ProfileReviewField label="Languages" value={profileListValue(profile.languages)} />
+                        <ProfileReviewField label="Packages" value={(profile.packages ?? []).map((item) => `${item.name}${item.priceCents ? ` ($${item.priceCents / 100})` : ""}${item.description ? `: ${item.description}` : ""}`).join(" · ") || null} />
+                        <ProfileReviewField label="Past events" value={(profile.highlights ?? []).map((item) => item.detail ? `${item.title} (${item.detail})` : item.title).join(" · ") || null} />
                         <ProfileReviewField label="Favorite song" value={profile.favorite_song_name} />
                         <ProfileReviewField label="Spotify track" value={profile.favorite_song_spotify_url} />
                         <ProfileReviewField label="Provides speakers" value={profile.provides_speakers === null ? null : profile.provides_speakers ? "Yes" : "No"} />

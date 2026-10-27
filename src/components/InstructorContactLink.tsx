@@ -6,14 +6,18 @@ import { getMarketplaceClient, signInUrl } from "@/lib/marketplace";
 export function InstructorContactLink({
   instructorIdentifier,
   className,
-  children
+  children,
+  packageName
 }: {
   instructorIdentifier: string;
   className: string;
   children: ReactNode;
+  packageName?: string;
 }) {
   const [routing, setRouting] = useState(false);
-  const contactHref = `/contact/?${new URLSearchParams({ instructor: instructorIdentifier }).toString()}`;
+  const params: Record<string, string> = { instructor: instructorIdentifier };
+  if (packageName) params.package = packageName;
+  const contactHref = `/contact/?${new URLSearchParams(params).toString()}`;
 
   async function openInquiry(event: MouseEvent<HTMLAnchorElement>) {
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;

@@ -38,7 +38,7 @@ function harness(component = "inbox", props = {}) {
     let single = false;
     const data = table === "instructor_profiles" ? [profile] : table === "instructor_private_settings" ? [{ inquiry_email: "account@example.test", subscription_status: "active" }] : table === "instructor_directory_profiles" ? [profile] : [];
     const result = { then: (yes, no) => Promise.resolve({ data: single ? data[0] ?? null : data, error: null }).then(yes, no) };
-    for (const method of ["select", "eq", "in", "order", "limit", "update", "upsert"]) result[method] = () => result;
+    for (const method of ["select", "eq", "neq", "in", "order", "limit", "update", "upsert"]) result[method] = () => result;
     result.maybeSingle = () => { single = true; return result; };
     return result;
   }
@@ -89,6 +89,8 @@ function harness(component = "inbox", props = {}) {
       if (specifier === "@/lib/marketplace") return load("src/lib/marketplace.ts");
       if (specifier === "@/lib/commercialTerms") return load("src/lib/commercialTerms.ts");
       if (specifier === "@/data/site") return load("src/data/site.ts");
+      if (specifier === "@/lib/videoLinks") return load("src/lib/videoLinks.ts");
+      if (specifier === "./ProfileEditor" || specifier === "./ProfileMediaManager") return load(`src/components/${specifier.slice(2)}.tsx`);
       if (specifier.includes("commercial-terms.json")) return JSON.parse(readFileSync(new URL("config/commercial-terms.json", root), "utf8"));
       if (specifier.endsWith(".css")) return { __esModule: true, default: new Proxy({}, { get: (_target, key) => String(key) }) };
       return new Proxy({}, { get: (_target, key) => key === "__esModule" ? true : () => null });

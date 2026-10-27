@@ -11,8 +11,11 @@ import {
   MapPin,
   Mic2,
   Music,
+  Share2,
   ShieldCheck,
+  Sparkles,
   Speaker,
+  Ticket,
   Users
 } from "lucide-react";
 import { SpotifyTrack } from "@/components/SpotifyTrack";
@@ -20,8 +23,11 @@ import { eventTypes } from "@/data/site";
 import {
   getMarketplaceClient,
   marketplaceConfigured,
-  type InstructorProfile
+  type InstructorProfile,
+  type ProfileHighlight,
+  type ProfilePackage
 } from "@/lib/marketplace";
+import { embedUrl, isVerticalProvider, providerLabel, type VideoProvider } from "@/lib/videoLinks";
 import { isFoundingInstructor } from "@/lib/commercialTerms";
 import styles from "./profile.module.css";
 
@@ -49,7 +55,7 @@ type PublicInstructorProfile = Pick<
   | "provides_music_playback"
   | "liability_insurance_status"
   | "preferred_response_hours"
-> & { created_at: string | null };
+> & { created_at: string | null; highlights: ProfileHighlight[]; packages: ProfilePackage[]; status?: string };
 
 type ProfileMedia = {
   id: string;
@@ -61,7 +67,11 @@ type ProfileMedia = {
   caption: string | null;
   alt_text: string | null;
   sort_order: number;
+  embed_provider: VideoProvider | null;
+  embed_id: string | null;
 };
+
+const mediaFields = "id,instructor_profile_id,media_type,storage_path,external_url,mime_type,caption,alt_text,sort_order,embed_provider,embed_id";
 
 const publicProfileFields = [
   "id",
@@ -147,48 +157,99 @@ function setupCopy(label: string, value: boolean | null) {
   return `Confirm ${label.toLowerCase()} with the instructor for this event.`;
 }
 
-function MediaGallery({ media, instructorName }: { media: ProfileMedia[]; instructorName: string }) {
-  const galleryMedia = media.filter((item) => item.media_type !== "headshot");
-  if (!galleryMedia.length) return null;
+function VideoEmbed({ item, title }: { item: ProfileMedia; title: string }) {
+  if (!item.embed_provider || !item.embed_id) return null;
+  const vertical = isVerticalProvider(item.embed_provider, item.external_url);
+  return (
+    <div className={`${styles.embed} ${vertical ? styles.embedVertical : ""} ${item.embed_provider === "instagram" ? styles.embedInstagram : ""}`}>
+      <iframe
+        src={embedUrl(item.embed_provider, item.embed_id)}
+        title={`${title} (${providerLabel(item.embed_provider)})`}
+        loading="lazy"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+        allowFullScreen
+        referrerPolicy="strict-origin-when-cross-origin"
+      />
+    </div>
+  );
+}
 
+function MediaItem({ item, instructorName }: { item: ProfileMedia; instructorName: string }) {
+  const url = mediaUrl(item);
+  const isVideo = item.media_type === "video" || item.media_type === "welcome_video";
+  if (item.embed_provider && item.embed_id) {
+    return <VideoEmbed item={item} title={item.caption || `${instructorName} video`} />;
+  }
+  if (!url) return null;
+  if (isVideo) {
+    const isDirectVideo = Boolean(item.storage_path || item.mime_type?.startsWith("video/") || /\.(mp4|m4v|webm|ogg|mov)(?:[?#]|$)/i.test(url));
+    return isDirectVideo ? (
+      <video className={styles.media} src={url} controls playsInline preload="metadata">
+        Your browser does not support this video.
+      </video>
+    ) : (
+      <a className={styles.videoLink} href={url} target="_blank" rel="noopener noreferrer">
+        <Music size={28} aria-hidden="true" />
+        <span>Open video</span>
+      </a>
+    );
+  }
+  // Profile media is uploaded at runtime and cannot use Next Image during static export.
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img className={styles.media} src={url} alt={item.alt_text || item.caption || `${instructorName} teaching line dancing`} loading="lazy" />;
+}
+
+function MediaGallery({ media, instructorName }: { media: ProfileMedia[]; instructorName: string }) {
+  const galleryMedia = media.filter((item) => item.media_type === "image" || item.media_type === "video");
+  if (!galleryMedia.length) return null;
   return (
     <section className={styles.section} aria-labelledby="profile-media-heading">
       <p className={styles.kicker}>Photos and videos</p>
       <h2 id="profile-media-heading">See {instructorName} teach and dance</h2>
       <div className={styles.mediaGrid}>
-        {galleryMedia.map((item) => {
-          const url = mediaUrl(item);
-          if (!url) return null;
-          const isVideo = item.media_type === "video" || item.media_type === "welcome_video";
-          const isDirectVideo = Boolean(
-            item.storage_path ||
-            item.mime_type?.startsWith("video/") ||
-            /\.(mp4|m4v|webm|ogg|mov)(?:[?#]|$)/i.test(url)
-          );
-
-          return (
-            <figure className={styles.mediaItem} key={item.id}>
-              {isVideo && isDirectVideo ? (
-                <video className={styles.media} src={url} controls playsInline preload="metadata">
-                  Your browser does not support this video.
-                </video>
-              ) : isVideo ? (
-                <a className={styles.videoLink} href={url} target="_blank" rel="noopener noreferrer">
-                  <Music size={28} aria-hidden="true" />
-                  <span>Open {item.media_type === "welcome_video" ? "welcome video" : "teaching video"}</span>
-                </a>
-              ) : (
-                // Profile media is uploaded at runtime and cannot use Next Image during static export.
-                // eslint-disable-next-line @next/next/no-img-element
-                <img className={styles.media} src={url} alt={item.alt_text || `${instructorName} teaching line dancing`} />
-              )}
-              {item.caption ? <figcaption>{item.caption}</figcaption> : null}
-            </figure>
-          );
-        })}
+        {galleryMedia.map((item) => (
+          <figure
+            className={`${styles.mediaItem} ${item.embed_provider && isVerticalProvider(item.embed_provider, item.external_url) ? styles.mediaItemTall : ""}`}
+            key={item.id}
+          >
+            <MediaItem item={item} instructorName={instructorName} />
+            {item.caption ? <figcaption>{item.caption}</figcaption> : null}
+          </figure>
+        ))}
       </div>
     </section>
   );
+}
+
+function ShareButton({ name }: { name: string }) {
+  const [copied, setCopied] = useState(false);
+  async function share() {
+    const url = window.location.href.replace(/[?&]preview=1/, "");
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: `${name} | Hire Line Dancers`, url });
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2500);
+    } catch {
+      // The person closed the share sheet.
+    }
+  }
+  return (
+    <button type="button" className={styles.shareButton} onClick={() => void share()}>
+      <Share2 size={16} aria-hidden="true" /> {copied ? "Link copied" : "Share"}
+    </button>
+  );
+}
+
+function money(cents: number) {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: cents % 100 ? 2 : 0 }).format(cents / 100);
+}
+
+function hoursLabel(hours: number) {
+  return `${hours} ${hours === 1 ? "hour" : "hours"}`;
 }
 
 export function PublicProfile() {
@@ -196,9 +257,12 @@ export function PublicProfile() {
   const [media, setMedia] = useState<ProfileMedia[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [previewing, setPreviewing] = useState(false);
 
   useEffect(() => {
-    const identifier = new URLSearchParams(window.location.search).get("instructor")?.trim();
+    const search = new URLSearchParams(window.location.search);
+    const identifier = search.get("instructor")?.trim();
+    const wantsPreview = search.get("preview") === "1";
     if (!identifier) {
       setError("Choose a published instructor from the directory to view a profile.");
       setLoading(false);
@@ -221,6 +285,34 @@ export function PublicProfile() {
 
     let active = true;
     async function loadProfile() {
+      // Owners and admins can preview a profile before it is published.
+      if (wantsPreview && isUuid(profileIdentifier)) {
+        const { data: sessionData } = await marketplaceClient.auth.getSession();
+        if (sessionData.session) {
+          const { data: ownData } = await marketplaceClient
+            .from("instructor_profiles")
+            .select(`${publicProfileFields},highlights,packages,status`)
+            .eq("id", profileIdentifier)
+            .maybeSingle();
+          if (!active) return;
+          if (ownData) {
+            const previewProfile = ownData as unknown as PublicInstructorProfile;
+            const { data: previewMedia } = await marketplaceClient
+              .from("profile_media")
+              .select(mediaFields)
+              .eq("instructor_profile_id", previewProfile.id)
+              .eq("status", "ready")
+              .order("sort_order");
+            if (!active) return;
+            setPreviewing(true);
+            setProfile({ ...previewProfile, highlights: previewProfile.highlights ?? [], packages: previewProfile.packages ?? [] });
+            setMedia((previewMedia ?? []) as ProfileMedia[]);
+            setLoading(false);
+            return;
+          }
+        }
+      }
+
       let query = marketplaceClient
         .from("instructor_directory_profiles")
         .select(publicProfileFields);
@@ -229,18 +321,33 @@ export function PublicProfile() {
       const { data: profileData, error: profileError } = await query.maybeSingle();
       if (!active) return;
       if (profileError || !profileData) {
-        setError("This published instructor profile could not be found.");
+        setError(wantsPreview
+          ? "Sign in with the instructor account to preview this profile."
+          : "This published instructor profile could not be found.");
         setLoading(false);
         return;
       }
 
-      const publicProfile = profileData as unknown as PublicInstructorProfile;
-      const { data: mediaData, error: mediaError } = await marketplaceClient
-        .from("profile_media")
-        .select("id,instructor_profile_id,media_type,storage_path,external_url,mime_type,caption,alt_text,sort_order")
-        .eq("instructor_profile_id", publicProfile.id)
-        .eq("status", "ready")
-        .order("sort_order");
+      const directoryProfile = profileData as unknown as PublicInstructorProfile;
+      const [{ data: mediaData, error: mediaError }, { data: extras }] = await Promise.all([
+        marketplaceClient
+          .from("profile_media")
+          .select(mediaFields)
+          .eq("instructor_profile_id", directoryProfile.id)
+          .eq("status", "ready")
+          .order("sort_order"),
+        marketplaceClient
+          .from("instructor_directory_profile_extras")
+          .select("highlights,packages")
+          .eq("id", directoryProfile.id)
+          .maybeSingle()
+      ]);
+      const extraFields = extras as { highlights?: ProfileHighlight[]; packages?: ProfilePackage[] } | null;
+      const publicProfile: PublicInstructorProfile = {
+        ...directoryProfile,
+        highlights: extraFields?.highlights ?? [],
+        packages: extraFields?.packages ?? []
+      };
 
       if (!active) return;
       if (mediaError) {
@@ -286,9 +393,18 @@ export function PublicProfile() {
   const headshot = media.find((item) => item.media_type === "headshot");
   const headshotUrl = headshot ? mediaUrl(headshot) : null;
   const location = [profile.city, profile.region].filter(Boolean).join(", ") || "Service area available on request";
+  const welcome = media.find((item) => item.media_type === "welcome_video");
+  const packages = profile.packages ?? [];
+  const highlights = profile.highlights ?? [];
 
   return (
     <main className={styles.shell}>
+      {previewing ? (
+        <p className={styles.previewBanner} role="status">
+          Preview{profile.status && profile.status !== "published" ? " · Not public yet" : ""}. This is how planners will see your profile.{" "}
+          <Link href="/account/?tab=profile">Back to editing</Link>
+        </p>
+      ) : null}
       <section className={styles.hero}>
         <div className={styles.headshot} aria-hidden={headshotUrl ? undefined : "true"}>
           {headshotUrl ? (
@@ -309,25 +425,74 @@ export function PublicProfile() {
           >
             Contact {firstName}
           </InstructorContactLink>
+          <ShareButton name={profile.display_name} />
           <div className={styles.heroTags}>
             <span><MapPin size={16} aria-hidden="true" /> {location}</span>
             {profile.max_group_size ? <span><Users size={16} aria-hidden="true" /> Groups up to {profile.max_group_size}</span> : null}
-            {profile.years_teaching !== null ? <span><Clock size={16} aria-hidden="true" /> {profile.years_teaching} years teaching</span> : null}
+            {profile.years_teaching !== null ? <span><Clock size={16} aria-hidden="true" /> {profile.years_teaching} {profile.years_teaching === 1 ? "year" : "years"} teaching</span> : null}
           </div>
         </div>
       </section>
 
       <div className={styles.layout}>
         <div className={styles.content}>
-          {profile.bio ? (
+          {profile.bio || welcome ? (
             <section className={styles.section} aria-labelledby="about-instructor-heading">
               <p className={styles.kicker}>About the instructor</p>
               <h2 id="about-instructor-heading">Meet {profile.display_name}</h2>
-              <p className={styles.bodyCopy}>{profile.bio}</p>
+              {welcome ? (
+                <div className={`${styles.welcomeVideo} ${welcome.embed_provider && isVerticalProvider(welcome.embed_provider, welcome.external_url) ? styles.welcomeVideoTall : ""}`}>
+                  <MediaItem item={welcome} instructorName={profile.display_name} />
+                </div>
+              ) : null}
+              {profile.bio ? <p className={styles.bodyCopy}>{profile.bio}</p> : null}
+            </section>
+          ) : null}
+
+          {packages.length ? (
+            <section className={styles.section} aria-labelledby="packages-heading">
+              <p className={styles.kicker}>Packages</p>
+              <h2 id="packages-heading">Ways to book {firstName}</h2>
+              <div className={styles.packageGrid}>
+                {packages.map((item) => (
+                  <article className={styles.packageCard} key={item.name}>
+                    <Ticket size={22} aria-hidden="true" />
+                    <h3>{item.name}</h3>
+                    <p className={styles.packageMeta}>
+                      {item.durationHours ? hoursLabel(item.durationHours) : null}
+                      {item.durationHours ? " · " : null}
+                      {item.priceCents ? `From ${money(item.priceCents)}` : "Custom quote"}
+                    </p>
+                    {item.description ? <p>{item.description}</p> : null}
+                    <InstructorContactLink instructorIdentifier={identifier} className={styles.packageLink} packageName={item.name}>
+                      Ask about this package
+                    </InstructorContactLink>
+                  </article>
+                ))}
+              </div>
+              <p className={styles.finePrint}>Final pricing is confirmed in the booking agreement. Hire Line Dancers adds a small service fee at checkout.</p>
             </section>
           ) : null}
 
           <MediaGallery media={media} instructorName={profile.display_name} />
+
+          {highlights.length ? (
+            <section className={styles.section} aria-labelledby="highlights-heading">
+              <p className={styles.kicker}>Past events</p>
+              <h2 id="highlights-heading">Where {firstName} has taught</h2>
+              <ul className={styles.highlightList}>
+                {highlights.map((item, index) => (
+                  <li key={`${item.title}-${index}`}>
+                    <Sparkles size={20} aria-hidden="true" />
+                    <div>
+                      <strong>{item.title}</strong>
+                      {item.detail ? <span>{item.detail}</span> : null}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
 
           <section className={styles.section} aria-labelledby="services-heading">
             <p className={styles.kicker}>Services and fit</p>
