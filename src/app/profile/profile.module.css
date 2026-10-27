@@ -367,3 +367,175 @@
     padding: 24px 22px;
   }
 }
+
+/* Preview, sharing, embeds, packages, and past events */
+
+.previewBanner {
+  margin: 0 0 18px;
+  padding: 12px 16px;
+  border: 2px solid #1c2a44;
+  background: #e7a33c;
+  color: #1c2a44;
+  font-weight: 700;
+}
+
+.previewBanner a {
+  color: #1c2a44;
+}
+
+.shareButton {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  margin-left: 0;
+  padding: 8px 2px;
+  border: 0;
+  background: none;
+  color: #1c2a44;
+  font: 700 0.92rem/1 "Lato", sans-serif;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+
+.embed {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #1c2a44;
+}
+
+.embedVertical {
+  aspect-ratio: 9 / 16;
+  max-height: 640px;
+  margin: 0 auto;
+  background: #000;
+}
+
+.embedInstagram {
+  aspect-ratio: auto;
+  height: 600px;
+  background: #fff;
+}
+
+.embed iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.mediaItemTall {
+  grid-row: span 2;
+}
+
+.welcomeVideo {
+  margin: 4px 0 22px;
+  border: 1px solid #1c2a44;
+  background: #1c2a44;
+}
+
+.welcomeVideo .media {
+  aspect-ratio: 16 / 9;
+  object-fit: contain;
+}
+
+.welcomeVideoTall {
+  max-width: 360px;
+}
+
+.packageGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+  margin-top: 22px;
+}
+
+.packageCard {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding: 20px;
+  border: 2px solid #1c2a44;
+  background: #fbfaf5;
+  color: #1c2a44;
+}
+
+.packageCard svg {
+  color: #b5472b;
+}
+
+.packageCard h3 {
+  margin: 4px 0 0;
+  font-size: 1.2rem;
+}
+
+.packageCard p {
+  margin: 0;
+  color: #3f4b66;
+  line-height: 1.5;
+}
+
+.packageMeta {
+  font: 700 0.8rem/1.3 "IBM Plex Mono", monospace !important;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #1c2a44 !important;
+}
+
+.packageLink {
+  margin-top: 8px;
+  color: #b5472b;
+  font-weight: 700;
+  text-underline-offset: 3px;
+}
+
+.highlightList {
+  display: grid;
+  gap: 0;
+  margin: 22px 0 0;
+  padding: 0;
+  border-top: 1px solid #d8d9dc;
+  list-style: none;
+}
+
+.highlightList li {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px 0;
+  border-bottom: 1px solid #d8d9dc;
+}
+
+.highlightList svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: #e7a33c;
+}
+
+.highlightList div {
+  display: grid;
+  gap: 3px;
+}
+
+.highlightList strong {
+  color: #1c2a44;
+}
+
+.highlightList span {
+  color: #57607a;
+  font-size: 0.92rem;
+}
+
+@media (max-width: 720px) {
+  .mediaItemTall {
+    grid-row: auto;
+  }
+
+  .embedInstagram {
+    height: 560px;
+  }
+}

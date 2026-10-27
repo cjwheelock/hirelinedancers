@@ -37,6 +37,13 @@ export function ContactInstructor() {
   });
 
   useEffect(() => {
+    const packageName = new URLSearchParams(window.location.search).get("package")?.trim().slice(0, 60);
+    if (packageName) {
+      setForm((current) => current.message ? current : { ...current, message: `I'm interested in your "${packageName}" package.` });
+    }
+  }, []);
+
+  useEffect(() => {
     async function loadProfile() {
       const client = getMarketplaceClient();
       const identifier = new URLSearchParams(window.location.search).get("instructor");

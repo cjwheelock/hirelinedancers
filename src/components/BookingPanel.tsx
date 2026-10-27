@@ -24,7 +24,7 @@ import {
   type CancellationWindow,
   type ThreadBookingState
 } from "@/lib/booking";
-import { getMarketplaceClient } from "@/lib/marketplace";
+import { getMarketplaceClient, type InstructorSocialLinks, type ProfilePackage } from "@/lib/marketplace";
 import styles from "./Marketplace.module.css";
 
 const timeZones = [
@@ -171,6 +171,7 @@ export function BookingPanel({
       ) : null}
 
       {booking ? <BookingSummary booking={booking} role={role} showAgreement={showAgreement} onToggleAgreement={() => setShowAgreement((value) => !value)} /> : null}
+      {booking?.paid_at && role === "organizer" ? <InstructorLinks threadId={threadId} /> : null}
 
       <div className={styles.buttonRow}>
         {canQuote && state.payouts_ready ? (
@@ -398,6 +399,36 @@ function QuoteForm({
   });
   const [windows, setWindows] = useState<CancellationWindow[]>(initialWindows);
   const [formError, setFormError] = useState<string | null>(null);
+  const [packages, setPackages] = useState<ProfilePackage[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    async function loadPackages() {
+      const client = getMarketplaceClient();
+      if (!client) return;
+      const { data: sessionData } = await client.auth.getSession();
+      const accountId = sessionData.session?.user.id;
+      if (!accountId) return;
+      const { data } = await client.from("instructor_profiles").select("packages").eq("account_id", accountId).maybeSingle();
+      if (active) setPackages(((data as { packages?: ProfilePackage[] } | null)?.packages) ?? []);
+    }
+    void loadPackages();
+    return () => { active = false; };
+  }, []);
+
+  function applyPackage(name: string) {
+    const chosen = packages.find((item) => item.name === name);
+    if (!chosen) return;
+    setForm((current) => ({
+      ...current,
+      serviceDescription: [chosen.name, chosen.description].filter(Boolean).join(": "),
+      ...(chosen.priceCents
+        ? { pricingMode: "flat" as const, flatPrice: String(chosen.priceCents / 100) }
+        : chosen.durationHours
+          ? { pricingMode: "hourly" as const, hours: String(chosen.durationHours), endTime: "" }
+          : {})
+    }));
+  }
 
   useEffect(() => {
     if (form.endTime || !form.startTime || !form.hours || form.pricingMode !== "hourly") return;
@@ -475,6 +506,15 @@ function QuoteForm({
         <label className={styles.field}><span>Venue name (optional)</span><input maxLength={200} value={form.venueName} onChange={(event) => set("venueName", event.target.value)} /></label>
         <label className={styles.field}><span>Venue address</span><input required minLength={3} maxLength={300} value={form.venueAddress} onChange={(event) => set("venueAddress", event.target.value)} /></label>
       </div>
+      {packages.length ? (
+        <label className={styles.field}>
+          <span>Start from a package (optional)</span>
+          <select defaultValue="" onChange={(event) => applyPackage(event.target.value)}>
+            <option value="">Choose a package</option>
+            {packages.map((item) => <option key={item.name} value={item.name}>{item.name}</option>)}
+          </select>
+        </label>
+      ) : null}
       <label className={styles.field}><span>What you will provide</span><textarea required minLength={3} maxLength={2000} value={form.serviceDescription} onChange={(event) => set("serviceDescription", event.target.value)} placeholder="For example: two hours of beginner line dance instruction, four dances, all ages." /></label>
 
       <fieldset className={styles.bookingFieldset}>
@@ -635,5 +675,33 @@ function ResolveForm({ booking, busy, onCancel, onSubmit }: { booking: Booking; 
         <button className={styles.secondaryButton} type="button" onClick={onCancel} disabled={busy}>Cancel</button>
       </div>
     </form>
+  );
+}
+
+function InstructorLinks({ threadId }: { threadId: string }) {
+  const [links, setLinks] = useState<InstructorSocialLinks | null>(null);
+  useEffect(() => {
+    let active = true;
+    async function load() {
+      const client = getMarketplaceClient();
+      if (!client) return;
+      const { data } = await client.rpc("get_thread_instructor_links", { p_thread_id: threadId });
+      if (active) setLinks((data as InstructorSocialLinks | null) ?? null);
+    }
+    void load();
+    return () => { active = false; };
+  }, [threadId]);
+  const candidates: Array<[string, string | undefined]> = links
+    ? [["Instagram", links.instagram], ["TikTok", links.tiktok], ["YouTube", links.youtube], ["Website", links.website]]
+    : [];
+  const entries = candidates.filter((entry): entry is [string, string] => Boolean(entry[1]));
+  if (!entries.length) return null;
+  return (
+    <p className={styles.help}>
+      Follow your instructor:{" "}
+      {entries.map(([label, url], index) => (
+        <span key={label}>{index ? " · " : ""}<a href={url} target="_blank" rel="noopener noreferrer">{label}</a></span>
+      ))}
+    </p>
   );
 }

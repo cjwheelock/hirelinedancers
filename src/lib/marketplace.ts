@@ -53,6 +53,25 @@ export type InstructorProfile = {
   provides_music_playback: boolean | null;
   liability_insurance_status: "not_provided" | "available" | "required_per_event";
   preferred_response_hours: number;
+  highlights?: ProfileHighlight[];
+  packages?: ProfilePackage[];
+  created_at?: string | null;
+};
+
+export type ProfileHighlight = { title: string; detail?: string };
+
+export type ProfilePackage = {
+  name: string;
+  description?: string;
+  durationHours?: number;
+  priceCents?: number | null;
+};
+
+export type InstructorSocialLinks = {
+  instagram?: string;
+  tiktok?: string;
+  youtube?: string;
+  website?: string;
 };
 
 export type InstructorPrivateSettings = {
@@ -71,6 +90,10 @@ export type InstructorPrivateSettings = {
   stripe_subscription_id: string | null;
   subscription_status: string;
   response_reminders_enabled: boolean;
+  instagram_url?: string | null;
+  tiktok_url?: string | null;
+  youtube_url?: string | null;
+  website_url?: string | null;
 };
 
 export type InstructorBillingRecovery = {
