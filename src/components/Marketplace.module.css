@@ -172,6 +172,46 @@
   gap: 18px;
 }
 
+.onboardingPricing {
+  display: grid;
+  gap: 18px;
+  margin-top: 12px;
+  padding-top: 24px;
+  border-top: 1px solid #d8d9dc;
+}
+
+.onboardingPricingDetails {
+  display: grid;
+  gap: 14px;
+}
+
+.onboardingPricingDetails h2 {
+  font-family: var(--font-sans);
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  font-weight: 900;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  text-transform: none;
+}
+
+.onboardingPricingDetails :global(.check-list) {
+  margin: 0;
+}
+
+.onboardingPricingNote {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  color: #57607a;
+  line-height: 1.55;
+}
+
+.onboardingPricingNote svg {
+  flex: 0 0 auto;
+  margin-top: 3px;
+}
+
 .field {
   display: grid;
   gap: 7px;

@@ -27,6 +27,7 @@ import {
 } from "@/lib/commercialTerms";
 import { useMarketplaceSession } from "@/hooks/useMarketplaceSession";
 import { ProfileEditor } from "./ProfileEditor";
+import { InstructorOnboardingPricing } from "./InstructorOnboardingPricing";
 import { InquiryInbox } from "./InquiryInbox";
 import { MembershipCreditAdmin } from "./MembershipCreditAdmin";
 import { PayoutsCard } from "./PayoutsCard";
@@ -123,6 +124,7 @@ export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean })
       return;
     }
 
+    if (!account.role && entryIntent) return;
     const url = new URL(window.location.href);
     if (!url.searchParams.has("intent") && !url.searchParams.has("returnTo")) return;
     url.searchParams.delete("intent");
@@ -570,6 +572,7 @@ function OnboardingForm({
         <span>{role === "organizer" ? "Company or organization (optional)" : "Business name (optional)"}</span>
         <input autoComplete="organization" value={company} onChange={(event) => setCompany(event.target.value)} />
       </label>
+      {role === "instructor" ? <InstructorOnboardingPricing /> : null}
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
       <button className={styles.button} disabled={busy} type="submit">
         {busy ? "Saving..." : invitationToken ? "Accept invitation" : role === "instructor" ? "Open instructor workspace" : "Open organizer workspace"}

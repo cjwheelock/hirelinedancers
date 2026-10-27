@@ -49,6 +49,10 @@
   object-fit: cover;
 }
 
+.heroCopy :global(.founding-badge) + h1 {
+  margin-top: 12px;
+}
+
 .heroCopy h1 {
   max-width: 12ch;
   font-size: clamp(34px, 3.8vw, 50px);

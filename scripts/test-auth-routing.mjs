@@ -93,7 +93,7 @@ function harness(path, { role = null, signedIn = true, signOutError = null, oaut
     if (Array.isArray(node)) return node.flatMap((child) => nodes(child));
     return [node, ...nodes(node.props?.children)];
   }
-  return { render, nodes: () => nodes(tree), navigation, authCalls, load, sessionState };
+  return { render, nodes: () => nodes(tree), navigation, authCalls, load, location, sessionState };
 }
 
 for (const path of [threadPath, "/account/?tab=profile", "/account/?inquiry=example", "/account/?followup=example"]) {
@@ -122,6 +122,12 @@ test("unfinished explicit instructor entry does not skip onboarding", async () =
   const app = harness(`/account/?intent=instructor&returnTo=${encodeURIComponent(threadPath)}`);
   await app.render();
   assert.deepEqual(app.navigation, []);
+  assert.equal(app.location.searchParams.get("intent"), "instructor");
+  assert.equal(app.location.searchParams.get("returnTo"), threadPath);
+
+  const refreshed = harness(`${app.location.pathname}${app.location.search}`);
+  await refreshed.render();
+  assert.ok(refreshed.nodes().some((node) => node.props?.fixedRole === "instructor"));
 });
 
 test("account return guard rejects absent intent, wrong roles, and self redirects", () => {

@@ -699,7 +699,6 @@ main { display: block; }
   padding: 6px 12px 6px 10px;
   background: var(--ink); color: var(--gold);
   border: 1.5px solid var(--gold);
-  box-shadow: 3px 3px 0 var(--sunset);
   font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
   line-height: 1;
 }
@@ -708,7 +707,7 @@ main { display: block; }
 .price-card.featured > .founding-badge { position: absolute; top: -15px; left: 26px; }
 .price-card.featured > h2 { margin: 10px 0 0; }
 .price-card.featured > h2 + .check-list { margin-top: 6px; }
-.founding-badge.compact { padding: 4px 9px 4px 8px; font-size: 10.5px; box-shadow: 2px 2px 0 var(--sunset); }
+.founding-badge.compact { padding: 4px 9px 4px 8px; font-size: 10.5px; }
 .price-card svg { color: var(--sunset); }
 .price {
   display: flex;

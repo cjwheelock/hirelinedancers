@@ -182,7 +182,7 @@ export function LoginScreen() {
   const subtitle = intent === "instructor"
     ? invited
       ? "Review the invitation first. Nothing is claimed until you choose the button below."
-      : "Create your instructor workspace, complete your profile, and save a card securely to submit it for review. No subscription starts and no charge is made before approval."
+      : "Add your account details, then complete your public instructor profile."
     : intent === "organizer"
       ? "Create a planner account to contact instructors and keep your event inquiries organized."
       : "Browse instructors without an account. Sign in when you are ready to send an inquiry, or to manage your instructor profile.";

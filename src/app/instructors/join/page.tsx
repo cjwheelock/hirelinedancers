@@ -1,29 +1,21 @@
 import Link from "next/link";
-import { ArrowRight, Award, Banknote, ClipboardCheck, FileSignature, ShieldCheck, Sparkles, Users } from "lucide-react";
-import {
-  bookingExample,
-  foundingInstructorDeadline,
-  instructorFeePercent,
-  payoutDelayLabel,
-  problemReportWindowLabel
-} from "@/lib/commercialTerms";
+import { ArrowRight, Banknote, ClipboardCheck, FileSignature, Sparkles, Users } from "lucide-react";
+import { payoutDelayLabel } from "@/lib/commercialTerms";
 import { signInUrl } from "@/lib/marketplace";
 
 export const metadata = {
   title: "List Your Services as a Line Dance Instructor",
-  description: "Join Hire Line Dancers free and become a founding instructor. Get discovered by people planning weddings, corporate events, and private parties, send quotes, and get paid through the platform."
+  description: "Join Hire Line Dancers and become a founding instructor. Get discovered by people planning weddings, corporate events, and private parties, send quotes, and get paid through the platform."
 };
-
-const example = bookingExample(40000);
 
 export default function JoinPage() {
   return (
     <section className="page-shell">
       <h1>Get booked by people planning events in your city.</h1>
-      <p className="lede">Hire Line Dancers helps event planners, couples, and companies find instructors who can get their guests dancing. Joining is free. Build a profile, reply to inquiries, send a quote, and get paid after the event.</p>
+      <p className="lede">Hire Line Dancers helps event planners, couples, and companies find instructors who can get their guests dancing. Build a profile, reply to inquiries, send a quote, and get paid after the event.</p>
 
       <div className="hero-actions" style={{ marginTop: 28 }}>
-        <Link className="button primary" href={signInUrl("/account/", "instructor")}>Apply to get listed free <ArrowRight size={18} /></Link>
+        <Link className="button primary" href={signInUrl("/account/", "instructor")}>Apply to get listed <ArrowRight size={18} /></Link>
       </div>
 
       <div className="faq-block">
@@ -73,27 +65,10 @@ export default function JoinPage() {
         </div>
       </div>
 
-      <div className="faq-block">
-        <h2>Pricing</h2>
-        <div className="pricing-grid">
-          <article className="price-card featured">
-            <span className="founding-badge"><Award size={15} aria-hidden="true" /> Founding instructor</span>
-            <h2>Free to join</h2>
-            <ul className="check-list">
-              <li>No monthly fee. You pay nothing until you get paid.</li>
-              <li>Hire Line Dancers keeps a {instructorFeePercent} platform fee from each booking paid through the platform.</li>
-              <li>Example: on a {example.price} booking, you receive {example.payout}.</li>
-              <li>You set your rate, minimum hours, and cancellation policy on every quote.</li>
-              <li>Your payout is sent {payoutDelayLabel} after the event unless the client reports a problem within {problemReportWindowLabel}.</li>
-              <li>If you need insurance, you can attach your own certificate or note that you handle insurance outside the agreement.</li>
-              <li>Join by {foundingInstructorDeadline} to become a founding instructor and keep a Founding Instructor badge on your profile.</li>
-            </ul>
-            <p>See the <Link href="/legal/terms/">Terms of Service</Link> and <Link href="/legal/refund-policy/">booking cancellation and refund policy</Link>.</p>
-            <Link className="button primary" href={signInUrl("/account/", "instructor")}>Apply for a profile</Link>
-          </article>
-        </div>
-        <p style={{ marginTop: 16 }}><ShieldCheck size={16} aria-hidden="true" /> Book and get paid through Hire Line Dancers to keep payment protection, guaranteed payouts, and support if something goes wrong.</p>
+      <div className="hero-actions">
+        <Link className="button primary" href={signInUrl("/account/", "instructor")}>Apply for a profile</Link>
       </div>
+
     </section>
   );
 }
