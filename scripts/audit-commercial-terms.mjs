@@ -50,7 +50,6 @@ if (packageJson.scripts?.["terms:audit"] !== "node scripts/audit-commercial-term
 requireText(".github/workflows/deploy.yml", "npm run terms:audit", "commercial terms CI gate");
 
 const wiredClientSurfaces = [
-  "src/app/instructors/join/page.tsx",
   "src/app/legal/refund-policy/page.tsx",
   "src/app/legal/terms/page.tsx",
   "src/components/AccountWorkspace.tsx",
@@ -77,7 +76,7 @@ const bannedRuntimeLiterals = [
   [/\b14(?:-| )days?\b/gi, "hard-coded timing policy"],
   [/2026-08-07-90-day-paid-invoice-v1/g, "hard-coded guarantee version"]
 ];
-for (const file of [...wiredClientSurfaces, ...wiredFunctionSurfaces]) {
+for (const file of ["src/app/instructors/join/page.tsx", ...wiredClientSurfaces, ...wiredFunctionSurfaces]) {
   const source = read(file);
   for (const [pattern, label] of bannedRuntimeLiterals) {
     pattern.lastIndex = 0;
