@@ -10,7 +10,7 @@ export function LogoMark({ size = 40 }: { size?: number }) {
     >
       <rect x="1" y="1" width="46" height="46" rx="2" fill="#FBFAF5" stroke="#E7A33C" strokeWidth="2" />
       <svg x="3" y="4" width="42" height="40" viewBox="130 45 1190 1000">
-        <image href="/icon.png" width="1473" height="1068" />
+        <image href="/images/brand-boots.png" width="1473" height="1068" />
       </svg>
     </svg>
   );
