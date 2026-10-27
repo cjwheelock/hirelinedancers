@@ -6,6 +6,7 @@ import { eventTypes, instructors } from "@/data/site";
 import { useMarketplaceSession } from "@/hooks/useMarketplaceSession";
 import { getMarketplaceClient, signInUrl, readableError, type InstructorProfile } from "@/lib/marketplace";
 import styles from "./Marketplace.module.css";
+import contactStyles from "./ContactInstructor.module.css";
 
 type ContactProfile = Pick<InstructorProfile, "id" | "slug" | "display_name" | "business_name" | "city" | "region"> & {
   isStaticListing: boolean;
@@ -28,7 +29,7 @@ export function ContactInstructor() {
     region: "",
     postalCode: "",
     guestCount: "",
-    budgetRange: "",
+    budget: "",
     musicRequests: "",
     venueHasSpeakers: "unknown",
     venueHasMicrophone: "unknown",
@@ -110,7 +111,7 @@ export function ContactInstructor() {
         p_event_region: form.region || null,
         p_event_postal_code: form.postalCode || null,
         p_guest_count: form.guestCount ? Number(form.guestCount) : null,
-        p_budget_range: form.budgetRange || null,
+        p_budget_range: form.budget === "" ? null : Number(form.budget).toLocaleString("en-US", { style: "currency", currency: "USD" }),
         p_music_requests: form.musicRequests || null,
         p_venue_has_speakers: booleanOrNull(form.venueHasSpeakers),
         p_venue_has_microphone: booleanOrNull(form.venueHasMicrophone),
@@ -201,15 +202,15 @@ export function ContactInstructor() {
       <p className={styles.eyebrow}>Contact {profile?.display_name}</p>
       <h1 className={styles.title}>Tell the instructor about your event</h1>
       <p className={styles.subtitle}>Send your event details and message through Hire Line Dancers. The instructor will confirm availability, rates, and terms. If they have not replied within 48 hours, we will help you explore other instructors.</p>
-      <form className={`${styles.card} ${styles.stack}`} onSubmit={submit}>
+      <form className={`${styles.card} ${styles.stack} ${contactStyles.form}`} onSubmit={submit}>
+        <label className={styles.field}>
+          <span>Event type</span>
+          <select required value={form.eventType} onChange={(e) => setForm({ ...form, eventType: e.target.value })}>
+            {eventTypes.map((item) => <option key={item.slug} value={item.slug}>{item.label}</option>)}
+          </select>
+        </label>
         <div className={styles.grid}>
-          <label className={styles.field}>
-            <span>Event type</span>
-            <select required value={form.eventType} onChange={(e) => setForm({ ...form, eventType: e.target.value })}>
-              {eventTypes.map((item) => <option key={item.slug} value={item.slug}>{item.label}</option>)}
-            </select>
-          </label>
-          <label className={styles.field}>
+          <label className={`${styles.field} ${contactStyles.eventDate}`}>
             <span>Event date</span>
             <input required type="date" min={new Date().toISOString().slice(0, 10)} value={form.eventDate} onChange={(e) => setForm({ ...form, eventDate: e.target.value })} />
           </label>
@@ -241,28 +242,29 @@ export function ContactInstructor() {
           </label>
           <label className={styles.field}>
             <span>Approximate budget (optional)</span>
-            <select value={form.budgetRange} onChange={(e) => setForm({ ...form, budgetRange: e.target.value })}>
-              <option value="">Prefer to discuss</option>
-              <option value="under-500">Under $500</option>
-              <option value="500-999">$500 to $999</option>
-              <option value="1000-1999">$1,000 to $1,999</option>
-              <option value="2000-plus">$2,000 or more</option>
-            </select>
+            <div className={contactStyles.currencyInput}>
+              <span aria-hidden="true">$</span>
+              <input type="number" inputMode="decimal" min="0" step="0.01" aria-label="Approximate budget in dollars (optional)" value={form.budget} onChange={(e) => setForm({ ...form, budget: e.target.value })} />
+            </div>
           </label>
         </div>
         <div className={styles.grid}>
-          <label className={styles.field}>
-            <span>Does the venue have speakers?</span>
-            <select value={form.venueHasSpeakers} onChange={(e) => setForm({ ...form, venueHasSpeakers: e.target.value })}>
-              <option value="unknown">Not sure</option><option value="yes">Yes</option><option value="no">No</option>
-            </select>
-          </label>
-          <label className={styles.field}>
-            <span>Does the venue have a microphone?</span>
-            <select value={form.venueHasMicrophone} onChange={(e) => setForm({ ...form, venueHasMicrophone: e.target.value })}>
-              <option value="unknown">Not sure</option><option value="yes">Yes</option><option value="no">No</option>
-            </select>
-          </label>
+          {([
+            ["venueHasSpeakers", "Does the venue have speakers?"],
+            ["venueHasMicrophone", "Does the venue have a microphone?"]
+          ] as const).map(([field, label]) => (
+            <fieldset className={contactStyles.equipmentField} key={field}>
+              <legend className={styles.legend}>{label}</legend>
+              <div className={contactStyles.choices}>
+                {([["yes", "Yes"], ["no", "No"], ["unknown", "Not sure"]] as const).map(([value, text]) => (
+                  <label className={contactStyles.choice} key={value}>
+                    <input type="radio" name={field} value={value} checked={form[field] === value} onChange={() => setForm({ ...form, [field]: value })} />
+                    <span>{text}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          ))}
         </div>
         <label className={styles.field}>
           <span>Music or song requests (optional)</span>

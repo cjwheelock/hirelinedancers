@@ -1,0 +1,87 @@
+.form select {
+  min-height: 50px;
+  padding-right: 32px;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%231c2a44' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-position: right 10px center;
+  background-repeat: no-repeat;
+  cursor: pointer;
+}
+
+.eventDate {
+  grid-column: 1 / -1;
+}
+
+.currencyInput {
+  position: relative;
+}
+
+.currencyInput > span {
+  position: absolute;
+  top: 50%;
+  left: 13px;
+  transform: translateY(-50%);
+  color: #57607a;
+  pointer-events: none;
+}
+
+.currencyInput input {
+  padding-left: 30px;
+}
+
+.equipmentField {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.equipmentField legend {
+  min-height: 2.8em;
+  margin-bottom: 7px;
+  padding: 0;
+}
+
+.choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.choice {
+  display: inline-flex;
+  min-height: 46px;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  border: 1.5px solid #8b91a2;
+  border-radius: 2px;
+  background: #fff;
+  color: #1c2a44;
+  cursor: pointer;
+  font-size: 0.95rem;
+  white-space: nowrap;
+}
+
+.choice:has(input:checked) {
+  border-color: #1c2a44;
+  background: #f8ebd6;
+}
+
+.choice:has(input:focus-visible) {
+  outline: 3px solid rgb(181 71 43 / 35%);
+  outline-offset: 2px;
+}
+
+.choice input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: #1c2a44;
+}
+
+@media (max-width: 720px) {
+  .equipmentField legend {
+    min-height: 0;
+  }
+}
