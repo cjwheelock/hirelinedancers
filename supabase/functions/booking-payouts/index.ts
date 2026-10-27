@@ -123,7 +123,12 @@ export default {
             instructor_profile_id: profile.id,
             account_id: accountId,
           },
-        }, { idempotencyKey: `hld-payout-account-${profile.id}` });
+        }, {
+          // A short time bucket still collapses double clicks into one account,
+          // but a failed attempt (for example before Connect was enabled) is
+          // not replayed by Stripe for the next 24 hours.
+          idempotencyKey: `hld-payout-account-${profile.id}-${Math.floor(Date.now() / 600_000)}`,
+        });
       }
 
       const status = await syncPayoutAccount(
