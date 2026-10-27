@@ -363,6 +363,8 @@ export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean })
           <OnboardingForm
             email={session.user.email ?? ""}
             initialName={account?.full_name ?? session.user.user_metadata.full_name ?? ""}
+            initialFirstName={account?.first_name ?? session.user.user_metadata.given_name ?? ""}
+            initialLastName={account?.last_name ?? session.user.user_metadata.family_name ?? ""}
             fixedRole="instructor"
             invitationToken={entryInvitationToken}
             onComplete={async () => {
@@ -444,6 +446,8 @@ export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean })
         <OnboardingForm
           email={session.user.email ?? ""}
           initialName={account?.full_name ?? session.user.user_metadata.full_name ?? ""}
+          initialFirstName={account?.first_name ?? session.user.user_metadata.given_name ?? ""}
+          initialLastName={account?.last_name ?? session.user.user_metadata.family_name ?? ""}
           fixedRole={entryIntent ?? undefined}
           onComplete={async () => {
             if (entryReturnTo) {
@@ -465,7 +469,7 @@ export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean })
       <div className={`${styles.topbar} ${adminWorkspaceActive ? styles.adminTopbar : ""}`}>
         <div>
           {!adminWorkspaceActive ? <p className={styles.eyebrow}>{workspaceMode === "organizer" || account?.role === "organizer" ? "Planner workspace" : "Instructor workspace"}</p> : null}
-          <h1>{adminWorkspaceActive ? "Admin" : `Welcome, ${account?.full_name?.split(" ")[0] || "there"}`}</h1>
+          <h1>{adminWorkspaceActive ? "Admin" : `Welcome, ${account?.first_name || account?.full_name?.trim().split(/\s+/)[0] || "there"}`}</h1>
           <p className={styles.muted}>{account?.email}</p>
         </div>
         <button className={styles.secondaryButton} type="button" disabled={signingOut} onClick={() => void signOut()}>
@@ -495,18 +499,23 @@ export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean })
 function OnboardingForm({
   email,
   initialName,
+  initialFirstName,
+  initialLastName,
   fixedRole,
   invitationToken,
   onComplete
 }: {
   email: string;
   initialName: string;
+  initialFirstName: string;
+  initialLastName: string;
   fixedRole?: AccountIntent;
   invitationToken?: string;
   onComplete: () => void | Promise<void>;
 }) {
   const [role, setRole] = useState<AccountRole>(fixedRole ?? "organizer");
-  const [name, setName] = useState(initialName);
+  const [firstName, setFirstName] = useState(initialFirstName || initialName.trim().split(/\s+/)[0] || "");
+  const [lastName, setLastName] = useState(initialLastName || initialName.trim().split(/\s+/).slice(1).join(" "));
   const [company, setCompany] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -522,19 +531,13 @@ function OnboardingForm({
       const tokenHash = invitationToken
         ? await instructorInvitationTokenHash(invitationToken)
         : null;
-      const { error: rpcError } = tokenHash
-        ? await client.rpc("accept_instructor_invitation", {
-            p_token_hash: tokenHash,
-            p_full_name: name.trim(),
-            p_company_name: company.trim() || null
-          })
-        : await client.rpc("complete_account_onboarding", {
-            p_role: role,
-            p_full_name: name.trim(),
-            p_company_name: company.trim() || null,
-            p_phone_e164: null,
-            p_sms_opt_in: false
-          });
+      const { error: rpcError } = await client.rpc("complete_account_onboarding_with_names", {
+        p_role: role,
+        p_first_name: firstName.trim(),
+        p_last_name: lastName.trim(),
+        p_company_name: company.trim() || null,
+        p_invitation_token_hash: tokenHash
+      });
       if (rpcError) throw rpcError;
       await onComplete();
     } catch (submitError) {
@@ -562,8 +565,12 @@ function OnboardingForm({
       ) : null}
 
       <label className={styles.field}>
-        <span>Full name</span>
-        <input required autoComplete="name" value={name} onChange={(event) => setName(event.target.value)} />
+        <span>First name</span>
+        <input required name="firstName" autoComplete="given-name" value={firstName} onChange={(event) => setFirstName(event.target.value)} />
+      </label>
+      <label className={styles.field}>
+        <span>Last name</span>
+        <input required name="lastName" autoComplete="family-name" value={lastName} onChange={(event) => setLastName(event.target.value)} />
       </label>
       <label className={styles.field}>
         <span>Email</span>

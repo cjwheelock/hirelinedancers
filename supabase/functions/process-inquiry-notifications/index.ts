@@ -35,6 +35,8 @@ type ClaimArgs = {
 type WorkerDatabase = {
   public: {
     Tables: {
+      accounts: ReadOnlyTable<{ id: string; email: string; first_name: string | null }>;
+
       inquiry_recipients: ReadOnlyTable<{
         id: string;
         instructor_profile_id: string | null;
@@ -143,6 +145,7 @@ type NotificationJob = {
   recipient_login_email: string | null;
   delivered_to_phone_e164: string | null;
   inquiry_id: string;
+  recipient_first_name?: string | null;
   instructor_name: string;
   organizer_name: string;
   organizer_email: string;
@@ -189,6 +192,7 @@ export type ThreadNotificationJob = {
   thread_id: string;
   inquiry_id: string;
   assignment_order: number;
+  recipient_first_name?: string | null;
   instructor_name: string;
   organizer_name: string;
   company_name: string | null;
@@ -237,7 +241,8 @@ type InstructorServiceNotificationType =
   | "billing_access_paused"
   | "inquiry_email_confirmation";
 
-type InstructorServiceJob = {
+export type InstructorServiceJob = {
+  recipient_first_name?: string | null;
   job_id: number;
   attempt_number: number;
   notification_type: InstructorServiceNotificationType;
@@ -275,6 +280,17 @@ function requiredEnv(name: string): string {
   const value = Deno.env.get(name)?.trim();
   if (!value) throw new ConfigurationError(`Missing required secret: ${name}`);
   return value;
+}
+
+export function greetingFirstName(fullName: string, firstName?: string | null): string {
+  return firstName?.trim() || fullName.trim().split(/\s+/)[0] || fullName;
+}
+
+async function accountFirstName(admin: AdminClient, column: "id" | "email", value: string | null): Promise<string | null> {
+  if (!value) return null;
+  const { data, error } = await admin.from("accounts").select("first_name").eq(column, value).maybeSingle();
+  if (error) throw new ProviderError("Unable to load the recipient's first name", true);
+  return data?.first_name ?? null;
 }
 
 function escapeHtml(value: unknown): string {
@@ -373,7 +389,7 @@ function emailText(job: NotificationJob, actionUrl: string | null = null): strin
   const notificationType = normalizedNotificationType(job);
   if (notificationType === "booking_followup") {
     return [
-      `Hi ${job.instructor_name},`,
+      `Hi ${greetingFirstName(job.instructor_name, job.recipient_first_name)},`,
       "",
       `${job.organizer_name}${job.company_name ? ` from ${job.company_name}` : ""} contacted you through Hire Line Dancers one week ago about a ${eventTypeInSentence(job.event_type)}.`,
       "",
@@ -387,7 +403,7 @@ function emailText(job: NotificationJob, actionUrl: string | null = null): strin
   }
   if (notificationType === "completion_followup") {
     return [
-      `Hi ${job.instructor_name},`,
+      `Hi ${greetingFirstName(job.instructor_name, job.recipient_first_name)},`,
       "",
       `We hope your ${eventTypeInSentence(job.event_type)} on ${display(job.event_date)} went well.`,
       "",
@@ -398,7 +414,7 @@ function emailText(job: NotificationJob, actionUrl: string | null = null): strin
   }
 
   return [
-    `Hi ${job.instructor_name},`,
+    `Hi ${greetingFirstName(job.instructor_name, job.recipient_first_name)},`,
     "",
     `${job.organizer_name} sent you a new inquiry through Hire Line Dancers. Open the conversation to reply on Hire Line Dancers.`,
     "",
@@ -440,7 +456,7 @@ function emailHtml(job: NotificationJob, actionUrl: string | null = null): strin
       <body style="margin:0;background:#fbfaf5;color:#1c2a44;font-family:Arial,sans-serif;line-height:1.55">
         <div style="max-width:640px;margin:0 auto;padding:32px 20px">
           <div style="border-top:8px solid #e7a33c;background:#ffffff;padding:30px">
-            <p style="margin:0 0 18px">Hi ${escapeHtml(job.instructor_name)},</p>
+            <p style="margin:0 0 18px">Hi ${escapeHtml(greetingFirstName(job.instructor_name, job.recipient_first_name))},</p>
             <h1 style="margin:0 0 16px;font-size:28px;line-height:1.15">${escapeHtml(heading)}</h1>
             <p style="margin:0 0 12px">${escapeHtml(description)}</p>
             <p style="margin:0 0 24px">${escapeHtml(prompt)} Your private comments help us improve Hire Line Dancers.</p>
@@ -476,7 +492,7 @@ function emailHtml(job: NotificationJob, actionUrl: string | null = null): strin
     <body style="margin:0;background:#fbfaf5;color:#1c2a44;font-family:Arial,sans-serif;line-height:1.55">
       <div style="max-width:640px;margin:0 auto;padding:32px 20px">
         <div style="border-top:8px solid #e7a33c;background:#ffffff;padding:30px">
-          <p style="margin:0 0 18px">Hi ${escapeHtml(job.instructor_name)},</p>
+          <p style="margin:0 0 18px">Hi ${escapeHtml(greetingFirstName(job.instructor_name, job.recipient_first_name))},</p>
           <h1 style="margin:0 0 16px;font-size:28px;line-height:1.15">You have a new event inquiry</h1>
           <p style="margin:0 0 22px">${escapeHtml(job.organizer_name)} sent you an inquiry through Hire Line Dancers. Open the conversation to reply on Hire Line Dancers.</p>
           <table role="presentation" style="width:100%;border-collapse:collapse">${details}</table>
@@ -580,7 +596,7 @@ export function threadNotificationContent(job: ThreadNotificationJob): {
   switch (job.notification_type) {
     case "new_thread":
       return {
-        recipientName: job.instructor_name,
+        recipientName: greetingFirstName(job.instructor_name, job.recipient_first_name),
         heading: "You have a new event inquiry",
         description: `${job.organizer_name} sent an inquiry through Hire Line Dancers.`,
         instruction: job.response_policy_version === 1 ? "Please reply within 72 hours, even if you are not available." : "Please reply on Hire Line Dancers within 48 hours, even if you are unavailable.",
@@ -594,35 +610,35 @@ export function threadNotificationContent(job: ThreadNotificationJob): {
       };
     case "response_reminder_24":
       return {
-        recipientName: job.instructor_name,
+        recipientName: greetingFirstName(job.instructor_name, job.recipient_first_name),
         heading: "An inquiry is waiting for your response",
         description: `${job.organizer_name}'s inquiry has been waiting for 24 hours.`,
         instruction: "Open the conversation to reply or mark that you are unavailable.",
       };
     case "response_reminder_47":
       return {
-        recipientName: job.instructor_name,
+        recipientName: greetingFirstName(job.instructor_name, job.recipient_first_name),
         heading: "One hour left to respond",
         description: "This inquiry has been waiting for 47 hours.",
         instruction: "Please reply within the next hour, even if you are unavailable. Otherwise, we will recommend other instructors to the organizer. You can still reply afterward while the event remains open.",
       };
     case "response_reminder_48":
       return {
-        recipientName: job.instructor_name,
+        recipientName: greetingFirstName(job.instructor_name, job.recipient_first_name),
         heading: "An inquiry is still waiting for your response",
         description: `${job.organizer_name}'s inquiry has been waiting for 48 hours.`,
         instruction: "Open the conversation to reply or mark that you are unavailable.",
       };
     case "response_timeout_instructor":
       return {
-        recipientName: job.instructor_name,
+        recipientName: greetingFirstName(job.instructor_name, job.recipient_first_name),
         heading: "The response window has ended",
         description: `The ${job.response_policy_version === 1 ? 72 : 48}-hour response window for this inquiry has ended.`,
         instruction: job.response_policy_version === 1 ? "Open the conversation to review its current status." : "We are helping the organizer explore other instructors. You can still reply while the event remains open, but they may book someone else.",
       };
     case "response_timeout_organizer":
       return {
-        recipientName: job.organizer_name,
+        recipientName: greetingFirstName(job.organizer_name, job.recipient_first_name),
         heading: `${job.instructor_name} has not responded`,
         description: job.response_policy_version === 1 ? "The instructor has not responded within 72 hours." : `${job.instructor_name} has not replied within 48 hours and may be busy.`,
         instruction: job.response_policy_version === 1
@@ -633,7 +649,7 @@ export function threadNotificationContent(job: ThreadNotificationJob): {
       };
     case "thread_declined":
       return {
-        recipientName: job.organizer_name,
+        recipientName: greetingFirstName(job.organizer_name, job.recipient_first_name),
         heading: `${job.instructor_name} is unavailable`,
         description: "The instructor marked that they are unavailable for this inquiry.",
         instruction: job.response_policy_version === 1
@@ -644,7 +660,7 @@ export function threadNotificationContent(job: ThreadNotificationJob): {
       };
     case "fallback_routed_organizer":
       return {
-        recipientName: job.organizer_name,
+        recipientName: greetingFirstName(job.organizer_name, job.recipient_first_name),
         heading: "Your inquiry was sent to another instructor",
         description: `Hire Line Dancers sent your event details to ${job.instructor_name}.`,
         instruction: "Open the conversation to follow the response.",
@@ -927,13 +943,12 @@ async function sendProfileSubmissionEmail(
   return payload.id;
 }
 
-function liveProfileUrl(job: InstructorServiceJob): string {
+export function liveProfileUrl(job: InstructorServiceJob): string {
   const appUrl = configuredAppUrl();
   if (!job.profile_slug) return new URL("instructors/", appUrl).toString();
-  return new URL(
-    `instructors/${encodeURIComponent(job.profile_slug)}/`,
-    appUrl,
-  ).toString();
+  const url = new URL("profile/", appUrl);
+  url.searchParams.set("instructor", job.profile_slug);
+  return url.toString();
 }
 
 async function instructorServiceMagicLink(
@@ -962,12 +977,12 @@ async function instructorServiceMagicLink(
   return actionLink;
 }
 
-function approvalEmailText(
+export function approvalEmailText(
   job: InstructorServiceJob,
   profileUrl: string,
 ): string {
   return [
-    `Hi ${job.display_name},`,
+    `Hi ${greetingFirstName(job.display_name, job.recipient_first_name)},`,
     "",
     "Wanted to let you know we just approved your profile. We are so glad to have you here.",
     "",
@@ -982,7 +997,7 @@ function approvalEmailText(
   ].join("\n");
 }
 
-function approvalEmailHtml(
+export function approvalEmailHtml(
   job: InstructorServiceJob,
   profileUrl: string,
 ): string {
@@ -991,7 +1006,7 @@ function approvalEmailHtml(
     <body style="margin:0;background:#fbfaf5;color:#1c2a44;font-family:Arial,sans-serif;line-height:1.55">
       <div style="max-width:640px;margin:0 auto;padding:32px 20px">
         <div style="border-top:8px solid #e7a33c;background:#ffffff;padding:30px">
-          <p style="margin:0 0 18px">Hi ${escapeHtml(job.display_name)},</p>
+          <p style="margin:0 0 18px">Hi ${escapeHtml(greetingFirstName(job.display_name, job.recipient_first_name))},</p>
           <h1 style="margin:0 0 16px;font-size:28px;line-height:1.15">Your profile has been approved</h1>
           <p style="margin:0 0 16px">Wanted to let you know we just approved your profile. We are so glad to have you here.</p>
           <p style="margin:0 0 16px">Now it is on us to connect with high-quality organizers near you, help you get work, and help you get booked.</p>
@@ -1020,7 +1035,7 @@ function billingRecoveryEmailText(
   ) {
     const deadline = recoveryDeadline(job.grace_ends_at);
     return [
-      `Hi ${job.display_name},`,
+      `Hi ${greetingFirstName(job.display_name, job.recipient_first_name)},`,
       "",
       "We had trouble processing your Hire Line Dancers membership payment. This can happen when a card expires, is replaced, or is declined by the card issuer.",
       "",
@@ -1038,7 +1053,7 @@ function billingRecoveryEmailText(
   }
 
   return [
-    `Hi ${job.display_name},`,
+    `Hi ${greetingFirstName(job.display_name, job.recipient_first_name)},`,
     "",
     "We could not process your first paid Hire Line Dancers membership charge. This can happen when a card expires, is replaced, or is declined by the card issuer.",
     "",
@@ -1060,7 +1075,7 @@ function activationPaymentFailureEmailText(
   accountUrl: string,
 ): string {
   return [
-    `Hi ${job.display_name},`,
+    `Hi ${greetingFirstName(job.display_name, job.recipient_first_name)},`,
     "",
     `We could not start your Hire Line Dancers membership with the payment method you saved. Your profile has not been published, and no ${BILLING_RECOVERY_GRACE_DAYS}-day grace period applies before the first successful payment.`,
     "",
@@ -1084,7 +1099,7 @@ function activationPaymentFailureEmailHtml(
     <body style="margin:0;background:#fbfaf5;color:#1c2a44;font-family:Arial,sans-serif;line-height:1.55">
       <div style="max-width:640px;margin:0 auto;padding:32px 20px">
         <div style="border-top:8px solid #9b3822;background:#ffffff;padding:30px">
-          <p style="margin:0 0 18px">Hi ${escapeHtml(job.display_name)},</p>
+          <p style="margin:0 0 18px">Hi ${escapeHtml(greetingFirstName(job.display_name, job.recipient_first_name))},</p>
           <h1 style="margin:0 0 16px;font-size:28px;line-height:1.15">We could not start your membership</h1>
           <p style="margin:0 0 16px">We could not start your Hire Line Dancers membership with the payment method you saved.</p>
           <p style="margin:0 0 24px">Your profile has not been published, and no ${BILLING_RECOVERY_GRACE_DAYS}-day grace period applies before the first successful payment.</p>
@@ -1119,7 +1134,7 @@ function billingRecoveryEmailHtml(
     <body style="margin:0;background:#fbfaf5;color:#1c2a44;font-family:Arial,sans-serif;line-height:1.55">
       <div style="max-width:640px;margin:0 auto;padding:32px 20px">
         <div style="border-top:8px solid #9b3822;background:#ffffff;padding:30px">
-          <p style="margin:0 0 18px">Hi ${escapeHtml(job.display_name)},</p>
+          <p style="margin:0 0 18px">Hi ${escapeHtml(greetingFirstName(job.display_name, job.recipient_first_name))},</p>
           <h1 style="margin:0 0 16px;font-size:28px;line-height:1.15">We could not process your membership payment</h1>
           <p style="margin:0 0 16px">This can happen when a card expires, is replaced, or is declined by the card issuer.</p>
           <p style="margin:0 0 24px">${statusCopy}</p>
@@ -1135,7 +1150,7 @@ function billingRecoveryEmailHtml(
 
 function inquiryEmailConfirmationText(job: InstructorServiceJob, accountUrl: string): string {
   return [
-    `Hi ${job.display_name},`,
+    `Hi ${greetingFirstName(job.display_name, job.recipient_first_name)},`,
     "",
     `This confirms that new inquiry and booking alerts from Hire Line Dancers will be sent to ${job.delivered_to_email}.`,
     "",
@@ -1154,7 +1169,7 @@ function inquiryEmailConfirmationHtml(job: InstructorServiceJob, accountUrl: str
     <body style="margin:0;background:#fbfaf5;color:#1c2a44;font-family:Arial,sans-serif;line-height:1.55">
       <div style="max-width:640px;margin:0 auto;padding:32px 20px">
         <div style="border-top:8px solid #e7a33c;background:#ffffff;padding:30px">
-          <p style="margin:0 0 18px">Hi ${escapeHtml(job.display_name)},</p>
+          <p style="margin:0 0 18px">Hi ${escapeHtml(greetingFirstName(job.display_name, job.recipient_first_name))},</p>
           <h1 style="margin:0 0 16px;font-size:28px;line-height:1.15">Your inquiry alerts are set up</h1>
           <p style="margin:0 0 16px">New inquiry and booking alerts from Hire Line Dancers will be sent to <strong>${escapeHtml(job.delivered_to_email)}</strong>.</p>
           <p style="margin:0 0 24px">If you did not make this change, sign in and update your inquiry email, or reply to this email.</p>
@@ -1174,6 +1189,7 @@ async function sendInstructorServiceEmail(
   const from = requiredEnv("RESEND_FROM_EMAIL");
   const supportEmail = Deno.env.get("SUPPORT_EMAIL")?.trim() ||
     "hello@hirelinedancers.com";
+  job.recipient_first_name = await accountFirstName(admin, "email", job.login_email);
   const isApproval = job.notification_type === "profile_approved";
   const isEmailConfirmation = job.notification_type === "inquiry_email_confirmation";
   const isActivationFailure =
@@ -1371,6 +1387,9 @@ async function processJob(admin: AdminClient, job: NotificationJob): Promise<str
       }
       await requireCurrentSmsConsent(admin, job);
     }
+    if (job.channel === "email") {
+      job.recipient_first_name = await accountFirstName(admin, "email", job.recipient_login_email);
+    }
     const providerMessageId = job.channel === "email"
       ? await sendEmail(job)
       : await sendSms(job);
@@ -1473,6 +1492,9 @@ async function processThreadNotificationJob(
       return String(data);
     }
 
+    if (job.channel === "email") {
+      job.recipient_first_name = await accountFirstName(admin, "id", job.recipient_account_id);
+    }
     if (job.response_policy_version !== 1 && ["response_timeout_organizer","thread_declined"].includes(job.notification_type)) {
       const {data, error} = await admin.rpc("get_inquiry_recommendations", {p_thread_id:job.thread_id});
       if (error) throw new ProviderError("Unable to load inquiry recommendations",true);

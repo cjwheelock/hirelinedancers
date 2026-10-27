@@ -20,6 +20,8 @@ export type MarketplaceAccount = {
   id: string;
   email: string | null;
   full_name: string | null;
+  first_name: string | null;
+  last_name: string | null;
   role: AccountRole | null;
   company_name: string | null;
   phone_e164: string | null;

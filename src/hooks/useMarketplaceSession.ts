@@ -37,7 +37,7 @@ export function useMarketplaceSession() {
     const [accountResult, adminResult, ownerResult] = await Promise.all([
       client
         .from("accounts")
-        .select("id,email,full_name,role,company_name,phone_e164,sms_opt_in,onboarding_completed_at")
+        .select("id,email,full_name,first_name,last_name,role,company_name,phone_e164,sms_opt_in,onboarding_completed_at")
         .eq("id", session.user.id)
         .maybeSingle(),
       client.rpc("current_marketplace_admin_status"),

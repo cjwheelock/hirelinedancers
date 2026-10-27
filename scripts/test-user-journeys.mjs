@@ -77,7 +77,7 @@ function harness(component = "inbox", props = {}) {
     if (modules.has(relative)) return modules.get(relative).exports;
     if (!compiled.has(relative)) {
       let source = readFileSync(new URL(relative, root), "utf8");
-      if (relative.endsWith("AccountWorkspace.tsx")) source += "\nexport { InstructorDashboard };";
+      if (relative.endsWith("AccountWorkspace.tsx")) source += "\nexport { InstructorDashboard, OnboardingForm };";
       compiled.set(relative, ts.transpileModule(source, { fileName: relative, compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText);
     }
     const commonJsModule = { exports: {} }; modules.set(relative, commonJsModule);
@@ -97,7 +97,7 @@ function harness(component = "inbox", props = {}) {
     }, window, { env: { NEXT_PUBLIC_SUPABASE_URL: "https://supabase.test", NEXT_PUBLIC_SUPABASE_ANON_KEY: "publishable-test" } });
     return commonJsModule.exports;
   }
-  const Component = component === "inbox" ? load("src/components/InquiryInbox.tsx").InquiryInbox : component === "dashboard" ? load("src/components/AccountWorkspace.tsx").InstructorDashboard : load("src/components/SearchPanel.tsx").PublicInstructorResults;
+  const Component = component === "inbox" ? load("src/components/InquiryInbox.tsx").InquiryInbox : component === "dashboard" ? load("src/components/AccountWorkspace.tsx").InstructorDashboard : component === "onboarding" ? load("src/components/AccountWorkspace.tsx").OnboardingForm : load("src/components/SearchPanel.tsx").PublicInstructorResults;
   const rootProps = component === "inbox" ? { perspective: "organizer", accountId: "account", ...props } : component === "dashboard" ? { account: { id: "account" }, ...props } : { onCountChange: count => counts.push(count), ...props };
   async function render() {
     for (let iteration = 0; iteration < 40; iteration++) {
@@ -229,4 +229,28 @@ test("recommendations remain bound to their conversation during rapid switches",
   await app.render();
   assert.ok(app.text().includes("Current instructor"));
   assert.ok(!app.text().includes("Stale instructor"));
+});
+
+for (const role of ["organizer", "instructor"]) {
+  test(`${role}: onboarding submits separate first and last names`, async () => {
+    let completed = false;
+    const app = harness("onboarding", { email: "names@example.test", initialName: "CJ Wheelock", initialFirstName: "", initialLastName: "", fixedRole: role, onComplete: () => { completed = true; } });
+    await app.render();
+    assert.equal(app.field("First name").props.value, "CJ");
+    assert.equal(app.field("Last name").props.value, "Wheelock");
+    assert.equal(app.field("First name").props.autoComplete, "given-name");
+    assert.equal(app.field("Last name").props.autoComplete, "family-name");
+    app.field("First name").props.onChange(event("  Mary Jane  "));
+    app.field("Last name").props.onChange(event("  de la Cruz  "));
+    await app.render();
+    await app.nodes().find(node => node.type === "form").props.onSubmit(event());
+    assert.deepEqual(app.calls[0], { name: "complete_account_onboarding_with_names", args: { p_role: role, p_first_name: "Mary Jane", p_last_name: "de la Cruz", p_company_name: null, p_invitation_token_hash: null } });
+    assert.equal(completed, true);
+  });
+}
+test("onboarding preserves an explicit compound first name from the account", async () => {
+  const app = harness("onboarding", { email: "names@example.test", initialName: "Mary Jane de la Cruz", initialFirstName: "Mary Jane", initialLastName: "de la Cruz", fixedRole: "organizer", onComplete() {} });
+  await app.render();
+  assert.equal(app.field("First name").props.value, "Mary Jane");
+  assert.equal(app.field("Last name").props.value, "de la Cruz");
 });

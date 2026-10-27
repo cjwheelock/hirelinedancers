@@ -87,3 +87,36 @@ Deno.test("booking updates keep their original action and do not request a reply
   const html = threadNotificationHtml(notification("booking_update"), "https://hirelinedancers.com/account/");
   assert(html.includes("Open conversation") && !html.includes("Please reply on Hire Line Dancers"), "booking action");
 });
+
+
+import { approvalEmailHtml, approvalEmailText, greetingFirstName, liveProfileUrl, type InstructorServiceJob } from "./index.ts";
+const approval: InstructorServiceJob = {
+  job_id: 1, attempt_number: 1, notification_type: "profile_approved", instructor_profile_id: "profile",
+  billing_recovery_id: null, delivered_to_email: "cj@example.test", login_email: "cj@example.test",
+  display_name: "CJ Wheelock", profile_slug: "cj-wheelock-new-york-ny", recovery_status: null,
+  has_prior_successful_payment: null, first_failed_at: null, grace_ends_at: null, recipient_first_name: "CJ",
+};
+Deno.test("approval links use the deployed database profile route and encode the identifier", () => {
+  Deno.env.set("APP_URL", "https://hirelinedancers.com/");
+  assertEquals(liveProfileUrl(approval), "https://hirelinedancers.com/profile/?instructor=cj-wheelock-new-york-ny");
+  const link = new URL(liveProfileUrl({ ...approval, profile_slug: "name/with space&other=true" }));
+  assertEquals(link.pathname, "/profile/");
+  assertEquals(link.searchParams.get("instructor")!, "name/with space&other=true");
+  assertEquals(String([...link.searchParams].length), "1");
+  assertEquals(liveProfileUrl({ ...approval, profile_slug: null }), "https://hirelinedancers.com/instructors/");
+});
+Deno.test("approval text and HTML use first-name greetings and the working profile link", () => {
+  const link = liveProfileUrl(approval);
+  assert(approvalEmailText(approval, link).startsWith("Hi CJ,\n"), "text first name");
+  const html = approvalEmailHtml(approval, link);
+  assert(html.includes("Hi CJ,") && !html.includes("Hi CJ Wheelock,"), "HTML first name");
+  assert(html.includes(`href="${link}"`), "working profile URL");
+});
+Deno.test("greetings prefer an explicit compound first name over public branding", () => {
+  assertEquals(greetingFirstName("Dance Company", "Mary Jane"), "Mary Jane");
+  assertEquals(greetingFirstName("  CJ   Wheelock  "), "CJ");
+  const html = approvalEmailHtml({ ...approval, recipient_first_name: "<CJ>" }, liveProfileUrl(approval));
+  assert(html.includes("Hi &lt;CJ&gt;,") && !html.includes("Hi <CJ>"), "greeting escaped");
+  const job = { ...notification("new_thread"), instructor_name: "Dance Company", recipient_first_name: "Mary Jane" };
+  assertEquals(threadNotificationContent(job).recipientName!, "Mary Jane");
+});
