@@ -15,6 +15,7 @@ import {
   Users
 } from "lucide-react";
 import { eventTypes, site, topCities } from "@/data/site";
+import { LogoMark } from "@/components/Logo";
 import { HeroArt } from "./HeroArt";
 import styles from "./desert.module.css";
 
@@ -66,13 +67,11 @@ const steps = [
   }
 ];
 
-function Mark({ size = 36 }: { size?: number }) {
+function Mark({ size = 48 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true">
-      <circle cx="16" cy="16" r="15" fill="#B8482A" />
-      <path d="M6 21h20M9 21a7 7 0 0 1 14 0" stroke="#F6EEE2" strokeWidth="2" fill="none" strokeLinecap="round" />
-      <path d="M11 25h10" stroke="#F6EEE2" strokeWidth="2" strokeLinecap="round" />
-    </svg>
+    <span aria-hidden="true" style={{ display: "inline-flex" }}>
+      <LogoMark size={size} />
+    </span>
   );
 }
 
@@ -255,7 +254,7 @@ export default function TestingHome() {
       <footer className={styles.footer}>
         <div className={styles.footerInner}>
           <div className={styles.footerBrand}>
-            <span className={styles.brand}><Mark size={32} /><span>{site.name}</span></span>
+            <span className={styles.brand}><Mark size={38} /><span>{site.name}</span></span>
             <p>A simple way to find a line dance instructor for your event and help more guests get moving together. No experience needed.</p>
           </div>
           <div>
