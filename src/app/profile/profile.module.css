@@ -17,7 +17,7 @@
 
 .state > p:not(.kicker) {
   max-width: 58ch;
-  color: #57607a;
+  color: #5a4a3e;
   font-size: 1.08rem;
   line-height: 1.65;
 }
@@ -28,7 +28,7 @@
   gap: clamp(28px, 5vw, 64px);
   align-items: center;
   padding-bottom: clamp(42px, 6vw, 72px);
-  border-bottom: 2px solid #1c2a44;
+  border-bottom: 1px solid var(--line);
 }
 
 .headshot {
@@ -36,11 +36,11 @@
   aspect-ratio: 1;
   place-items: center;
   overflow: hidden;
-  border: 2px solid #1c2a44;
-  background: #e7a33c;
-  color: #1c2a44;
+  border: 1px solid var(--line);
+  background: #e9a94b;
+  color: #2a1e17;
   font-size: clamp(3rem, 8vw, 6rem);
-  font-weight: 900;
+  font-weight: 900; border-radius: var(--radius);
 }
 
 .headshot img {
@@ -61,8 +61,8 @@
 
 .kicker {
   margin: 0 0 12px;
-  color: #b5472b;
-  font: 700 0.75rem/1.3 "IBM Plex Mono", monospace;
+  color: #b8482a;
+  font: 700 0.75rem/1.3 var(--font-mono);
   letter-spacing: 0.09em;
   text-transform: uppercase;
 }
@@ -70,7 +70,7 @@
 .headline {
   max-width: 62ch;
   margin-top: 18px;
-  color: #3f4b66;
+  color: #4a3a2f;
   font-size: clamp(1.05rem, 2vw, 1.3rem);
   line-height: 1.55;
 }
@@ -92,11 +92,11 @@
   align-items: center;
   gap: 7px;
   padding: 8px 11px;
-  border: 1px solid #1c2a44;
+  border: 1px solid var(--line);
   background: #fff;
-  color: #1c2a44;
+  color: #2a1e17;
   font-size: 0.88rem;
-  font-weight: 700;
+  font-weight: 700; border-radius: var(--radius);
 }
 
 .layout {
@@ -114,7 +114,7 @@
 
 .section {
   padding: clamp(24px, 4vw, 36px);
-  border: 1px solid #d8d9dc;
+  border: 1px solid #eadfd0;
   background: #fff;
 }
 
@@ -129,7 +129,7 @@
 
 .bodyCopy {
   margin-top: 20px;
-  color: #3f4b66;
+  color: #4a3a2f;
   font-size: 1.02rem;
   line-height: 1.75;
 }
@@ -149,8 +149,8 @@
 
 .tags span {
   padding: 6px 10px;
-  background: #e8ebf2;
-  color: #1c2a44;
+  background: #e4f0ee;
+  color: #2a1e17;
   font-size: 0.8rem;
   font-weight: 700;
 }
@@ -159,7 +159,7 @@
   display: grid;
   gap: 0;
   margin-top: 26px;
-  border-top: 1px solid #d8d9dc;
+  border-top: 1px solid #eadfd0;
 }
 
 .detailList > div {
@@ -167,13 +167,13 @@
   grid-template-columns: 28px minmax(0, 1fr);
   gap: 11px;
   padding: 16px 0;
-  border-bottom: 1px solid #d8d9dc;
-  color: #3f4b66;
+  border-bottom: 1px solid #eadfd0;
+  color: #4a3a2f;
   line-height: 1.55;
 }
 
 .detailList svg {
-  color: #b5472b;
+  color: #b8482a;
 }
 
 .mediaGrid {
@@ -186,8 +186,8 @@
 .mediaItem {
   min-width: 0;
   margin: 0;
-  border: 1px solid #1c2a44;
-  background: #f1efe8;
+  border: 1px solid var(--line);
+  background: #efe3d0; border-radius: var(--radius);
 }
 
 .media {
@@ -195,7 +195,7 @@
   width: 100%;
   aspect-ratio: 4 / 3;
   object-fit: cover;
-  background: #1c2a44;
+  background: #2a1e17;
 }
 
 .videoLink {
@@ -206,18 +206,18 @@
   gap: 12px;
   padding: 28px;
   color: #fff;
-  background: #1c2a44;
+  background: #2a1e17;
   text-align: center;
   font-weight: 900;
 }
 
 .videoLink:hover {
-  color: #e7a33c;
+  color: #e9a94b;
 }
 
 .mediaItem figcaption {
   padding: 11px 13px;
-  color: #3f4b66;
+  color: #4a3a2f;
   font-size: 0.86rem;
   line-height: 1.45;
 }
@@ -228,13 +228,13 @@
   display: grid;
   gap: 16px;
   padding: clamp(24px, 4vw, 34px);
-  border: 2px solid #1c2a44;
-  border-top: 8px solid #e7a33c;
-  background: #fff;
+  border: 1px solid var(--line);
+  border-top: 8px solid #e9a94b;
+  background: #fff; border-radius: var(--radius);
 }
 
 .contactCard > svg {
-  color: #b5472b;
+  color: #b8482a;
 }
 
 .contactCard h2 {
@@ -245,7 +245,7 @@
 }
 
 .contactCard > p:not(.kicker, .finePrint, .response) {
-  color: #3f4b66;
+  color: #4a3a2f;
   line-height: 1.65;
 }
 
@@ -256,20 +256,20 @@
   justify-content: center;
   margin-top: 6px;
   padding: 12px 18px;
-  border: 2px solid #e7a33c;
-  background: #e7a33c;
-  color: #1c2a44;
+  border: 2px solid #e9a94b;
+  background: #e9a94b;
+  color: #2a1e17;
   font-weight: 900;
 }
 
 .primaryButton:hover {
-  border-color: #b5472b;
-  background: #b5472b;
+  border-color: #b8482a;
+  background: #b8482a;
   color: #fff;
 }
 
 .finePrint {
-  color: #57607a;
+  color: #5a4a3e;
   font-size: 0.82rem;
   line-height: 1.55;
 }
@@ -278,7 +278,7 @@
   display: grid;
   gap: 10px;
   padding-left: 20px;
-  color: #3f4b66;
+  color: #4a3a2f;
   font-size: 0.9rem;
   line-height: 1.55;
 }
@@ -288,8 +288,8 @@
   align-items: center;
   gap: 7px;
   padding-top: 14px;
-  border-top: 1px solid #d8d9dc;
-  color: #1c2a44;
+  border-top: 1px solid #eadfd0;
+  color: #2a1e17;
   font-size: 0.82rem;
   font-weight: 700;
 }
@@ -301,9 +301,9 @@
   gap: clamp(24px, 4vw, 48px);
   margin-top: clamp(42px, 6vw, 72px);
   padding: clamp(28px, 4vw, 44px);
-  border: 2px solid #1c2a44;
-  border-left: 8px solid #e7a33c;
-  background: #fff;
+  border: 1px solid var(--line);
+  border-left: 8px solid #e9a94b;
+  background: #fff; border-radius: var(--radius);
 }
 
 .bottomCta > div {
@@ -316,7 +316,7 @@
 
 .bottomCta p:not(.kicker) {
   margin-top: 12px;
-  color: #3f4b66;
+  color: #4a3a2f;
   line-height: 1.65;
 }
 
@@ -377,14 +377,14 @@
 .previewBanner {
   margin: 0 0 18px;
   padding: 12px 16px;
-  border: 2px solid #1c2a44;
-  background: #e7a33c;
-  color: #1c2a44;
-  font-weight: 700;
+  border: 1px solid var(--line);
+  background: #e9a94b;
+  color: #2a1e17;
+  font-weight: 700; border-radius: var(--radius);
 }
 
 .previewBanner a {
-  color: #1c2a44;
+  color: #2a1e17;
 }
 
 .shareButton {
@@ -397,8 +397,8 @@
   padding: 8px 2px;
   border: 0;
   background: none;
-  color: #1c2a44;
-  font: 700 0.92rem/1 "Lato", sans-serif;
+  color: #2a1e17;
+  font: 700 0.92rem/1 var(--font-sans);
   text-decoration: underline;
   text-underline-offset: 4px;
   cursor: pointer;
@@ -408,7 +408,7 @@
   position: relative;
   width: 100%;
   aspect-ratio: 16 / 9;
-  background: #1c2a44;
+  background: #2a1e17;
 }
 
 .embedVertical {
@@ -438,8 +438,8 @@
 
 .welcomeVideo {
   margin: 4px 0 22px;
-  border: 1px solid #1c2a44;
-  background: #1c2a44;
+  border: 1px solid var(--line);
+  background: #2a1e17; border-radius: var(--radius);
 }
 
 .welcomeVideo .media {
@@ -463,13 +463,13 @@
   align-content: start;
   gap: 8px;
   padding: 20px;
-  border: 2px solid #1c2a44;
-  background: #fbfaf5;
-  color: #1c2a44;
+  border: 1px solid var(--line);
+  background: #f6eee2;
+  color: #2a1e17; border-radius: var(--radius);
 }
 
 .packageCard svg {
-  color: #b5472b;
+  color: #b8482a;
 }
 
 .packageCard h3 {
@@ -479,20 +479,20 @@
 
 .packageCard p {
   margin: 0;
-  color: #3f4b66;
+  color: #4a3a2f;
   line-height: 1.5;
 }
 
 .packageMeta {
-  font: 700 0.8rem/1.3 "IBM Plex Mono", monospace !important;
+  font: 700 0.8rem/1.3 var(--font-mono) !important;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #1c2a44 !important;
+  color: #2a1e17 !important;
 }
 
 .packageLink {
   margin-top: 8px;
-  color: #b5472b;
+  color: #b8482a;
   font-weight: 700;
   text-underline-offset: 3px;
 }
@@ -502,7 +502,7 @@
   gap: 0;
   margin: 22px 0 0;
   padding: 0;
-  border-top: 1px solid #d8d9dc;
+  border-top: 1px solid #eadfd0;
   list-style: none;
 }
 
@@ -511,13 +511,13 @@
   align-items: flex-start;
   gap: 14px;
   padding: 16px 0;
-  border-bottom: 1px solid #d8d9dc;
+  border-bottom: 1px solid #eadfd0;
 }
 
 .highlightList svg {
   flex: 0 0 auto;
   margin-top: 2px;
-  color: #e7a33c;
+  color: #e9a94b;
 }
 
 .highlightList div {
@@ -526,11 +526,11 @@
 }
 
 .highlightList strong {
-  color: #1c2a44;
+  color: #2a1e17;
 }
 
 .highlightList span {
-  color: #57607a;
+  color: #5a4a3e;
   font-size: 0.92rem;
 }
 

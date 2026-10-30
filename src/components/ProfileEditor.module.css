@@ -33,21 +33,21 @@
 
 .progress p {
   margin: 0;
-  color: #3f4b66;
+  color: #4a3a2f;
   font-size: 0.95rem;
 }
 
 .progressTrack {
   height: 10px;
   overflow: hidden;
-  border: 2px solid #1c2a44;
-  border-radius: 2px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
   background: #fff;
 }
 
 .progressFill {
   height: 100%;
-  background: linear-gradient(90deg, #b5472b, #e7a33c);
+  background: linear-gradient(90deg, #b8482a, #e9a94b);
   transition: width 300ms ease;
 }
 
@@ -70,21 +70,21 @@
   gap: 8px;
   min-height: 42px;
   padding: 8px 14px 8px 8px;
-  border: 1.5px solid #c9ccd4;
+  border: 1.5px solid #dccdb8;
   border-radius: 999px;
   background: #fff;
-  color: #3f4b66;
-  font: 700 0.9rem/1 "Lato", sans-serif;
+  color: #4a3a2f;
+  font: 700 0.9rem/1 var(--font-sans);
   cursor: pointer;
 }
 
 .stepButton:hover {
-  border-color: #1c2a44;
+  border-color: #2a1e17;
 }
 
 .stepActive {
-  border-color: #1c2a44;
-  background: #1c2a44;
+  border-color: #2a1e17;
+  background: #2a1e17;
   color: #fff;
 }
 
@@ -94,13 +94,13 @@
   height: 26px;
   place-items: center;
   border-radius: 50%;
-  background: #f1efe8;
-  color: #1c2a44;
-  font: 700 0.78rem/1 "IBM Plex Mono", monospace;
+  background: #efe3d0;
+  color: #2a1e17;
+  font: 700 0.78rem/1 var(--font-mono);
 }
 
 .stepActive .stepNumber {
-  background: #e7a33c;
+  background: #e9a94b;
 }
 
 .body {
@@ -117,12 +117,12 @@
 
 .counter,
 .fieldHint {
-  color: #57607a;
+  color: #5a4a3e;
   font-size: 0.82rem;
 }
 
 .fieldError {
-  color: #8e341f;
+  color: #7a2e1a;
   font-size: 0.85rem;
   font-weight: 700;
 }
@@ -136,28 +136,28 @@
 .chip {
   min-height: 40px;
   padding: 8px 14px;
-  border: 1.5px solid #8b91a2;
+  border: 1.5px solid #8a7a6c;
   border-radius: 999px;
   background: #fff;
-  color: #1c2a44;
-  font: 600 0.92rem/1.1 "Lato", sans-serif;
+  color: #2a1e17;
+  font: 600 0.92rem/1.1 var(--font-sans);
   cursor: pointer;
   transition: background 120ms ease, border-color 120ms ease;
 }
 
 .chip:hover {
-  border-color: #1c2a44;
+  border-color: #2a1e17;
 }
 
 .chip[aria-pressed="true"] {
-  border-color: #1c2a44;
-  background: #1c2a44;
+  border-color: #2a1e17;
+  background: #2a1e17;
   color: #fff;
 }
 
 .chip[aria-pressed="true"]::before {
   content: "✓ ";
-  color: #e7a33c;
+  color: #e9a94b;
 }
 
 .chip:disabled {
@@ -175,10 +175,10 @@
   min-width: 0;
   min-height: 46px;
   padding: 11px 12px;
-  border: 1.5px solid #8b91a2;
-  border-radius: 2px;
+  border: 1.5px solid #8a7a6c;
+  border-radius: 12px;
   background: #fff;
-  color: #1c2a44;
+  color: #2a1e17;
   font: inherit;
 }
 
@@ -186,8 +186,8 @@
   display: grid;
   gap: 14px;
   padding: 18px;
-  border: 1.5px solid #d8d9dc;
-  border-radius: 4px;
+  border: 1.5px solid #eadfd0;
+  border-radius: 12px;
   background: #fff;
 }
 
@@ -201,7 +201,7 @@
 
 .subsectionHeader h4 {
   margin: 0 0 4px;
-  color: #1c2a44;
+  color: #2a1e17;
   font-size: 1.1rem;
 }
 
@@ -217,18 +217,18 @@
   gap: 8px;
   min-height: 64px;
   padding: 14px;
-  border: 2px dashed #8b91a2;
-  border-radius: 4px;
-  background: #fbfaf5;
-  color: #3f4b66;
-  font: 600 0.95rem/1.3 "Lato", sans-serif;
+  border: 2px dashed #8a7a6c;
+  border-radius: 12px;
+  background: #f6eee2;
+  color: #4a3a2f;
+  font: 600 0.95rem/1.3 var(--font-sans);
   text-align: center;
   cursor: pointer;
 }
 
 .emptyTile:hover {
-  border-color: #b5472b;
-  color: #1c2a44;
+  border-color: #b8482a;
+  color: #2a1e17;
 }
 
 .repeatRow {
@@ -265,26 +265,26 @@
   padding: 4px 0;
   border: 0;
   background: none;
-  color: #8e341f;
-  font: 700 0.88rem/1.2 "Lato", sans-serif;
+  color: #7a2e1a;
+  font: 700 0.88rem/1.2 var(--font-sans);
   text-decoration: underline;
   text-underline-offset: 3px;
   cursor: pointer;
 }
 
 .textButton {
-  color: #1c2a44;
+  color: #2a1e17;
 }
 
 .inlineLink {
   display: inline;
   padding: 0;
-  color: #b5472b;
+  color: #b8482a;
 }
 
 .divider {
   height: 1px;
-  background: #d8d9dc;
+  background: #eadfd0;
 }
 
 .footer {
@@ -298,8 +298,8 @@
   gap: 12px;
   margin: 0 calc(-1 * clamp(22px, 4vw, 36px)) calc(-1 * clamp(22px, 4vw, 36px));
   padding: 14px clamp(22px, 4vw, 36px);
-  border-top: 2px solid #1c2a44;
-  background: #fbfaf5;
+  border-top: 1px solid var(--line);
+  background: #f6eee2;
 }
 
 .footerLeft {
@@ -320,7 +320,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  color: #1c2a44;
+  color: #2a1e17;
 }
 
 .done {
@@ -330,15 +330,15 @@
 
 .todo {
   flex: 0 0 auto;
-  color: #8b91a2;
+  color: #8a7a6c;
 }
 
 .shareBox {
   display: grid;
   gap: 8px;
   padding: 16px;
-  border: 2px solid #1c2a44;
-  border-radius: 4px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
   background: #fff;
 }
 
@@ -367,12 +367,12 @@
   display: grid;
   overflow: hidden;
   place-items: center;
-  border: 2px solid #1c2a44;
-  border-radius: 4px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
   background: #fff;
   padding: 0;
-  color: #1c2a44;
-  font: 700 0.95rem/1.2 "Lato", sans-serif;
+  color: #2a1e17;
+  font: 700 0.95rem/1.2 var(--font-sans);
   cursor: pointer;
 }
 
@@ -398,7 +398,7 @@ button.welcomeTile {
 
 .emptySlot {
   border-style: dashed;
-  background: #f1efe8;
+  background: #efe3d0;
 }
 
 .emptySlot span {
@@ -410,15 +410,15 @@ button.welcomeTile {
 }
 
 .emptySlot:hover:not(:disabled) {
-  border-color: #b5472b;
+  border-color: #b8482a;
 }
 
 .linkBox {
   display: grid;
   gap: 8px;
   padding: 16px;
-  border: 1.5px solid #d8d9dc;
-  border-radius: 4px;
+  border: 1.5px solid #eadfd0;
+  border-radius: 12px;
   background: #fff;
 }
 
@@ -441,9 +441,9 @@ button.welcomeTile {
   align-items: center;
   padding: 4px 10px;
   border-radius: 999px;
-  background: #1c2a44;
+  background: #2a1e17;
   color: #fff;
-  font: 700 0.72rem/1 "IBM Plex Mono", monospace;
+  font: 700 0.72rem/1 var(--font-mono);
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
@@ -473,10 +473,10 @@ button.welcomeTile {
   justify-items: center;
   gap: 8px;
   padding: 24px 16px;
-  border: 2px dashed #8b91a2;
-  border-radius: 4px;
-  background: #fbfaf5;
-  color: #1c2a44;
+  border: 2px dashed #8a7a6c;
+  border-radius: 12px;
+  background: #f6eee2;
+  color: #2a1e17;
   text-align: center;
   transition: border-color 120ms ease, background 120ms ease;
 }
@@ -486,7 +486,7 @@ button.welcomeTile {
 }
 
 .dropZoneActive {
-  border-color: #b5472b;
+  border-color: #b8482a;
   background: #fdf1e6;
 }
 
@@ -504,8 +504,8 @@ button.welcomeTile {
   display: grid;
   gap: 8px;
   padding: 8px;
-  border: 1.5px solid #c9ccd4;
-  border-radius: 4px;
+  border: 1.5px solid #dccdb8;
+  border-radius: 12px;
   background: #fff;
   cursor: grab;
 }
@@ -525,8 +525,8 @@ button.welcomeTile {
   aspect-ratio: 4 / 3;
   overflow: hidden;
   place-items: center;
-  border-radius: 2px;
-  background: #1c2a44;
+  border-radius: 12px;
+  background: #2a1e17;
   color: #fff;
   object-fit: cover;
 }
@@ -556,10 +556,10 @@ button.welcomeTile {
   top: 14px;
   left: 14px;
   padding: 3px 8px;
-  border-radius: 2px;
-  background: #e7a33c;
-  color: #1c2a44;
-  font: 700 0.7rem/1 "IBM Plex Mono", monospace;
+  border-radius: 12px;
+  background: #e9a94b;
+  color: #2a1e17;
+  font: 700 0.7rem/1 var(--font-mono);
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
@@ -568,8 +568,8 @@ button.welcomeTile {
   width: 100%;
   min-height: 38px;
   padding: 8px 10px;
-  border: 1px solid #c9ccd4;
-  border-radius: 2px;
+  border: 1px solid #dccdb8;
+  border-radius: 12px;
   font: inherit;
   font-size: 0.88rem;
 }
@@ -591,15 +591,15 @@ button.welcomeTile {
   width: 36px;
   height: 36px;
   place-items: center;
-  border: 1.5px solid #c9ccd4;
-  border-radius: 2px;
+  border: 1.5px solid #dccdb8;
+  border-radius: 12px;
   background: #fff;
-  color: #1c2a44;
+  color: #2a1e17;
   cursor: pointer;
 }
 
 .iconButton:hover:not(:disabled) {
-  border-color: #1c2a44;
+  border-color: #2a1e17;
 }
 
 .iconButton:disabled {

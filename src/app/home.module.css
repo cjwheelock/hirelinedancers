@@ -27,53 +27,6 @@
 }
 .page h3 { font-family: var(--sans); font-weight: 700; letter-spacing: -0.01em; }
 
-/* ---------- Header ---------- */
-.header {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  background: rgba(246, 238, 226, 0.92);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid var(--line);
-}
-.headerInner {
-  max-width: 1240px;
-  margin: 0 auto;
-  padding: 16px 24px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  align-items: center;
-  justify-content: space-between;
-}
-.brand {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  font-family: var(--serif);
-  font-size: 23px;
-}
-.nav {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 22px;
-  font-size: 15px;
-  font-weight: 500;
-}
-.nav a:hover { color: var(--clay); }
-.nav .navCta {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  background: var(--saddle);
-  color: var(--sand);
-  padding: 12px 18px;
-  border-radius: 999px;
-  font-weight: 700;
-}
-.nav .navCta:hover { background: var(--clay); color: #fff; }
-
 /* ---------- Hero ---------- */
 .hero {
   max-width: 1240px;
@@ -97,6 +50,7 @@
   line-height: 1;
   letter-spacing: -0.01em;
 }
+.heroCopy h1 { text-wrap: pretty; }
 .heroCopy h1 em { color: var(--clay); }
 .lede {
   font-size: clamp(18px, 1.6vw, 20px);
@@ -150,30 +104,8 @@
   box-shadow: 0 30px 60px rgba(42, 30, 23, 0.18);
 }
 .arch img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.artSwitch {
-  display: inline-flex;
-  gap: 4px;
-  padding: 4px;
-  background: #fff;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-}
-.artSwitch button {
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  min-height: 36px;
-  padding: 0 14px;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--ink);
-  cursor: pointer;
-}
-.artSwitch .artOn { background: var(--saddle); color: var(--sand); }
-
 /* ---------- Trust ---------- */
-.trust { background: #fff; border-block: 1px solid var(--line); }
+.trust { background: var(--clay); color: var(--sand); }
 .trustInner {
   max-width: 1240px;
   margin: 0 auto;
@@ -186,7 +118,7 @@
   font-weight: 600;
 }
 .trustInner span { display: inline-flex; align-items: center; gap: 9px; }
-.trustInner svg { color: var(--clay); }
+.trustInner svg { color: var(--gold); }
 
 /* ---------- Sections ---------- */
 .section {
@@ -320,29 +252,15 @@
 .linkCard strong { font-size: 19px; }
 .linkCard span { color: var(--muted); line-height: 1.55; font-size: 15px; }
 .linkArrow { position: absolute; left: 24px; bottom: 20px; color: var(--clay); }
-
-.cityGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
-  gap: 14px;
-}
-.cityCard {
-  background: var(--sand-2);
-  border-radius: 18px;
-  padding: 22px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  transition: background 0.15s ease;
-}
-.cityCard:hover { background: #fff; }
-.cityCard strong { display: inline-flex; align-items: center; gap: 8px; font-size: 18px; }
-.cityCard strong svg { color: var(--clay); }
-.cityCard span { color: var(--muted); line-height: 1.55; font-size: 15px; }
+.eventsWrap { background: #f4d9a3; }
+.eventsWrap .linkCard { border-color: transparent; border-top: 5px solid var(--clay); }
+.eventsWrap .linkCard:hover { border-color: transparent; border-top-color: var(--saddle); }
+.eventsWrap .accentClay { border-top-color: var(--clay); }
+.eventsWrap .accentGold { border-top-color: var(--gold); }
+.eventsWrap .accentTeal { border-top-color: var(--teal); }
 
 /* ---------- Quote bands ---------- */
-.quoteClay, .quoteTeal { color: var(--sand); }
-.quoteClay { background: var(--clay); }
+.quoteTeal { color: var(--sand); }
 .quoteTeal { background: var(--teal); }
 .quoteInner {
   max-width: 960px;
@@ -367,23 +285,9 @@
   color: #f7dfb0;
 }
 
-/* ---------- Instructor strip ---------- */
-.instructorStrip {
-  background: var(--gold);
-  border-radius: 28px;
-  padding: 40px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 24px;
-  align-items: center;
-  justify-content: space-between;
-}
-.instructorStrip strong { font-family: var(--serif); font-weight: 400; font-size: clamp(28px, 3vw, 38px); display: block; margin-bottom: 8px; }
-.instructorStrip p { font-size: 17px; }
-
 /* ---------- Final CTA ---------- */
 .finalCta {
-  background: var(--saddle) url("/images/testing/night-dance-hall.webp") center bottom / cover no-repeat;
+  background: var(--saddle) url("/images/home/night-dance-hall.webp") center bottom / cover no-repeat;
   position: relative;
   color: var(--sand);
 }
@@ -401,40 +305,8 @@
 .finalInner h2 { font-family: var(--serif); font-weight: 400; font-size: clamp(38px, 5vw, 64px); line-height: 1.02; }
 .finalInner p { font-size: 18px; line-height: 1.6; color: #e8dccb; max-width: 560px; }
 
-/* ---------- Footer ---------- */
-.footer { background: var(--saddle); color: #d8cbba; border-top: 1px solid #3a2c22; }
-.footerInner {
-  max-width: 1240px;
-  margin: 0 auto;
-  padding: 64px 24px 40px;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 36px;
-}
-.footerBrand { display: flex; flex-direction: column; gap: 14px; }
-.footerBrand .brand { color: var(--sand); font-size: 21px; }
-.footerBrand p { line-height: 1.6; font-size: 14px; }
-.footer h3 { color: var(--sand); font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 14px; }
-.footer ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; font-size: 14px; }
-.footer a:hover { color: var(--gold); }
-.footerBottom {
-  max-width: 1240px;
-  margin: 0 auto;
-  padding: 22px 24px 36px;
-  border-top: 1px solid #3a2c22;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px 24px;
-  justify-content: space-between;
-  font-size: 13px;
-  color: #b3a492;
-}
-
 @media (max-width: 640px) {
-  .header { position: static; }
-  .nav { gap: 4px 14px; font-size: 14px; }
   .hero { padding-top: 32px; }
   .finalCta { background-position: 76% bottom; }
   .section, .how { padding-block: 64px; }
-  .instructorStrip { padding: 28px; }
 }

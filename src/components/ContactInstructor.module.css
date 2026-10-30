@@ -21,7 +21,7 @@
   top: 50%;
   left: 13px;
   transform: translateY(-50%);
-  color: #57607a;
+  color: #5a4a3e;
   pointer-events: none;
 }
 
@@ -54,17 +54,17 @@
   align-items: center;
   gap: 6px;
   padding: 8px;
-  border: 1.5px solid #8b91a2;
-  border-radius: 2px;
+  border: 1.5px solid #8a7a6c;
+  border-radius: 12px;
   background: #fff;
-  color: #1c2a44;
+  color: #2a1e17;
   cursor: pointer;
   font-size: 0.95rem;
   white-space: nowrap;
 }
 
 .choice:has(input:checked) {
-  border-color: #1c2a44;
+  border-color: #2a1e17;
   background: #f8ebd6;
 }
 
@@ -77,7 +77,7 @@
   width: 16px;
   height: 16px;
   margin: 0;
-  accent-color: #1c2a44;
+  accent-color: #2a1e17;
 }
 
 @media (max-width: 720px) {

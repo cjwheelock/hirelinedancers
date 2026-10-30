@@ -8,7 +8,7 @@ export function LogoMark({ size = 40 }: { size?: number }) {
       aria-label="Hire Line Dancers"
       xmlns="http://www.w3.org/2000/svg"
     >
-      <rect x="1" y="1" width="46" height="46" rx="2" fill="#FBFAF5" stroke="#E7A33C" strokeWidth="2" />
+      <rect x="1" y="1" width="46" height="46" rx="10" fill="#FFFFFF" stroke="#E7A33C" strokeWidth="2" />
       <svg x="3" y="4" width="42" height="40" viewBox="130 45 1190 1000">
         <image href="/images/brand-boots.png" width="1473" height="1068" />
       </svg>
@@ -44,11 +44,11 @@ export function LogoWordmark() {
   );
 }
 
-export function Logo({ size = 40 }: { size?: number }) {
+export function Logo({ size = 44 }: { size?: number }) {
   return (
     <span className="brand">
-      <LogoMark size={size} />
-      <LogoWordmark />
+      <span aria-hidden="true" style={{ display: "inline-flex" }}><LogoMark size={size} /></span>
+      <span className="brand-text">Hire Line Dancers</span>
     </span>
   );
 }
