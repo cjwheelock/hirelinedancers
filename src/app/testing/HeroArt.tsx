@@ -1,14 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import styles from "./desert.module.css";
 
 const ART = [
   {
-    id: "golden-hour",
-    label: "Golden hour",
-    src: "/images/testing/hero-golden-hour.svg",
-    alt: "Desert mesas at sunset with string lights over a wooden dance floor and a row of cowboy boots mid-step"
+    id: "sunset-dance-floor",
+    label: "Sunset dance floor",
+    src: "/images/testing/sunset-dance-floor.webp",
+    alt: "Illustrated guests line dancing under string lights with desert mesas and a setting sun behind them"
   },
   {
     id: "boot-line",
@@ -26,13 +26,28 @@ const ART = [
 
 export function HeroArt() {
   const [active, setActive] = useState(0);
+  const selection = useRef(0);
   const art = ART[active];
+
+  async function selectArt(index: number) {
+    const request = ++selection.current;
+    if (index === active) return;
+
+    const image = new Image();
+    image.src = ART[index].src;
+    try {
+      await image.decode();
+      if (request === selection.current) setActive(index);
+    } catch {
+      // Keep the current illustration visible if the next image cannot load.
+    }
+  }
 
   return (
     <div className={styles.heroArt}>
       <div className={styles.arch}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={art.src} alt={art.alt} />
+        <img src={art.src} alt={art.alt} fetchPriority="high" />
       </div>
       <div className={styles.artSwitch} role="group" aria-label="Preview hero art">
         {ART.map((item, index) => (
@@ -41,7 +56,7 @@ export function HeroArt() {
             type="button"
             aria-pressed={index === active}
             className={index === active ? styles.artOn : undefined}
-            onClick={() => setActive(index)}
+            onClick={() => { void selectArt(index); }}
           >
             {item.label}
           </button>

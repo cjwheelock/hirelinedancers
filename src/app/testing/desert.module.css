@@ -143,7 +143,7 @@
 .arch {
   width: 100%;
   max-width: 520px;
-  aspect-ratio: 5 / 6;
+  aspect-ratio: 4 / 5;
   border-radius: 999px 999px 28px 28px;
   overflow: hidden;
   background: var(--sand-2);
@@ -383,7 +383,7 @@
 
 /* ---------- Final CTA ---------- */
 .finalCta {
-  background: var(--saddle);
+  background: var(--saddle) url("/images/testing/night-dance-hall.webp") center bottom / cover no-repeat;
   position: relative;
   color: var(--sand);
 }
@@ -434,6 +434,7 @@
   .header { position: static; }
   .nav { gap: 4px 14px; font-size: 14px; }
   .hero { padding-top: 32px; }
+  .finalCta { background-position: 76% bottom; }
   .section, .how { padding-block: 64px; }
   .instructorStrip { padding: 28px; }
 }
