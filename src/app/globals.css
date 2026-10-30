@@ -1523,3 +1523,9 @@ button:disabled { opacity: 0.7; cursor: progress; }
   .marketplace-supply,
   .marketplace-demand { transform: none; }
 }
+
+/* ---------- /testing homepage preview: uses its own header and footer ---------- */
+body:has([data-desert-preview]) > .site-header,
+body:has([data-desert-preview]) > footer.footer {
+  display: none;
+}
