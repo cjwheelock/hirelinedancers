@@ -445,7 +445,7 @@ export function PublicInstructorResults({
       <>
         <div className={stateClass} role="status">
           <h3>We could not load the live directory</h3>
-          <p>Please try again soon. You can still explore Tessa McTester&rsquo;s profile below.</p>
+          <p>Please try again soon.</p>
         </div>
         {demoResults.map((instructor) => (
           <ExampleProfileCard key={instructor.slug} instructor={instructor} compact={compact} />
@@ -490,7 +490,7 @@ export function PublicInstructorResults({
       <>
         <div className={stateClass}>
           <h3>Published profiles are coming soon</h3>
-          <p>The live directory is not connected in this build. You can still explore Tessa McTester&rsquo;s profile below.</p>
+          <p>The live directory is not connected in this build.</p>
         </div>
         {demoResults.map((instructor) => (
           <ExampleProfileCard key={instructor.slug} instructor={instructor} compact={compact} />
@@ -519,8 +519,8 @@ export function PublicInstructorResults({
               <h3>{results.length ? "Featured instructor profile" : emptyTitle}</h3>
               <p>
                 {results.length
-                  ? "Explore Tessa McTester’s teaching approach, event specialties, equipment, travel preferences, and sample session."
-                  : `${emptyBody} You can still explore Tessa McTester’s profile while more instructors join.`}
+                  ? ""
+                  : emptyBody}
               </p>
             </div>
           ) : null}
