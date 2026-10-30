@@ -19,7 +19,7 @@ export const metadata: Metadata = {
     description: site.description,
     url: site.url,
     siteName: site.name,
-    images: ["/images/line-dance-event-hero.png"],
+    images: ["/images/share-sunset-dance-floor.jpg"],
     type: "website"
   }
 };

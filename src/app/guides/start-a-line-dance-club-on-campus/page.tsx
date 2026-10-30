@@ -53,7 +53,7 @@ export const metadata: Metadata = {
     title: "Start a Line Dance Club on Your College Campus",
     description: "A practical eight-week launch guide with first-meeting plans, promotion ideas, and copyable campus club templates.",
     url: `${site.url}/guides/start-a-line-dance-club-on-campus/`,
-    images: ["/images/line-dance-event-hero.png"]
+    images: ["/images/share-sunset-dance-floor.jpg"]
   }
 };
 

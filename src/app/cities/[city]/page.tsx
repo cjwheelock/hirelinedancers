@@ -22,7 +22,7 @@ export async function generateMetadata({ params }: { params: Promise<{ city: str
       title: `Hire a Line Dance Instructor in ${city.city}, ${city.state}`,
       description,
       url: `${site.url}/cities/${city.slug}/`,
-      images: ["/images/line-dance-event-hero.png"]
+      images: ["/images/share-sunset-dance-floor.jpg"]
     }
   };
 }

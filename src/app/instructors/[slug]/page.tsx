@@ -26,7 +26,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       title,
       description: instructor.bio,
       url: `${site.url}/instructors/${instructor.slug}/`,
-      images: [instructor.photo || "/images/line-dance-event-hero.png"]
+      images: [instructor.photo || "/images/share-sunset-dance-floor.jpg"]
     }
   };
 }

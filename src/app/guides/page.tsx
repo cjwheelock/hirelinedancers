@@ -10,7 +10,7 @@ export const metadata: Metadata = {
     title: "Line Dancing Guides",
     description: "Practical guides for hiring instructors and growing line dancing communities.",
     url: `${site.url}/guides/`,
-    images: ["/images/line-dance-event-hero.png"]
+    images: ["/images/share-sunset-dance-floor.jpg"]
   }
 };
 

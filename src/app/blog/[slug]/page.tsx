@@ -24,7 +24,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       publishedTime: post.publishDate,
       modifiedTime: post.updatedDate ?? post.publishDate,
       authors: [post.author ?? site.name],
-      images: ["/images/line-dance-event-hero.png"]
+      images: ["/images/share-sunset-dance-floor.jpg"]
     }
   };
 }
@@ -50,7 +50,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
         dateModified: post.updatedDate ?? post.publishDate,
         url: `${site.url}/blog/${post.slug}/`,
         mainEntityOfPage: `${site.url}/blog/${post.slug}/`,
-        image: `${site.url}/images/line-dance-event-hero.png`,
+        image: `${site.url}/images/share-sunset-dance-floor.jpg`,
         author: {
           "@type": authorIsPerson ? "Person" : "Organization",
           name: authorName,

@@ -18,7 +18,6 @@ export function Header() {
         <nav className={styles.nav} aria-label="Main navigation">
           <Link className="navlink" href="/#how-it-works">How it works</Link>
           <Link className="navlink" href="/#events">Events</Link>
-          <Link className="navlink" href="/#cities">Cities</Link>
           <Link className="navlink" href="/about/">About</Link>
           <Link className="navlink" href="/blog/">Blog</Link>
           {!loading && !session ? (

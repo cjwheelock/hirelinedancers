@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     description:
       "Meet the idea behind Hire Line Dancers and our mission to create more movement, more shared memories, and more full dance floors.",
     url: `${site.url}/about/`,
-    images: ["/images/line-dance-event-hero.png"]
+    images: ["/images/share-sunset-dance-floor.jpg"]
   }
 };
 

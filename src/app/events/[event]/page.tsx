@@ -20,7 +20,7 @@ export async function generateMetadata({ params }: { params: Promise<{ event: st
       title: event.title,
       description: event.intro,
       url: `${site.url}/events/${event.slug}/`,
-      images: ["/images/line-dance-event-hero.png"]
+      images: ["/images/share-sunset-dance-floor.jpg"]
     }
   };
 }
