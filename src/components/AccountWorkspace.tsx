@@ -32,6 +32,8 @@ import { InstructorOnboardingPricing } from "./InstructorOnboardingPricing";
 import { InquiryInbox } from "./InquiryInbox";
 import { MembershipCreditAdmin } from "./MembershipCreditAdmin";
 import { PayoutsCard } from "./PayoutsCard";
+import { ReferralsCard, AdminReferrals } from "./ReferralsCard";
+import { clearStoredReferral, lookupReferralCode, normalizeReferralCode, storedReferral } from "@/lib/referrals";
 import { AdminBookings } from "./AdminBookings";
 import {
   accountEntryRedirect,
@@ -67,7 +69,7 @@ type ProfileMedia = {
   embed_provider?: string | null;
 };
 
-type InstructorTab = "profile" | "inquiries" | "payouts" | "membership";
+type InstructorTab = "profile" | "inquiries" | "payouts" | "referrals" | "membership";
 
 type InstructorInvitationOfferStatus = Pick<
   InstructorInvitationLifecycle,
@@ -519,6 +521,27 @@ function OnboardingForm({
   const [company, setCompany] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [linkedReferral] = useState(() => storedReferral()?.code ?? "");
+  const [referralCode, setReferralCode] = useState(linkedReferral);
+  const [referrerName, setReferrerName] = useState<string | null>(null);
+
+  useEffect(() => {
+    const code = normalizeReferralCode(referralCode);
+    setReferrerName(null);
+    if (!code) return;
+    let active = true;
+    const timer = window.setTimeout(() => {
+      lookupReferralCode(code)
+        .then((result) => {
+          if (active) setReferrerName(result?.referrerName ?? null);
+        })
+        .catch(() => undefined);
+    }, 300);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [referralCode]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -528,6 +551,11 @@ function OnboardingForm({
     setBusy(true);
     setError(null);
     try {
+      const enteredReferral = role === "instructor" && referralCode.trim() ? normalizeReferralCode(referralCode) : null;
+      if (role === "instructor" && referralCode.trim()) {
+        const found = enteredReferral ? await lookupReferralCode(enteredReferral) : null;
+        if (!found) throw new Error("That referral code was not found. Check it or leave it blank.");
+      }
       const tokenHash = invitationToken
         ? await instructorInvitationTokenHash(invitationToken)
         : null;
@@ -539,6 +567,14 @@ function OnboardingForm({
         p_invitation_token_hash: tokenHash
       });
       if (rpcError) throw rpcError;
+      if (enteredReferral) {
+        const { error: referralError } = await client.rpc("attach_referral_code", {
+          p_code: enteredReferral,
+          p_source: enteredReferral === normalizeReferralCode(linkedReferral) ? "link" : "typed"
+        });
+        // A failed attach does not block onboarding; the code can be added from Referrals.
+        if (!referralError) clearStoredReferral();
+      }
       await onComplete();
     } catch (submitError) {
       setError(readableError(submitError));
@@ -580,6 +616,21 @@ function OnboardingForm({
         <span>{role === "organizer" ? "Company or organization (optional)" : "Business name (optional)"}</span>
         <input autoComplete="organization" value={company} onChange={(event) => setCompany(event.target.value)} />
       </label>
+      {role === "instructor" ? (
+        <label className={styles.field}>
+          <span>Referred by a friend? Their code (optional)</span>
+          <input
+            name="referralCode"
+            autoComplete="off"
+            autoCapitalize="characters"
+            value={referralCode}
+            onChange={(event) => setReferralCode(event.target.value.toUpperCase())}
+          />
+          {referrerName ? (
+            <small className={styles.success}><CheckCircle2 size={14} aria-hidden="true" /> Referred by {referrerName}</small>
+          ) : null}
+        </label>
+      ) : null}
       {role === "instructor" ? <InstructorOnboardingPricing /> : null}
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
       <button className={styles.button} disabled={busy} type="submit">
@@ -757,7 +808,7 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
       window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
       return;
     }
-    if (["profile", "inquiries", "payouts", "membership"].includes(requestedTab ?? "")) {
+    if (["profile", "inquiries", "payouts", "referrals", "membership"].includes(requestedTab ?? "")) {
       setTab(requestedTab as InstructorTab);
     }
   }, [account.id]);
@@ -1039,8 +1090,8 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
 
       <div className={styles.tabs} role="tablist" aria-label="Instructor account sections">
         {(hasLifetimeAccess === false
-          ? ["profile", "inquiries", "payouts", "membership"] as const
-          : ["profile", "inquiries", "payouts"] as const
+          ? ["profile", "inquiries", "payouts", "referrals", "membership"] as const
+          : ["profile", "inquiries", "payouts", "referrals"] as const
         ).map((name) => (
           <button
             key={name}
@@ -1087,6 +1138,7 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
       {!loading && profile && tab === "payouts" ? (
         <PayoutsCard profileId={profile.id} settings={settings} onSaved={() => void load(true)} />
       ) : null}
+      {!loading && tab === "referrals" ? <ReferralsCard onOpenPayouts={() => chooseTab("payouts")} /> : null}
       {!loading && profile && tab === "membership" && hasLifetimeAccess !== null ? (
         <MembershipCard
           profile={profile}
@@ -2052,7 +2104,7 @@ function MembershipGuaranteeAdmin({ isOwner }: { isOwner: boolean }) {
 }
 
 function AdminDashboard({ isOwner }: { isOwner: boolean }) {
-  const [tab, setTab] = useState<"overview" | "messages" | "bookings" | "profiles" | "memberships" | "invitations" | "delivery" | "access">("overview");
+  const [tab, setTab] = useState<"overview" | "messages" | "bookings" | "profiles" | "referrals" | "memberships" | "invitations" | "delivery" | "access">("overview");
   const [focusedProfileId, setFocusedProfileId] = useState<string | null>(null);
   const [focusedInquiryId, setFocusedInquiryId] = useState<string | null>(null);
   const [focusedThreadId, setFocusedThreadId] = useState<string | null>(null);
@@ -2200,7 +2252,7 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const requestedTab = params.get("tab");
-    if (["overview", "messages", "bookings", "profiles", "memberships", "invitations", "delivery", "access"].includes(requestedTab ?? "")) {
+    if (["overview", "messages", "bookings", "profiles", "referrals", "memberships", "invitations", "delivery", "access"].includes(requestedTab ?? "")) {
       setTab(requestedTab as typeof tab);
     }
     setFocusedProfileId(params.get("profile"));
@@ -2469,8 +2521,8 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
     <>
       <div className={styles.tabs} role="tablist" aria-label="Admin dashboard sections">
         {(isOwner
-          ? (["overview", "messages", "bookings", "profiles", "memberships", "invitations", "delivery", "access"] as const)
-          : (["overview", "messages", "bookings", "profiles", "memberships", "invitations", "delivery"] as const)
+          ? (["overview", "messages", "bookings", "profiles", "referrals", "memberships", "invitations", "delivery", "access"] as const)
+          : (["overview", "messages", "bookings", "profiles", "referrals", "memberships", "invitations", "delivery"] as const)
         ).map((name) => (
           <button key={name} className={`${styles.tab} ${tab === name ? styles.activeTab : ""}`} type="button" onClick={() => selectAdminTab(name)}>
             {name[0].toUpperCase() + name.slice(1)}
@@ -2482,6 +2534,7 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
       {loading ? <div className={styles.loading}>Loading marketplace operations...</div> : null}
 
       {!loading && tab === "bookings" ? <AdminBookings /> : null}
+      {!loading && tab === "referrals" ? <AdminReferrals /> : null}
 
       {!loading && tab === "messages" ? (
         <InquiryInbox

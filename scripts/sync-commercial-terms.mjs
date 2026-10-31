@@ -95,15 +95,30 @@ export function validateCommercialTerms(terms) {
     }
   });
 
+  const referrals = terms.referrals;
+  assertInteger(referrals?.shareBps, "referrals.shareBps");
+  if (referrals.shareBps > 10000) throw new Error("referrals.shareBps cannot exceed 10000");
+  assertInteger(referrals?.durationMonths, "referrals.durationMonths");
+  assertInteger(referrals?.attachWindowDays, "referrals.attachWindowDays");
+  assertString(referrals?.referredJoinedBefore, "referrals.referredJoinedBefore");
+  if (Number.isNaN(Date.parse(referrals.referredJoinedBefore))) {
+    throw new Error("referrals.referredJoinedBefore must be an ISO timestamp");
+  }
+  if (referrals?.basis !== "platform_revenue_after_refunds") {
+    throw new Error("The referral earnings basis must remain explicit");
+  }
+
   for (const [key, value] of Object.entries(terms.database ?? {})) {
-    assertString(value, `database.${key}`, /^\d{12}_[a-z0-9_]+\.sql$/);
+    assertString(value, `database.${key}`, /^(?:\d{12}|\d{14})_[a-z0-9_]+\.sql$/);
   }
   const requiredMigrationKeys = [
     "invitationPolicyMigration",
     "guaranteePolicyMigration",
     "paymentSetupPolicyMigration",
     "billingRecoveryPolicyMigration",
-    "bookingPolicyMigration"
+    "bookingPolicyMigration",
+    "referralPolicyMigration",
+    "referralWindowMigration"
   ];
   for (const key of requiredMigrationKeys) {
     if (!terms.database?.[key]) throw new Error(`database.${key} is required`);
@@ -141,7 +156,8 @@ export function renderGeneratedTerms(terms) {
     `export const GUARANTEE_CLAIM_WINDOW_DAYS = HLD_COMMERCIAL_TERMS.guarantee.claimWindowDays;\n` +
     `export const BILLING_RECOVERY_GRACE_DAYS = HLD_COMMERCIAL_TERMS.billingRecovery.graceDays;\n` +
     `export const BOOKING_TERMS = HLD_COMMERCIAL_TERMS.bookings;\n` +
-    `export const BOOKING_AGREEMENT_VERSION = HLD_COMMERCIAL_TERMS.bookings.agreementVersion;\n`;
+    `export const BOOKING_AGREEMENT_VERSION = HLD_COMMERCIAL_TERMS.bookings.agreementVersion;\n` +
+    `export const REFERRAL_TERMS = HLD_COMMERCIAL_TERMS.referrals;\n`;
 }
 
 function main() {
