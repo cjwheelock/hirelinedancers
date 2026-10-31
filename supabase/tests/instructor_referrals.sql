@@ -48,7 +48,8 @@ values
   ('50000000-0000-0000-0000-000000000011', 'tay2@example.test', '{"full_name":"Tay Second"}'),
   ('50000000-0000-0000-0000-000000000020', 'maria@example.test', '{"full_name":"Maria Lopez"}'),
   ('50000000-0000-0000-0000-000000000030', 'old@example.test', '{"full_name":"Old Timer"}'),
-  ('50000000-0000-0000-0000-000000000040', 'planner@example.test', '{"full_name":"Pat Planner"}');
+  ('50000000-0000-0000-0000-000000000040', 'planner@example.test', '{"full_name":"Pat Planner"}'),
+  ('50000000-0000-0000-0000-000000000050', 'late@example.test', '{"full_name":"Late Joiner"}');
 
 update public.accounts
 set role = case
@@ -60,6 +61,10 @@ set role = case
 where id::text like '50000000-%';
 update public.accounts set created_at = now() - interval '60 days'
 where id = '50000000-0000-0000-0000-000000000030';
+update public.accounts set created_at = timestamptz '2027-02-01T05:00:00Z'
+where id = '50000000-0000-0000-0000-000000000050';
+update public.accounts set created_at = now() - interval '3 days'
+where id = '50000000-0000-0000-0000-000000000020';
 
 insert into public.marketplace_admins (account_id, is_owner, granted_by)
 values ('50000000-0000-0000-0000-000000000001', true, '50000000-0000-0000-0000-000000000001');
@@ -118,10 +123,18 @@ select pg_temp.referral_as('50000000-0000-0000-0000-000000000010', 'authenticate
 select pg_temp.referral_expect_error(format('select public.attach_referral_code(%L)', :'tay_code'), 'own referral code', 'self referral');
 select pg_temp.referral_as('50000000-0000-0000-0000-000000000030', 'authenticated');
 select pg_temp.referral_expect_error(format('select public.attach_referral_code(%L)', :'tay_code'), 'within 30 days', 'old account');
+select pg_temp.referral_as('50000000-0000-0000-0000-000000000050', 'authenticated');
+select pg_temp.referral_expect_error(format('select public.attach_referral_code(%L)', :'tay_code'), 'joined by January 31, 2027', 'joined after the cutoff');
+select pg_temp.referral_assert((public.get_my_referral_program() ->> 'can_add_referral')::boolean = false, 'late joiners cannot add a code');
 select pg_temp.referral_as('50000000-0000-0000-0000-000000000020', 'authenticated');
 select pg_temp.referral_expect_error($sql$select public.attach_referral_code('ZZZ99')$sql$, 'not found', 'unknown code attach');
 select pg_temp.referral_assert(public.attach_referral_code(:'tay_code', 'link') = 'Dancing with Tay', 'attach returns referrer name');
 select pg_temp.referral_expect_error(format('select public.attach_referral_code(%L)', :'tay2_code'), 'already saved', 'second attach');
+select pg_temp.referral_assert(
+  (select referred_joined_at = now() - interval '3 days' and earning_ends_at = now() - interval '3 days' + interval '1 year'
+   from public.instructor_referrals where referred_account_id = '50000000-0000-0000-0000-000000000020'),
+  'earning window is exactly one year from the join date'
+);
 select pg_temp.referral_assert(
   (public.get_my_referral_program() -> 'referred_by' ->> 'code') = :'tay_code'
   and (public.get_my_referral_program() ->> 'can_add_referral')::boolean = false,
@@ -238,7 +251,16 @@ select pg_temp.referral_expect_error(
   format('select public.admin_set_instructor_referral(%L, %L)', '50000000-0000-0000-0000-000000000020', :'tay2_code'),
   'cannot be moved', 'move referral with earnings'
 );
+select pg_temp.referral_expect_error(
+  format('select public.admin_set_instructor_referral(%L, %L)', '50000000-0000-0000-0000-000000000050', :'tay2_code'),
+  'joined by January 31, 2027', 'admin attach after the cutoff'
+);
 select public.admin_set_instructor_referral('50000000-0000-0000-0000-000000000030', :'tay2_code');
+select pg_temp.referral_assert(
+  (select earning_ends_at = now() - interval '60 days' + interval '12 months'
+   from public.instructor_referrals where referred_account_id = '50000000-0000-0000-0000-000000000030'),
+  'admin-set referral also runs one year from the join date'
+);
 select pg_temp.referral_assert(
   (select source = 'admin' and code = :'tay2_code' from public.instructor_referrals where referred_account_id = '50000000-0000-0000-0000-000000000030'),
   'admin can attach an older instructor'

@@ -11,6 +11,12 @@ import styles from "./ReferralsCard.module.css";
 const referralTerms = commercialTerms.referrals;
 const sharePercent = `${referralTerms.shareBps / 100}%`;
 const durationLabel = `${referralTerms.durationMonths} months`;
+const joinDeadline = new Intl.DateTimeFormat("en-US", {
+  month: "long",
+  day: "numeric",
+  year: "numeric",
+  timeZone: "America/New_York"
+}).format(new Date(Date.parse(referralTerms.referredJoinedBefore) - 1));
 const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 const shortDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" });
 
@@ -147,7 +153,7 @@ export function ReferralsCard({ onOpenPayouts }: { onOpenPayouts: () => void }) 
     <div className={styles.wrap}>
       <header className={styles.header}>
         <h2>Referrals</h2>
-        <p>Invite line dance instructors you know. For {durationLabel} after each one joins, you earn {sharePercent} of what Hire Line Dancers earns from their bookings.</p>
+        <p>Invite line dance instructors you know. For {durationLabel} after each one joins, you earn {sharePercent} of what Hire Line Dancers earns from their bookings. Instructors must join by {joinDeadline} to count.</p>
       </header>
 
       {error ? <p className={styles.error} role="alert">{error}</p> : null}

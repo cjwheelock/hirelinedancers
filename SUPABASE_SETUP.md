@@ -258,12 +258,12 @@ Use a test secret key with `STRIPE_EXPECTED_MODE=test`, complete Express onboard
 
 ## 7b. Instructor referrals
 
-Migration `20261030230000_instructor_referrals.sql` adds the referral program. Terms live in `config/commercial-terms.json` under `referrals` and are re-checked by table constraints.
+Migrations `20261030230000_instructor_referrals.sql` and `20261031020000_referral_join_dates.sql` add the referral program. Terms live in `config/commercial-terms.json` under `referrals` and are re-checked by table constraints.
 
 1. A signed-in instructor creates one code from the account **Referrals** tab: their first name plus two random digits (three if every two-digit option is taken). The share link is `/instructors/join/?ref=CODE`.
 2. Opening the link saves the code in the browser and adds it to the sign-in link, so it survives Google sign-in and email links opened on another device. Onboarding shows the code prefilled; the instructor can also type one.
-3. A code can be attached once, to an instructor account that is at most 30 days old and has no paid bookings. Administrators can set, change, or clear a referral from the admin **Referrals** tab until it has earnings.
-4. When a referred instructor's booking payout is recorded within 12 months of the referral, the referrer earns 30% of what the platform kept from that booking (client fee plus instructor fee, less refunds). `booking-scheduler` transfers it to the referrer's Stripe Express account once their payouts are set up; earnings wait until then.
+3. Only instructors who join by January 31, 2027 (Eastern) can be credited to a referrer. A code can be attached once, to an instructor account that is at most 30 days old and has no paid bookings. Administrators can set, change, or clear a referral from the admin **Referrals** tab until it has earnings.
+4. When a referred instructor's booking is paid within exactly one year of the date they joined the platform and its payout is recorded, the referrer earns 30% of what the platform kept from that booking (client fee plus instructor fee, less refunds). `booking-scheduler` transfers it to the referrer's Stripe Express account once their payouts are set up; earnings wait until then.
 
 Deploy:
 

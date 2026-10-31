@@ -117,8 +117,10 @@ if (!bookingSql.includes("booking_create_quote")) failures.push(`${bookingMigrat
 
 const referralMigration = `supabase/migrations/${migrations.referralPolicyMigration}`;
 requireText(referralMigration, `share_bps = ${terms.referrals.shareBps}`, "referral share rate");
-requireText(referralMigration, `interval '${terms.referrals.durationMonths} months'`, "referral earning window");
-requireText(referralMigration, `interval '${terms.referrals.attachWindowDays} days'`, "referral attach window");
+const referralWindowMigration = `supabase/migrations/${migrations.referralWindowMigration}`;
+requireText(referralWindowMigration, `referred_joined_at + interval '${terms.referrals.durationMonths} months'`, "referral earning window from join date");
+requireText(referralWindowMigration, `timestamptz '${terms.referrals.referredJoinedBefore}'`, "referral join cutoff");
+requireText(referralWindowMigration, `interval '${terms.referrals.attachWindowDays} days'`, "referral attach window");
 
 const freeMonthsWord = numberWord(terms.offer.freeBillingCycles);
 const docs = ["README.md", "SUPABASE_SETUP.md", "supabase/functions/README.md"];

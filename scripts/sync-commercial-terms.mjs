@@ -100,6 +100,10 @@ export function validateCommercialTerms(terms) {
   if (referrals.shareBps > 10000) throw new Error("referrals.shareBps cannot exceed 10000");
   assertInteger(referrals?.durationMonths, "referrals.durationMonths");
   assertInteger(referrals?.attachWindowDays, "referrals.attachWindowDays");
+  assertString(referrals?.referredJoinedBefore, "referrals.referredJoinedBefore");
+  if (Number.isNaN(Date.parse(referrals.referredJoinedBefore))) {
+    throw new Error("referrals.referredJoinedBefore must be an ISO timestamp");
+  }
   if (referrals?.basis !== "platform_revenue_after_refunds") {
     throw new Error("The referral earnings basis must remain explicit");
   }
@@ -113,7 +117,8 @@ export function validateCommercialTerms(terms) {
     "paymentSetupPolicyMigration",
     "billingRecoveryPolicyMigration",
     "bookingPolicyMigration",
-    "referralPolicyMigration"
+    "referralPolicyMigration",
+    "referralWindowMigration"
   ];
   for (const key of requiredMigrationKeys) {
     if (!terms.database?.[key]) throw new Error(`database.${key} is required`);

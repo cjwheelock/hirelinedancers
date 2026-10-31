@@ -60,6 +60,7 @@ export const HLD_COMMERCIAL_TERMS = {
     "shareBps": 3000,
     "durationMonths": 12,
     "attachWindowDays": 30,
+    "referredJoinedBefore": "2027-02-01T05:00:00Z",
     "basis": "platform_revenue_after_refunds"
   },
   "database": {
@@ -68,7 +69,8 @@ export const HLD_COMMERCIAL_TERMS = {
     "paymentSetupPolicyMigration": "202608080001_pre_review_payment_setup.sql",
     "billingRecoveryPolicyMigration": "202608100003_fix_billing_recovery_notification_type.sql",
     "bookingPolicyMigration": "202610260001_booking_payments.sql",
-    "referralPolicyMigration": "20261030230000_instructor_referrals.sql"
+    "referralPolicyMigration": "20261030230000_instructor_referrals.sql",
+    "referralWindowMigration": "20261031020000_referral_join_dates.sql"
   }
 } as const;
 
