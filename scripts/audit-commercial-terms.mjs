@@ -115,6 +115,11 @@ requireText(bookingMigration, `[${terms.bookings.standardCancellationWindows.map
 requireText(bookingMigration, `price_cents between ${terms.bookings.minimumPriceCents} and ${terms.bookings.maximumPriceCents}`, "booking price limits");
 if (!bookingSql.includes("booking_create_quote")) failures.push(`${bookingMigration}: missing booking_create_quote`);
 
+const referralMigration = `supabase/migrations/${migrations.referralPolicyMigration}`;
+requireText(referralMigration, `share_bps = ${terms.referrals.shareBps}`, "referral share rate");
+requireText(referralMigration, `interval '${terms.referrals.durationMonths} months'`, "referral earning window");
+requireText(referralMigration, `interval '${terms.referrals.attachWindowDays} days'`, "referral attach window");
+
 const freeMonthsWord = numberWord(terms.offer.freeBillingCycles);
 const docs = ["README.md", "SUPABASE_SETUP.md", "supabase/functions/README.md"];
 for (const file of docs) {

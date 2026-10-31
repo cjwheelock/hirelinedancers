@@ -288,7 +288,24 @@ export function callbackUrl(next = "/account/"): string {
   if (typeof window === "undefined") return "";
   const url = new URL("/auth/callback/", window.location.origin);
   url.searchParams.set("next", cleanReturnPath(next));
+  const referral = storedReferralCode();
+  if (referral) url.searchParams.set("ref", referral);
   return url.toString();
+}
+
+// Read directly here (not from lib/referrals) to keep this module free of a
+// circular import. Keeps a referral code with the sign-in link so it survives
+// opening that link on a different device.
+function storedReferralCode(): string | null {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem("hld_referral") ?? "null") as { code?: unknown; capturedAt?: unknown } | null;
+    const code = typeof parsed?.code === "string" ? parsed.code : "";
+    const capturedAt = typeof parsed?.capturedAt === "number" ? parsed.capturedAt : 0;
+    if (!/^[A-Z]{1,12}[0-9]{2,3}$/.test(code) || Date.now() - capturedAt > 60 * 24 * 60 * 60 * 1000) return null;
+    return code;
+  } catch {
+    return null;
+  }
 }
 
 export function cleanAccountIntent(value: string | null | undefined): AccountIntent | null {
