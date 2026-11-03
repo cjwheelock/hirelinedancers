@@ -28,7 +28,7 @@ function text(node) {
 
 // Executes the actual components, hook state, callbacks, and child mount/unmount
 // behavior. Only browser, timers, and API boundaries are isolated.
-function harness(component = "inbox", props = {}) {
+function harness(component = "inbox", props = {}, directoryProfiles = [profile]) {
   const instances = new Map(), modules = new Map(), timers = new Map(), plans = new Map();
   const calls = [], counts = [];
   let active, tree, dirty = true, nextTimer = 0;
@@ -36,7 +36,7 @@ function harness(component = "inbox", props = {}) {
   const window = { location, history: { replaceState: (_s, _t, url) => { location.href = new URL(url, location).href; } }, setTimeout: fn => { const id = ++nextTimer; timers.set(id, fn); return id; }, clearTimeout: id => timers.delete(id) };
   function query(table) {
     let single = false;
-    const data = table === "instructor_profiles" ? [profile] : table === "instructor_private_settings" ? [{ inquiry_email: "account@example.test", subscription_status: "active" }] : table === "instructor_directory_profiles" ? [profile] : [];
+    const data = table === "instructor_profiles" ? [profile] : table === "instructor_private_settings" ? [{ inquiry_email: "account@example.test", subscription_status: "active" }] : table === "instructor_directory_profiles" ? directoryProfiles : [];
     const result = { then: (yes, no) => Promise.resolve({ data: single ? data[0] ?? null : data, error: null }).then(yes, no) };
     for (const method of ["select", "eq", "neq", "in", "order", "limit", "update", "upsert"]) result[method] = () => result;
     result.maybeSingle = () => { single = true; return result; };
@@ -90,14 +90,14 @@ function harness(component = "inbox", props = {}) {
       if (specifier === "@/lib/commercialTerms") return load("src/lib/commercialTerms.ts");
       if (specifier === "@/data/site") return load("src/data/site.ts");
       if (specifier === "@/lib/videoLinks") return load("src/lib/videoLinks.ts");
-      if (specifier === "./ProfileEditor" || specifier === "./ProfileMediaManager" || specifier === "./InquiryRecommendations") return load(`src/components/${specifier.slice(2)}.tsx`);
+      if (specifier === "./ProfileEditor" || specifier === "./ProfileMediaManager" || specifier === "./InquiryRecommendations" || specifier === "./DirectoryCityField") return load(`src/components/${specifier.slice(2)}.tsx`);
       if (specifier.includes("commercial-terms.json")) return JSON.parse(readFileSync(new URL("config/commercial-terms.json", root), "utf8"));
       if (specifier.endsWith(".css")) return { __esModule: true, default: new Proxy({}, { get: (_target, key) => String(key) }) };
       return new Proxy({}, { get: (_target, key) => key === "__esModule" ? true : () => null });
     }, window, { env: { NEXT_PUBLIC_SUPABASE_URL: "https://supabase.test", NEXT_PUBLIC_SUPABASE_ANON_KEY: "publishable-test" } });
     return commonJsModule.exports;
   }
-  const Component = component === "inbox" ? load("src/components/InquiryInbox.tsx").InquiryInbox : component === "dashboard" ? load("src/components/AccountWorkspace.tsx").InstructorDashboard : component === "onboarding" ? load("src/components/AccountWorkspace.tsx").OnboardingForm : load("src/components/SearchPanel.tsx").PublicInstructorResults;
+  const Component = component === "inbox" ? load("src/components/InquiryInbox.tsx").InquiryInbox : component === "dashboard" ? load("src/components/AccountWorkspace.tsx").InstructorDashboard : component === "onboarding" ? load("src/components/AccountWorkspace.tsx").OnboardingForm : component === "browser" ? load("src/components/SearchPanel.tsx").InstructorDirectoryBrowser : load("src/components/SearchPanel.tsx").PublicInstructorResults;
   const rootProps = component === "inbox" ? { perspective: "organizer", accountId: "account", ...props } : component === "dashboard" ? { account: { id: "account" }, ...props } : { onCountChange: count => counts.push(count), ...props };
   async function render() {
     for (let iteration = 0; iteration < 40; iteration++) {
@@ -127,7 +127,7 @@ function harness(component = "inbox", props = {}) {
   }
   const nodes = () => all(tree);
   const button = name => nodes().find(node => node.type === "button" && text(node) === name);
-  const field = name => { const label = nodes().find(node => node.type === "label" && all(node).some(child => child.type === "span" && text(child).trim() === name)); return all(label).find(node => ["input", "textarea", "select"].includes(node.type)); };
+  const field = name => { const label = nodes().find(node => node.type === "label" && all(node).some(child => child.type === "span" && text(child).trim() === name)); return label?.props.htmlFor ? nodes().find(node => node.props?.id === label.props.htmlFor) : all(label).find(node => ["input", "textarea", "select"].includes(node.type)); };
   return { render, nodes, button, field, counts, calls, text: () => text(tree), queue: (name, fn) => { if (!plans.has(name)) plans.set(name, []); plans.get(name).push(fn); }, choose: id => nodes().find(node => node.type === "button" && node.props.className?.includes("threadListItem") && text(node).includes(id === a ? "Conversation 1" : "Conversation 2")).props.onClick(), reply: () => nodes().find(node => node.type === "textarea" && node.props.placeholder === "Write a reply"), submit: () => nodes().find(node => node.type === "form" && node.props.className === "messageComposer").props.onSubmit(event()), flushTimers: async () => { const pending = [...timers.values()]; timers.clear(); pending.forEach(fn => fn()); await render(); } };
 }
 
@@ -253,4 +253,74 @@ test("onboarding preserves an explicit compound first name from the account", as
   await app.render();
   assert.equal(app.field("First name").props.value, "Mary Jane");
   assert.equal(app.field("Last name").props.value, "de la Cruz");
+});
+
+
+const cityProfiles = [
+  { ...profile, id: "cole", display_name: "Cole La Brie", city: "San Francisco Bay Area", region: "CA" },
+  { ...profile, id: "tay", display_name: "Dancing with Tay", city: "San Francisco Bay Area", region: "CA", event_types: ["corporate"] },
+  { ...profile, id: "oakland", display_name: "Oakland instructor", city: "Oakland", region: "California" },
+  { ...profile, id: "tulsa", display_name: "Tulsa instructor", city: "Tulsa", region: "OK" }
+];
+const resultNames = app => app.nodes().filter(node => node.type === "h3").map(text);
+const keyEvent = key => ({ key, nativeEvent: { isComposing: false }, preventDefault() {} });
+
+test("partial city typing filters immediately, and selecting a market broadens to its service cities", async () => {
+  const app = harness("browser", {}, cityProfiles); await app.render();
+  for (const query of ["S", "Sa", "San", "San F", "San Fran", "  san   fran  "]) {
+    app.field("City").props.onChange(event(query)); await app.render();
+    assert.ok(resultNames(app).includes("Cole La Brie"), query);
+    if (query.trim().length >= 3) assert.ok(!resultNames(app).includes("Tulsa instructor"), query);
+    assert.equal(app.field("City").props["aria-expanded"], true);
+  }
+  app.field("City").props.onKeyDown(keyEvent("ArrowDown")); await app.render();
+  const activeId = app.field("City").props["aria-activedescendant"];
+  assert.ok(app.nodes().some(node => node.props?.id === activeId && text(node).includes("San Francisco Bay Area")));
+  app.field("City").props.onKeyDown(keyEvent("Enter")); await app.render();
+  assert.equal(app.field("City").props.value, "San Francisco Bay Area, CA");
+  assert.deepEqual(resultNames(app).sort(), ["Cole La Brie", "Dancing with Tay", "Oakland instructor"]);
+  assert.equal(app.field("City").props["aria-expanded"], false);
+});
+
+test("suggestions persist through idle time and pointer use, and dismiss without losing the query", async () => {
+  const app = harness("browser", {}, cityProfiles); await app.render();
+  app.field("City").props.onChange(event("San")); await app.render();
+  await app.flushTimers();
+  assert.equal(app.field("City").props["aria-expanded"], true);
+  let mouseDownPrevented = false;
+  app.nodes().find(node => node.props?.role === "listbox").props.onMouseDown({ preventDefault() { mouseDownPrevented = true; } });
+  assert.equal(mouseDownPrevented, true);
+  app.nodes().find(node => node.props?.role === "option").props.onClick(); await app.render();
+  assert.equal(app.field("City").props.value, "San Francisco Bay Area, CA");
+  assert.equal(app.field("City").props["aria-expanded"], false);
+  app.field("City").props.onClick(); await app.render();
+  app.field("City").props.onKeyDown(keyEvent("Escape")); await app.render();
+  assert.equal(app.field("City").props["aria-expanded"], false);
+  assert.equal(app.field("City").props.value, "San Francisco Bay Area, CA");
+  app.field("City").props.onFocus(); await app.render();
+  app.field("City").props.onKeyDown(keyEvent("Tab")); await app.render();
+  assert.equal(app.field("City").props["aria-expanded"], false);
+  app.field("City").props.onFocus(); await app.render();
+  app.nodes().find(node => node.props?.onBlur).props.onBlur({ currentTarget: { contains: () => false }, relatedTarget: null });
+  await app.render();
+  assert.equal(app.field("City").props["aria-expanded"], false);
+});
+
+test("clearing, unmatched cities, state queries, and event preferences retain existing behavior", async () => {
+  const app = harness("browser", {}, cityProfiles); await app.render();
+  app.field("Event or program").props.onChange(event("weddings")); await app.render();
+  assert.ok(!resultNames(app).includes("Dancing with Tay"));
+  app.field("City").props.onChange(event("San Fran")); await app.render();
+  assert.ok(resultNames(app).includes("Dancing with Tay"));
+  assert.equal(resultNames(app)[0], "Cole La Brie");
+  app.field("City").props.onChange(event("Unknown city")); await app.render();
+  assert.equal(app.field("City").props["aria-expanded"], false);
+  assert.ok(app.text().includes("0 instructor profiles"));
+  app.field("City").props.onChange(event("CA")); await app.render();
+  assert.deepEqual(resultNames(app).sort(), ["Cole La Brie", "Dancing with Tay", "Oakland instructor"]);
+  app.field("City").props.onChange(event("Tulsa Oklahoma")); await app.render();
+  assert.deepEqual(resultNames(app), ["Tulsa instructor"]);
+  app.field("City").props.onChange(event("   ")); await app.render();
+  assert.equal(app.field("Event or program").props.value, "weddings");
+  assert.deepEqual(resultNames(app).sort(), ["Cole La Brie", "Oakland instructor", "Tulsa instructor"]);
 });

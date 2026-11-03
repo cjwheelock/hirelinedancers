@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Award, CalendarDays, MapPin, Search } from "lucide-react";
 import { isFoundingInstructor } from "@/lib/commercialTerms";
+import { DirectoryCityField } from "./DirectoryCityField";
 import { eventTypes, instructors, serviceMarkets, type Instructor } from "@/data/site";
 import {
   getMarketplaceClient,
@@ -156,7 +157,7 @@ export function parseCityQuery(query: string): { city: string; region: string } 
   const [cityPart, regionPart] = trimmed.split(",").map((part) => part.trim());
   if (regionPart !== undefined) return { city: normalizePlace(cityPart), region: normalizeRegion(regionPart) };
   const whole = normalizePlace(trimmed);
-  if (stateNames[whole] || /^[a-z]{2}$/.test(whole)) return { city: "", region: normalizeRegion(whole) };
+  if (stateNames[whole] || Object.values(stateNames).includes(whole.toUpperCase())) return { city: "", region: normalizeRegion(whole) };
   for (const [name, code] of Object.entries(stateNames)) {
     if (whole.endsWith(` ${name}`)) return { city: whole.slice(0, -name.length - 1), region: code };
   }
@@ -179,7 +180,7 @@ function cityQueryScore(profile: Pick<PublicProfile, "city" | "region">, query: 
   const { city, region } = parseCityQuery(query);
   const profileCity = normalizePlace(profile.city);
   const profileRegion = normalizeRegion(profile.region);
-  if (city && profileCity === city && (!region || profileRegion === region)) return 2;
+  if (city && profileCity.includes(city) && (!region || profileRegion === region)) return 2;
   if (region && profileRegion === region) return 1;
   return 0;
 }
@@ -545,19 +546,7 @@ export function InstructorDirectoryBrowser() {
   return (
     <div className="search-grid">
       <form className="search-form" onSubmit={(submitEvent) => submitEvent.preventDefault()}>
-        <label>
-          <span><MapPin size={16} aria-hidden="true" /> City</span>
-          <input
-            list="directory-city-suggestions"
-            value={cityInput}
-            onChange={(changeEvent) => setCityInput(changeEvent.target.value)}
-            placeholder="Any US city, for example Tulsa, OK"
-            autoComplete="address-level2"
-          />
-          <datalist id="directory-city-suggestions">
-            {serviceMarkets.map((item) => <option key={item.slug} value={`${item.city}, ${item.state}`} />)}
-          </datalist>
-        </label>
+        <DirectoryCityField value={cityInput} onChange={setCityInput} />
         <label>
           <span><CalendarDays size={16} aria-hidden="true" /> Event or program</span>
           <select value={event} onChange={(changeEvent) => setEvent(changeEvent.target.value)}>
