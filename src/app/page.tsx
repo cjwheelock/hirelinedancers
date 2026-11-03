@@ -149,13 +149,43 @@ export default function Home() {
               ))}
             </ol>
           </div>
-          <div className={styles.inboxArt} aria-hidden="true">
-            <div className={styles.inboxTop}><span /><span /><span /></div>
-            <div className={styles.inboxBody}>
-              <div className={styles.bubbleThem}><i style={{ width: "88%" }} /><i style={{ width: "60%" }} /></div>
-              <div className={styles.bubbleMe}><i style={{ width: "92%" }} /><i style={{ width: "70%" }} /></div>
-              <div className={styles.bubbleThem}><i style={{ width: "74%" }} /></div>
-              <div className={styles.inboxCheck}><CheckCircle2 size={18} /></div>
+          <div className={styles.connectionArt} aria-hidden="true">
+            <div className={styles.connectionHeading}>A simple way to connect</div>
+            <div className={styles.connectionCard}>
+              <span className={styles.connectionEventIcon}><MapPin size={28} strokeWidth={1.6} /></span>
+              <div className={styles.connectionCopy}>
+                <strong>Your event</strong>
+                <span>City <span className={styles.connectionBullet}>•</span> Event type</span>
+              </div>
+            </div>
+            <div className={styles.connectionDots}><i /><i /><i /></div>
+            <div className={`${styles.connectionCard} ${styles.connectionPeople}`}>
+              <svg className={styles.connectionAvatar} viewBox="0 0 64 64" focusable="false">
+                <circle cx="32" cy="32" r="32" fill="#f6d69e" />
+                <circle cx="32" cy="28" r="11" fill="#c88d5c" />
+                <path d="M21 25c0-12 22-12 22 0Z" fill="#2a1e17" />
+                <path d="M12 49c0-19 40-19 40 0Z" fill="#1f6f6b" />
+              </svg>
+              <div className={styles.connectionCopy}>
+                <strong>Local instructors</strong>
+                <span>Browse profiles</span>
+                <span className={styles.connectionFit}>Find your fit</span>
+              </div>
+            </div>
+            <div className={`${styles.connectionDots} ${styles.connectionDotsBack}`}><i /><i /><i /></div>
+            <div className={`${styles.connectionCard} ${styles.connectionInquiry}`}>
+              <span className={styles.connectionInquiryIcon}>
+                <svg width="28" height="28" viewBox="0 0 28 28" focusable="false">
+                  <path d="M7 4h14a5 5 0 0 1 5 5v9a5 5 0 0 1-5 5h-9l-6 4v-5a5 5 0 0 1-4-5V9a5 5 0 0 1 5-5Z" fill="currentColor" />
+                  <circle cx="8" cy="13.5" r="1.3" fill="#fff" />
+                  <circle cx="14" cy="13.5" r="1.3" fill="#fff" />
+                  <circle cx="20" cy="13.5" r="1.3" fill="#fff" />
+                </svg>
+              </span>
+              <div className={styles.connectionCopy}>
+                <strong>Your inquiry</strong>
+                <span>Connect in your inbox</span>
+              </div>
             </div>
           </div>
         </div>
