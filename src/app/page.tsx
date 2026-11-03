@@ -184,7 +184,8 @@ export default function Home() {
       {/* MISSION */}
       <section className={styles.quoteTeal}>
         <div className={styles.quoteInner}>
-          <p>Our mission is simple: get more people dancing. That means more people moving to music, trying something new, and having fun together. It also means more great local instructors making a living doing what they love.</p>
+          <p>Our mission is simple: get more people dancing.</p>
+          <p>That means more people moving to music, trying something new, and having fun together. It also means more great local instructors making a living doing what they love.</p>
           <span>{site.name}</span>
         </div>
       </section>
