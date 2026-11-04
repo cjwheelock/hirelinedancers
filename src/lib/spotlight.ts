@@ -20,8 +20,9 @@ export function articleText(value: string) {
 }
 
 export function spotlightHeading(c: SpotlightContent) {
-  const location = [c.city, c.region].filter(Boolean).join(", ");
-  const title = articleText(`Meet ${c.name} in ${c.city}`);
+  const city = c.city === "San Francisco Bay Area" ? `the ${c.city}` : c.city;
+  const location = [city, c.region].filter(Boolean).join(", ");
+  const title = articleText(`Meet ${c.name} in ${city}`);
   const searchTitle = articleText(`Meet ${c.name}, a line dance instructor in ${location}`);
   const events = c.events.map(value => eventTypes.find(event => event.slug === value)?.label.toLowerCase() || value.replace(/[-_]/g, " "));
   const occasion = events.length ? ` for ${new Intl.ListFormat("en-US").format(events)}` : "";
