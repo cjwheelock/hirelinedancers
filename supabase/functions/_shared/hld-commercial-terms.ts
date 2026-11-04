@@ -56,12 +56,21 @@ export const HLD_COMMERCIAL_TERMS = {
     ],
     "foundingInstructorJoinedBefore": "2027-02-01T05:00:00Z"
   },
+  "referrals": {
+    "shareBps": 3000,
+    "durationMonths": 12,
+    "attachWindowDays": 30,
+    "referredJoinedBefore": "2027-02-01T05:00:00Z",
+    "basis": "platform_revenue_after_refunds"
+  },
   "database": {
     "invitationPolicyMigration": "202608070001_instructor_invitation_claim_lifecycle.sql",
     "guaranteePolicyMigration": "202608070002_offer_billing_and_90_day_guarantee.sql",
     "paymentSetupPolicyMigration": "202608080001_pre_review_payment_setup.sql",
     "billingRecoveryPolicyMigration": "202608100003_fix_billing_recovery_notification_type.sql",
-    "bookingPolicyMigration": "202610260001_booking_payments.sql"
+    "bookingPolicyMigration": "202610260001_booking_payments.sql",
+    "referralPolicyMigration": "20261030230000_instructor_referrals.sql",
+    "referralWindowMigration": "20261031020000_referral_join_dates.sql"
   }
 } as const;
 
@@ -82,3 +91,4 @@ export const GUARANTEE_CLAIM_WINDOW_DAYS = HLD_COMMERCIAL_TERMS.guarantee.claimW
 export const BILLING_RECOVERY_GRACE_DAYS = HLD_COMMERCIAL_TERMS.billingRecovery.graceDays;
 export const BOOKING_TERMS = HLD_COMMERCIAL_TERMS.bookings;
 export const BOOKING_AGREEMENT_VERSION = HLD_COMMERCIAL_TERMS.bookings.agreementVersion;
+export const REFERRAL_TERMS = HLD_COMMERCIAL_TERMS.referrals;

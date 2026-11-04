@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, Banknote, ClipboardCheck, FileSignature, Sparkles, Users } from "lucide-react";
 import { signInUrl } from "@/lib/marketplace";
+import { ReferralInviteBanner } from "@/components/ReferralInviteBanner";
 
 export const metadata = {
   title: "List Your Services as a Line Dance Instructor",
@@ -10,6 +11,7 @@ export const metadata = {
 export default function JoinPage() {
   return (
     <section className="page-shell">
+      <ReferralInviteBanner />
       <h1>Get booked by people planning events in your city.</h1>
       <p className="lede">Hire Line Dancers helps event planners, couples, and companies find instructors who can get their guests dancing. Build a profile, reply to inquiries, send a quote, and get paid after the event.</p>
 

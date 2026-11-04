@@ -408,6 +408,6 @@ Bookings replace the monthly membership as the business model. See `SUPABASE_SET
 - `booking-stripe-webhook`: confirms payments (including ACH that clears later), records disputes and refund updates, and syncs Connect accounts. It ignores membership events; `stripe-webhook` ignores booking events.
 - `booking-cancel`: organizer, instructor, or administrator cancellation. The database computes the refund from the agreement's cancellation policy.
 - `booking-admin`: administrator resolution of a reported problem (release the payout or refund part or all of the instructor price).
-- `booking-scheduler`: once-per-minute worker that expires quotes, posts reminders and event-ended notices, retries refunds, and transfers instructor payouts 24 hours after each event.
+- `booking-scheduler`: once-per-minute worker that expires quotes, posts reminders and event-ended notices, retries refunds, transfers instructor payouts 24 hours after each event, and transfers referral earnings to referrers whose payouts are set up.
 
 Shared logic is in `_shared/hld-booking.ts` with tests in `_shared/hld-booking_test.ts` (`deno test supabase/functions/_shared/hld-booking_test.ts`).

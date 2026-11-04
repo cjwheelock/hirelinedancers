@@ -1,0 +1,23 @@
+.banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 22px;
+  margin: 0 0 28px;
+  padding: 14px 20px;
+  border-radius: var(--radius);
+  background: var(--sunset);
+  color: var(--sand);
+  font-size: 15px;
+}
+
+.who {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+}
+
+.offer {
+  color: #f7dfb0;
+}

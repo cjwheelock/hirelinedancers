@@ -6,7 +6,8 @@
 //   2. Posts quote-expiry reminders, event reminders, and event-ended notices.
 //   3. Retries refunds that have not reached Stripe yet.
 //   4. Transfers instructor payouts that are due.
-//   5. Creates the booking webhook endpoints in Stripe the first time.
+//   5. Transfers referral earnings to referrers whose payouts are set up.
+//   6. Creates the booking webhook endpoints in Stripe the first time.
 import { withSupabase } from "npm:@supabase/server@^1";
 import type Stripe from "npm:stripe@^22";
 import {
@@ -26,6 +27,25 @@ type DueTransfer = {
   instructor_profile_id: string;
   reason: string;
 };
+
+type DueReferralPayout = {
+  earning_id: string;
+  amount_cents: number;
+  stripe_account_id: string;
+  stripe_charge_id: string;
+  booking_id: string;
+  referrer_account_id: string;
+};
+
+async function existingReferralTransfer(stripe: Stripe, due: DueReferralPayout): Promise<Stripe.Transfer | null> {
+  const transfers = await stripe.transfers.list({ transfer_group: due.booking_id, limit: 20 });
+  return transfers.data.find((transfer) =>
+    transfer.metadata?.referral_earning_id === due.earning_id &&
+    transfer.destination === due.stripe_account_id &&
+    transfer.amount === due.amount_cents &&
+    !transfer.reversed
+  ) ?? null;
+}
 
 async function existingTransfer(stripe: Stripe, due: DueTransfer): Promise<Stripe.Transfer | null> {
   const transfers = await stripe.transfers.list({ transfer_group: due.booking_id, limit: 10 });
@@ -150,6 +170,56 @@ export default {
     }
     summary.transfersSent = transferred;
     summary.transfersFailed = failed;
+
+    // Referral earnings are created when a referred instructor's payout is
+    // recorded, and wait here until the referrer can receive transfers.
+    const { data: dueReferrals, error: referralClaimError } = await ctx.supabaseAdmin.rpc("referral_claim_due_payouts", { p_limit: 10 });
+    if (referralClaimError) {
+      console.error("Unable to claim referral payouts", referralClaimError.message);
+      summary.referralPayouts = "unavailable";
+      return Response.json(summary);
+    }
+    let referralsSent = 0;
+    let referralsFailed = 0;
+    for (const item of (dueReferrals ?? []) as DueReferralPayout[]) {
+      try {
+        let transfer = await existingReferralTransfer(stripe, item);
+        if (!transfer) {
+          transfer = await stripe.transfers.create({
+            amount: item.amount_cents,
+            currency: "usd",
+            destination: item.stripe_account_id,
+            source_transaction: item.stripe_charge_id,
+            transfer_group: item.booking_id,
+            description: `Hire Line Dancers referral earning for booking ${item.booking_id}`,
+            metadata: {
+              booking_id: item.booking_id,
+              referral_earning_id: item.earning_id,
+              referrer_account_id: item.referrer_account_id,
+              reason: "referral",
+            },
+          }, { idempotencyKey: `hld-referral-transfer-${item.earning_id}-${item.amount_cents}` });
+        }
+        if (transfer.livemode !== config.expectedLivemode) throw new Error("Transfer mode mismatch");
+        const { error } = await ctx.supabaseAdmin.rpc("referral_record_payout", {
+          p_earning_id: item.earning_id,
+          p_transfer_id: transfer.id,
+          p_amount_cents: item.amount_cents,
+        });
+        if (error) throw new Error(`Referral transfer ${transfer.id} was sent but not recorded: ${error.message}`);
+        referralsSent += 1;
+      } catch (error) {
+        referralsFailed += 1;
+        const message = stripeErrorMessage(error);
+        console.error("Referral transfer failed", item.earning_id, message);
+        await ctx.supabaseAdmin.rpc("referral_record_payout_error", {
+          p_earning_id: item.earning_id,
+          p_error: message,
+        });
+      }
+    }
+    summary.referralTransfersSent = referralsSent;
+    summary.referralTransfersFailed = referralsFailed;
     return Response.json(summary);
   }),
 };

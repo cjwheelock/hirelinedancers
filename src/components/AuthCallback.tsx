@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { cleanReturnPath, getMarketplaceClient, readableError, signInUrl } from "@/lib/marketplace";
+import { captureReferralFromUrl } from "@/lib/referrals";
 import styles from "./Marketplace.module.css";
 
 export function AuthCallback() {
@@ -21,6 +22,7 @@ export function AuthCallback() {
       }
 
       const url = new URL(window.location.href);
+      captureReferralFromUrl(url.toString());
       const next = cleanReturnPath(url.searchParams.get("next"));
       setRetryHref(signInUrl(next));
       const providerError = url.searchParams.get("error_description") ?? url.searchParams.get("error");
