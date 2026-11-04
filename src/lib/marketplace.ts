@@ -48,6 +48,7 @@ export type InstructorProfile = {
   event_types: string[];
   age_groups: string[];
   languages: string[];
+  favorite_dance: string | null;
   favorite_song_name: string | null;
   favorite_song_spotify_url: string | null;
   provides_speakers: boolean | null;

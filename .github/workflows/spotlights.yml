@@ -1,0 +1,29 @@
+name: Check for released instructor spotlights
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Compare released articles with the live blog
+        id: articles
+        run: node scripts/sync-spotlights.mjs --check
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://wzmyroeowbsxxibkeejf.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_36gNqu74ysQhY2_VvJlS4A_XTYUFyxe
+      - name: Rebuild the blog
+        if: steps.articles.outputs.changed == 'true'
+        run: gh workflow run deploy.yml --ref main
+        env:
+          GH_TOKEN: ${{ github.token }}

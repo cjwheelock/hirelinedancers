@@ -11,3 +11,5 @@ supabase/.temp/
 *.tsbuildinfo
 output/preview/
 *.inspect.ndjson
+
+public/spotlights-version.json

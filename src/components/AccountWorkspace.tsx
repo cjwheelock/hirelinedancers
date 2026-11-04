@@ -26,6 +26,7 @@ import {
   profileSubmissionWindow
 } from "@/lib/commercialTerms";
 import { useMarketplaceSession } from "@/hooks/useMarketplaceSession";
+import { SpotlightReview } from "./SpotlightReview";
 import { ProfileEditor } from "./ProfileEditor";
 import { InstructorSmsSettings } from "./InstructorSmsSettings";
 import { InstructorOnboardingPricing } from "./InstructorOnboardingPricing";
@@ -1067,6 +1068,7 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
       ) : null}
       {profile ? (
         <div hidden={tab !== "profile"}>
+          {["pending_review", "approved", "published"].includes(profile.status) && <SpotlightReview key={`spotlight-${profile.id}`} profile={profile} />}
           <ProfileEditor key={profile.id} profile={profile} settings={settings} hasLifetimeAccess={hasLifetimeAccess} onSaved={() => void load(true)} describeEdgeError={edgeFunctionError} />
           <div className={styles.card}>
             <h3>Inquiry response window</h3>
@@ -2637,6 +2639,7 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
             {!pending.length ? <p className={styles.notice}>No profiles are waiting for review.</p> : null}
           </section>
 
+          <SpotlightReview profiles={profiles} />
           <div className={styles.profileReviewList}>
               {reviewProfiles.map((profile) => {
                 const profileMedia = media.filter((item) => item.instructor_profile_id === profile.id);

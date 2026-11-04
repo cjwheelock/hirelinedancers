@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { SpotlightBody } from "@/components/SpotlightBody";
+import { spotlightMediaUrl } from "@/lib/spotlight";
 import { notFound } from "next/navigation";
 import { publishedPosts, formatPostDate } from "@/data/blog";
 import { cities, site } from "@/data/site";
@@ -24,7 +26,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       publishedTime: post.publishDate,
       modifiedTime: post.updatedDate ?? post.publishDate,
       authors: [post.author ?? site.name],
-      images: ["/images/share-sunset-dance-floor.jpg"]
+      images: [spotlightMediaUrl(post.spotlight?.content.photo) || "/images/share-sunset-dance-floor.jpg"]
     }
   };
 }
@@ -50,7 +52,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
         dateModified: post.updatedDate ?? post.publishDate,
         url: `${site.url}/blog/${post.slug}/`,
         mainEntityOfPage: `${site.url}/blog/${post.slug}/`,
-        image: `${site.url}/images/share-sunset-dance-floor.jpg`,
+        image: spotlightMediaUrl(post.spotlight?.content.photo) || `${site.url}/images/share-sunset-dance-floor.jpg`,
         author: {
           "@type": authorIsPerson ? "Person" : "Organization",
           name: authorName,
@@ -71,7 +73,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
 
   return (
     <article className="page-shell article-page">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
       <nav className="breadcrumbs" aria-label="Breadcrumb">
         <Link href="/">Home</Link>
         <span aria-hidden="true">/</span>
@@ -85,6 +87,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
         {post.reviewer ? `, reviewed with ${post.reviewer}` : ""}
         {post.updatedDate && post.updatedDate !== post.publishDate ? ` · Updated ${formatPostDate(post.updatedDate)}` : ""}
       </p>
+      {post.spotlight ? <SpotlightBody content={post.spotlight.content} profileId={post.spotlight.profile_id} /> : <>
       <div className="post-body" dangerouslySetInnerHTML={{ __html: post.body }} />
       <div className="policy-box" style={{ marginTop: 48 }}>
         <h2>Planning an event{city ? ` in ${city.city}` : ""}?</h2>
@@ -95,6 +98,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
           </Link>
         </p>
       </div>
+      </>}
       <p style={{ marginTop: 32 }}><Link href="/blog/">&larr; All posts</Link></p>
     </article>
   );

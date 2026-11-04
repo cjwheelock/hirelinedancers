@@ -1,0 +1,14 @@
+.body { display: grid; gap: 1.25rem; margin: 1.5rem 0; overflow-wrap: anywhere; }
+.body > p, .body figure, .body dl, .body dd, .body h3 { margin: 0; }
+.body figure { display: grid; gap: .45rem; }
+.body img, .body video, .body iframe { display: block; width: 100%; max-height: 32rem; border: 0; border-radius: 12px; background: var(--cream, #f4efe9); }
+.body img, .body video { object-fit: contain; }
+.body iframe { aspect-ratio: 16/9; }
+.body .vertical { aspect-ratio: 9/16; max-width: 22rem; max-height: none; }
+.body figcaption { font-size: .9rem; color: var(--ink-2); }
+.body dl { display: flex; flex-wrap: wrap; gap: 1rem 2.5rem; }
+.body dt { font-weight: 700; }
+.body ul { padding-left: 1.2em; }
+.body > :last-child { justify-self: start; }
+.review { margin: .75rem 0; padding: 1rem; border: 1px solid var(--line, #ddd); border-radius: 12px; }
+.review summary { cursor: pointer; font-weight: 700; overflow-wrap: anywhere; }

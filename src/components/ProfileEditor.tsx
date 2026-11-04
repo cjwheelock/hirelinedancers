@@ -132,6 +132,7 @@ export function ProfileEditor({
     event_types: profile.event_types,
     age_groups: profile.age_groups ?? [],
     languages: profile.languages?.length ? profile.languages : ["English"],
+    favorite_dance: profile.favorite_dance ?? "",
     favorite_song_name: profile.favorite_song_name ?? "",
     favorite_song_spotify_url: profile.favorite_song_spotify_url ?? "",
     provides_speakers: profile.provides_speakers ?? false,
@@ -263,6 +264,7 @@ export function ProfileEditor({
       event_types: form.event_types,
       age_groups: form.age_groups,
       languages: form.languages,
+      favorite_dance: form.favorite_dance.trim() || null,
       favorite_song_name: form.favorite_song_name.trim() || null,
       favorite_song_spotify_url: form.favorite_song_spotify_url.trim() || null,
       provides_speakers: form.provides_speakers,
@@ -679,6 +681,10 @@ export function ProfileEditor({
                   <option value="48">Within 48 hours</option>
                   <option value="72">Within 72 hours</option>
                 </select>
+              </label>
+              <label className={styles.field}>
+                <span>Favorite line dance (optional)</span>
+                <input maxLength={120} value={form.favorite_dance} onChange={(e) => setValue("favorite_dance", e.target.value)} />
               </label>
               <label className={styles.field}>
                 <span>Favorite line dance song</span>
