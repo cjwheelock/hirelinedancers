@@ -7,7 +7,7 @@ import { SpotlightBody } from "./SpotlightBody";
 import styles from "./Marketplace.module.css";
 import articleStyles from "./Spotlight.module.css";
 
-const stateLabel = { draft: "Awaiting instructor review", approved: "Approved by instructor", declined: "Kept private", released: "Released for publication" };
+const stateLabel = { draft: "Draft", approved: "Approved by instructor", declined: "Kept private", released: "Released for publication" };
 type Action = "approve" | "decline" | "release";
 
 export function SpotlightReview({ profile, profiles }: { profile?: InstructorProfile; profiles?: InstructorProfile[] }) {
@@ -59,7 +59,8 @@ export function SpotlightReview({ profile, profiles }: { profile?: InstructorPro
     {!error && !rows.length && <p>No spotlight drafts yet. New instructor submissions will appear here for review.</p>}
     {rows.map(row => {
       const { title, description } = spotlightHeading(row.content);
-      const liveProfile = (profile || profiles?.find(p => p.id === row.profile_id))?.status === "published";
+      const instructor = profile || profiles?.find(p => p.id === row.profile_id);
+      const canPublish = instructor?.status === "published" && instructor.city?.trim() && instructor.display_name.trim();
       return <details key={row.profile_id} className={articleStyles.review}>
         <summary>{profile ? "Review your article" : title} · {stateLabel[row.status]}</summary>
         <article>
@@ -71,12 +72,11 @@ export function SpotlightReview({ profile, profiles }: { profile?: InstructorPro
         <p className={styles.help}>{row.status === "released"
           ? "The article will appear on the blog after the next site update."
           : row.status === "declined" ? "You chose to keep this article private. A previously published article comes off the blog after the next site update."
-          : profile ? "Your article stays private until you approve it and an administrator publishes it."
-          : "Publishing requires the instructor’s approval and a live instructor profile."}</p>
+          : "An administrator can publish this article when the instructor profile is live."}</p>
         <div className={styles.buttonRow}>
-          {profile && ["draft","declined"].includes(row.status) && <button type="button" className={styles.button} disabled={busy} onClick={() => void review(row,"approve")}>Approve article</button>}
+          {profile && row.status === "declined" && <button type="button" className={styles.button} disabled={busy} onClick={() => void review(row,"approve")}>Allow publication</button>}
           {profile && row.status !== "declined" && <button type="button" className={styles.secondaryButton} disabled={busy} onClick={() => void review(row,"decline")}>Keep private</button>}
-          {!profile && row.status === "approved" && <button type="button" className={styles.button} disabled={busy || !liveProfile} onClick={() => void review(row,"release")}>Publish article</button>}
+          {!profile && (row.status === "draft" || row.status === "approved") && <button type="button" className={styles.button} disabled={busy || !canPublish} onClick={() => void review(row,"release")}>Publish article</button>}
         </div>
       </details>;
     })}
