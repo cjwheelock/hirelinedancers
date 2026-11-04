@@ -20,16 +20,15 @@ export function Header() {
           <Link className="navlink" href="/#events">Events</Link>
           <Link className="navlink" href="/about/">About</Link>
           <Link className="navlink" href="/blog/">Blog</Link>
-          {!loading && !session ? (
-            <>
-              <span className="nav-divider" aria-hidden="true" />
-              <Link className="navlink nav-ghost nav-role" href="/instructors/join/">For instructors</Link>
-              <Link className="navlink nav-ghost nav-role" href="/sign-in/?next=%2Faccount%2F&role=organizer">For organizers</Link>
-            </>
-          ) : null}
           {!loading ? (
             <Link className="navlink is-account" href={session ? "/account/?tab=profile" : "/sign-in/"}>
               {session ? "Profile" : "Sign in"}
+            </Link>
+          ) : null}
+          {!loading && !session ? (
+            <Link className="navlink is-join" href="/instructors/join/">
+              <span className="nav-join-long">Join as an instructor</span>
+              <span className="nav-join-short">Join</span>
             </Link>
           ) : null}
           <Link className="button primary small navlink is-cta" href="/instructors/">

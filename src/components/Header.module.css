@@ -3,7 +3,7 @@
 }
 
 @media (min-width: 1041px) and (max-width: 1240px) {
-  .nav :global(.navlink:not(.is-cta):not(.is-account):not(.nav-role)),
+  .nav :global(.navlink:not(.is-cta):not(.is-account):not(.is-join)),
   .nav :global(.nav-divider) {
     display: none;
   }

@@ -197,6 +197,14 @@ main { display: block; }
 .nav-divider { width: 1px; height: 22px; background: var(--line); margin: 0 6px; }
 .nav-ghost { color: var(--ink-2) !important; font-size: 14px; }
 .nav-cta-short { display: none; }
+.site-header nav .navlink.is-join {
+  margin-left: 6px;
+  padding: 9px 16px;
+  border: 1.5px solid var(--ink);
+  font-weight: 700;
+}
+.site-header nav .navlink.is-join:hover { color: #fff; background: var(--ink); }
+.nav-join-short { display: none; }
 
 /* ---------- Buttons ---------- */
 .button, button.btn {
@@ -1405,7 +1413,7 @@ button:disabled { opacity: 0.7; cursor: progress; }
 
 /* ---------- Responsive ---------- */
 @media (max-width: 1040px) {
-  .site-header nav .navlink:not(.is-cta):not(.is-account) { display: none; }
+  .site-header nav .navlink:not(.is-cta):not(.is-account):not(.is-join) { display: none; }
   .nav-divider { display: none; }
   .hero { min-height: clamp(620px, 82dvh, 760px); }
   .hero::after {
@@ -1454,13 +1462,16 @@ button:disabled { opacity: 0.7; cursor: progress; }
   .site-header { padding: 0 14px; }
   .site-header-inner { gap: 8px; min-height: 64px; }
   .brand { gap: 8px; }
-  .brand > svg { width: 34px; height: 34px; }
+  .brand > span:first-child > svg { width: 36px; height: 36px; }
   .brand-text { font-size: 19px; }
   .site-header nav .is-cta { min-height: 44px; padding: 8px 12px; font-size: 13px; white-space: nowrap; }
   .site-header nav .is-account { padding: 8px; font-size: 13px; white-space: nowrap; }
   .site-header nav .is-cta svg { display: block; }
   .nav-cta-long { display: none; }
   .nav-cta-short { display: inline; }
+  .site-header nav .navlink.is-join { margin-left: 2px; padding: 8px 12px; font-size: 13px; }
+  .nav-join-long { display: none; }
+  .nav-join-short { display: inline; }
   .hero { min-height: 700px; }
   .hero::after {
     background:
@@ -1513,8 +1524,15 @@ button:disabled { opacity: 0.7; cursor: progress; }
   .resource-template .copy-template { margin: 12px; padding: 18px; }
 }
 
-@media (max-width: 375px) {
-  .site-header .brand-text { font-size: 16px; }
+@media (max-width: 430px) {
+  .site-header-inner { gap: 6px; }
+  .site-header .brand-text { font-size: 17px; }
+  .site-header nav .is-cta svg { display: none; }
+  .site-header nav .navlink.is-cta { margin-left: 4px; padding: 8px 14px; }
+}
+
+@media (max-width: 380px) {
+  .site-header .brand-text { display: none; }
 }
 
 @media (max-width: 540px) and (orientation: portrait) {
