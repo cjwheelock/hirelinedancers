@@ -9,6 +9,7 @@ import { weeklyPosts } from "./posts/weeklyPosts";
 export type BlogPost = {
   slug: string;
   title: string;
+  searchTitle?: string;
   description: string;
   /** ISO date (YYYY-MM-DD). Future dates stay out of production builds. */
   publishDate: string;

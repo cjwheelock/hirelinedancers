@@ -21,11 +21,12 @@ export function articleText(value: string) {
 
 export function spotlightHeading(c: SpotlightContent) {
   const location = [c.city, c.region].filter(Boolean).join(", ");
-  const title = articleText(`Meet ${c.name}, a line dance instructor in ${location}`);
+  const title = articleText(`Meet ${c.name} in ${c.city}`);
+  const searchTitle = articleText(`Meet ${c.name}, a line dance instructor in ${location}`);
   const events = c.events.map(value => eventTypes.find(event => event.slug === value)?.label.toLowerCase() || value.replace(/[-_]/g, " "));
   const occasion = events.length ? ` for ${new Intl.ListFormat("en-US").format(events)}` : "";
   const description = articleText(c.headline || `${c.name} teaches line dancing${occasion} in ${location}.`);
-  return { title, description };
+  return { title, searchTitle, description };
 }
 
 export function spotlightMediaUrl(media?: SpotlightMedia) {

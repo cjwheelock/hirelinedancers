@@ -37,6 +37,12 @@ export function SpotlightReview({ profile, profiles }: { profile?: InstructorPro
     return () => { active = false; };
   }, [profile, profiles, reload, page]);
 
+  useEffect(() => {
+    if (loaded && !profile && window.location.hash === "#instructor-spotlights") {
+      document.getElementById("instructor-spotlights")?.scrollIntoView();
+    }
+  }, [loaded, profile]);
+
   async function review(row: Spotlight, action: Action) {
     const client = getMarketplaceClient();
     if (!client || busy) return;
@@ -47,10 +53,10 @@ export function SpotlightReview({ profile, profiles }: { profile?: InstructorPro
     setReload(v => v + 1);
   }
   if ((!loaded || !rows.length) && !error && (profile || !loaded)) return null;
-  return <section className={styles.card}>
+  return <section className={styles.card} id={profile ? undefined : "instructor-spotlights"}>
     <h2>{profile ? "Your instructor spotlight" : "Instructor spotlights"}</h2>
     {error && <p role="alert" className={styles.error}>{error} <button type="button" onClick={() => { setError(""); setReload(v => v + 1); }}>Refresh</button></p>}
-    {!error && !rows.length && <p>No spotlight drafts yet.</p>}
+    {!error && !rows.length && <p>No spotlight drafts yet. New instructor submissions will appear here for review.</p>}
     {rows.map(row => {
       const { title, description } = spotlightHeading(row.content);
       const liveProfile = (profile || profiles?.find(p => p.id === row.profile_id))?.status === "published";
