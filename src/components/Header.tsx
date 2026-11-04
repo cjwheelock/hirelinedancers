@@ -25,17 +25,17 @@ export function Header() {
               {session ? "Profile" : "Sign in"}
             </Link>
           ) : null}
+          <Link className="button primary small navlink is-cta" href="/instructors/">
+            <Search size={16} aria-hidden="true" />
+            <span className="nav-cta-long">Find an instructor</span>
+            <span className="nav-cta-short">Find</span>
+          </Link>
           {!loading && !session ? (
             <Link className="navlink is-join" href="/instructors/join/">
               <span className="nav-join-long">Join as an instructor</span>
               <span className="nav-join-short">Join</span>
             </Link>
           ) : null}
-          <Link className="button primary small navlink is-cta" href="/instructors/">
-            <Search size={16} aria-hidden="true" />
-            <span className="nav-cta-long">Find an instructor</span>
-            <span className="nav-cta-short">Find</span>
-          </Link>
         </nav>
       </div>
     </header>

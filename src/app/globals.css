@@ -198,7 +198,7 @@ main { display: block; }
 .nav-ghost { color: var(--ink-2) !important; font-size: 14px; }
 .nav-cta-short { display: none; }
 .site-header nav .navlink.is-join {
-  margin-left: 6px;
+  margin-left: 8px;
   padding: 9px 16px;
   border: 1.5px solid var(--ink);
   font-weight: 700;
