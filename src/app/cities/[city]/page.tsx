@@ -13,13 +13,17 @@ export async function generateMetadata({ params }: { params: Promise<{ city: str
   const { city: citySlug } = await params;
   const city = cities.find((item) => item.slug === citySlug);
   if (!city) return {};
-  const description = `${city.localIntro} Browse instructors, local planning guidance, and line dancing articles for ${city.city}, ${city.state}.`;
+  const isBayArea = city.slug === "san-francisco-ca";
+  const title = isBayArea ? `${city.city} Line Dance Instructors` : `Hire a Line Dance Instructor in ${city.city}, ${city.state}`;
+  const description = isBayArea
+    ? `Hire a line dance instructor in the ${city.city}. Browse instructors, local planning guidance, and line dancing articles.`
+    : `${city.localIntro} Browse instructors, local planning guidance, and line dancing articles for ${city.city}, ${city.state}.`;
   return {
-    title: `Hire a Line Dance Instructor in ${city.city}, ${city.state}`,
+    title,
     description,
     alternates: { canonical: `/cities/${city.slug}/` },
     openGraph: {
-      title: `Hire a Line Dance Instructor in ${city.city}, ${city.state}`,
+      title,
       description,
       url: `${site.url}/cities/${city.slug}/`,
       images: ["/images/share-sunset-dance-floor.jpg"]
