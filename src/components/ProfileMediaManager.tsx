@@ -10,6 +10,7 @@ import {
   youtubeThumbnail,
   type VideoProvider
 } from "@/lib/videoLinks";
+import { isVideoFile, MAX_VIDEO_BYTES, prepareVideo, VIDEO_ACCEPT, videoSizeError } from "@/lib/videoUpload";
 import { ImageCropDialog } from "./ImageCropDialog";
 import styles from "./Marketplace.module.css";
 import editor from "./ProfileEditor.module.css";
@@ -29,9 +30,7 @@ export type EditorMedia = {
 type CropJob = { file: File; mediaType: "headshot" | "image" };
 
 const imageTypes = ["image/jpeg", "image/png", "image/webp"];
-const videoTypes = ["video/mp4", "video/webm", "video/quicktime"];
 const maxImageBytes = 10 * 1024 * 1024;
-const maxVideoBytes = 50 * 1024 * 1024;
 const galleryPhotoLimit = 8;
 const galleryVideoLimit = 6;
 
@@ -67,6 +66,11 @@ export function ProfileMediaManager({
   const [dragOver, setDragOver] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
   const [captions, setCaptions] = useState<Record<string, string>>({});
+  const videoController = useRef<AbortController | null>(null);
+  const operation = useRef(false);
+  const [processingVideo, setProcessingVideo] = useState(false);
+  const lifecycle = useRef(0);
+  useEffect(() => () => { lifecycle.current += 1; videoController.current?.abort(); }, [profile.id]);
   const headshotInput = useRef<HTMLInputElement>(null);
   const welcomeInput = useRef<HTMLInputElement>(null);
   const galleryInput = useRef<HTMLInputElement>(null);
@@ -99,7 +103,7 @@ export function ProfileMediaManager({
   const photoCount = gallery.filter((item) => item.media_type === "image").length;
   const videoCount = gallery.filter((item) => item.media_type === "video").length;
 
-  async function uploadFile(file: File, mediaType: EditorMedia["media_type"], sortOrder: number) {
+  async function uploadFile(file: File, mediaType: EditorMedia["media_type"], sortOrder: number, replace?: EditorMedia) {
     const client = getMarketplaceClient();
     if (!client) throw new Error("Uploads are unavailable right now.");
     const safeName = file.name.toLowerCase().replace(/[^a-z0-9.]+/g, "-");
@@ -110,18 +114,22 @@ export function ProfileMediaManager({
       upsert: false
     });
     if (uploadError) throw new Error(uploadError.message);
-    const { error: metadataError } = await client.from("profile_media").insert({
+    const values = {
       instructor_profile_id: profile.id,
       media_type: mediaType,
       storage_path: path,
       mime_type: file.type,
       status: "ready",
       sort_order: Math.min(sortOrder, 99)
-    });
+    };
+    const { error: metadataError } = replace
+      ? await client.from("profile_media").update({ ...values, external_url: null, embed_provider: null, embed_id: null }).eq("id", replace.id).select("id").single()
+      : await client.from("profile_media").insert(values);
     if (metadataError) {
       await client.storage.from("instructor-media").remove([path]);
       throw new Error(friendlyDbError(metadataError.message));
     }
+    if (replace?.storage_path) await client.storage.from("instructor-media").remove([replace.storage_path]);
   }
 
   async function removeItem(item: EditorMedia, reload = true) {
@@ -135,15 +143,34 @@ export function ProfileMediaManager({
 
   function checkFile(file: File): "image" | "video" | string {
     if (imageTypes.includes(file.type)) return file.size > maxImageBytes ? `${file.name} is larger than 10 MB.` : "image";
-    if (videoTypes.includes(file.type)) {
-      if (file.type === "video/quicktime") return `${file.name} is a .mov file. Export it as MP4 (on iPhone, share it and choose "Save to Files" as most compatible), then try again.`;
-      return file.size > maxVideoBytes ? `${file.name} is larger than 50 MB. Trim it, or post it to Instagram, TikTok, or YouTube and paste the link instead.` : "video";
+    if (isVideoFile(file)) return file.size > MAX_VIDEO_BYTES ? videoSizeError(file.name) : "video";
+    return `${file.name} isn't a supported file. Use JPG, PNG, or WebP photos and MOV, MP4, or WebM videos.`;
+  }
+
+  async function uploadVideo(file: File, mediaType: "welcome_video" | "video", sortOrder: number, replace?: EditorMedia) {
+    const generation = lifecycle.current;
+    const controller = new AbortController();
+    videoController.current = controller;
+    setProcessingVideo(true);
+    try {
+      const prepared = await prepareVideo(file, controller.signal, ({ stage, percent }) => {
+        setBusy(stage === "loading" ? "Loading video processor..." : `Preparing ${file.name}${percent === null ? "..." : `: ${percent}%`}`);
+      });
+      if (controller.signal.aborted || generation !== lifecycle.current) throw new DOMException("Canceled", "AbortError");
+      // Cancellation is available during processing, before any remote upload.
+      setProcessingVideo(false);
+      setBusy(`Uploading ${prepared.name}...`);
+      await uploadFile(prepared, mediaType, sortOrder, replace);
+    } finally {
+      videoController.current = null;
+      setProcessingVideo(false);
     }
-    return `${file.name} isn't a supported file. Use JPG, PNG, or WebP photos and MP4 videos.`;
   }
 
   async function addGalleryFiles(files: File[]) {
-    if (!canEdit || !files.length) return;
+    if (!canEdit || !files.length || operation.current || busy !== null) return;
+    operation.current = true;
+    const generation = lifecycle.current;
     setError(null);
     setNotice(null);
     const problems: string[] = [];
@@ -168,14 +195,19 @@ export function ProfileMediaManager({
       setBusy(`Uploading ${videos.length === 1 ? "video" : `${videos.length} videos`}...`);
       try {
         let order = gallery.length;
-        for (const file of videos) await uploadFile(file, "video", order++);
+        for (const file of videos) {
+          if (generation !== lifecycle.current) throw new DOMException("Canceled", "AbortError");
+          await uploadVideo(file, "video", order++);
+        }
       } catch (uploadError) {
-        setError(uploadError instanceof Error ? uploadError.message : "Upload failed.");
+        if (uploadError instanceof DOMException && uploadError.name === "AbortError") setNotice("Video processing canceled.");
+        else setError(uploadError instanceof Error ? uploadError.message : "Upload failed.");
       }
       setBusy(null);
       await load();
     }
     if (crops.length) setCropQueue((current) => [...current, ...crops]);
+    operation.current = false;
   }
 
   async function onCropConfirm(file: File) {
@@ -193,25 +225,28 @@ export function ProfileMediaManager({
   }
 
   async function chooseWelcomeFile(file: File | undefined) {
-    if (!file || !canEdit) return;
+    if (!file || !canEdit || operation.current || busy !== null) return;
     const kind = checkFile(file);
     if (kind !== "video") {
       setError(kind === "image" ? "Your welcome video needs to be a video file." : kind);
       return;
     }
     setError(null);
-    setBusy("Uploading welcome video...");
+    operation.current = true;
+    setBusy("Preparing welcome video...");
     try {
-      if (welcome) await removeItem(welcome, false);
-      await uploadFile(file, "welcome_video", 0);
+      await uploadVideo(file, "welcome_video", 0, welcome);
     } catch (uploadError) {
-      setError(uploadError instanceof Error ? uploadError.message : "Upload failed.");
+      if (uploadError instanceof DOMException && uploadError.name === "AbortError") setNotice("Video processing canceled.");
+      else setError(uploadError instanceof Error ? uploadError.message : "Upload failed.");
     }
     setBusy(null);
+    operation.current = false;
     await load();
   }
 
   async function addLink() {
+    if (!canEdit || operation.current || busy !== null) return;
     const problem = videoLinkProblem(link);
     if (problem || !link.trim()) {
       setError(problem ?? "Paste a video link first.");
@@ -323,6 +358,7 @@ export function ProfileMediaManager({
       </div>
 
       {busy ? <p className={styles.notice} role="status">{busy}</p> : null}
+      {processingVideo ? <button type="button" className={styles.secondaryButton} onClick={() => videoController.current?.abort()}>Cancel video processing</button> : null}
       {notice ? <p className={styles.success} role="status">{notice}</p> : null}
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
       {!canEdit && profile.status === "pending_review" ? <p className={styles.notice}>Photos and videos are locked while your profile is in review.</p> : null}
@@ -378,7 +414,7 @@ export function ProfileMediaManager({
             </button>
           )}
           <small className={styles.muted}>30–60 seconds saying hi and what a class with you feels like. Or paste a link below and choose &ldquo;Use as welcome video.&rdquo;</small>
-          <input ref={welcomeInput} hidden type="file" accept="video/mp4,video/webm,video/quicktime" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; void chooseWelcomeFile(file); }} />
+          <input ref={welcomeInput} hidden type="file" accept={VIDEO_ACCEPT} onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; void chooseWelcomeFile(file); }} />
         </div>
       </div>
 
@@ -414,20 +450,20 @@ export function ProfileMediaManager({
 
       <div
         className={`${editor.dropZone} ${dragOver ? editor.dropZoneActive : ""}`}
-        onDragOver={(event) => { if (!dragId && canEdit) { event.preventDefault(); setDragOver(true); } }}
+        onDragOver={(event) => { if (!dragId && canEdit && busy === null) { event.preventDefault(); setDragOver(true); } }}
         onDragLeave={() => setDragOver(false)}
         onDrop={onDropFiles}
       >
         <Upload size={22} aria-hidden="true" />
         <p><strong>Drop photos or videos here</strong> or</p>
         <button type="button" className={styles.secondaryButton} disabled={!canEdit || busy !== null} onClick={() => galleryInput.current?.click()}>Choose files</button>
-        <small className={styles.muted}>JPG, PNG, or WebP photos up to 10 MB. MP4 videos up to 50 MB. You can pick several at once.</small>
+        <small className={styles.muted}>JPG, PNG, or WebP photos up to 10 MB. MOV, MP4, or WebM videos up to 50 MB. Videos are prepared as MP4 before uploading. If a video is larger, quickly edit and shorten it on your phone. You can pick several at once.</small>
         <input
           ref={galleryInput}
           hidden
           multiple
           type="file"
-          accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime"
+          accept={`image/jpeg,image/png,image/webp,${VIDEO_ACCEPT}`}
           onChange={(event) => { const files = Array.from(event.target.files ?? []); event.target.value = ""; void addGalleryFiles(files); }}
         />
       </div>
@@ -438,7 +474,7 @@ export function ProfileMediaManager({
             <li
               key={item.id}
               className={`${editor.galleryItem} ${dragId === item.id ? editor.dragging : ""}`}
-              draggable={canEdit}
+              draggable={canEdit && busy === null}
               onDragStart={() => setDragId(item.id)}
               onDragEnd={() => setDragId(null)}
               onDragOver={(event) => { if (dragId) event.preventDefault(); }}

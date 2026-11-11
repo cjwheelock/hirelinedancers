@@ -28,6 +28,8 @@ jobs:
         run: npm run terms:audit
       - name: Lint
         run: npm run lint
+      - name: Test video upload handling
+        run: npm run test:video
       - name: Test instructor approval flow
         run: npm run test:approval
       - name: Test authentication routing

@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "prebuild": "node scripts/sync-spotlights.mjs && node scripts/sync-public-profiles.mjs",
+    "prebuild": "node scripts/prepare-video-processor.mjs && node scripts/sync-spotlights.mjs && node scripts/sync-public-profiles.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
@@ -17,9 +17,12 @@
     "test:approval": "node --test scripts/test-approval-flow.mjs",
     "test:auth": "node --test scripts/test-auth-routing.mjs",
     "test:journeys": "node --test scripts/test-user-journeys.mjs",
-    "test:booking-document": "node --test scripts/test-booking-document.mjs"
+    "test:booking-document": "node --test scripts/test-booking-document.mjs",
+    "predev": "node scripts/prepare-video-processor.mjs",
+    "test:video": "node --test scripts/test-video-upload.mjs"
   },
   "dependencies": {
+    "@ffmpeg/ffmpeg": "0.12.15",
     "@supabase/supabase-js": "^2.108.2",
     "jspdf": "4.2.1",
     "lucide-react": "^0.468.0",
@@ -34,7 +37,8 @@
     "@types/react-dom": "^19.0.1",
     "eslint": "^9.16.0",
     "eslint-config-next": "^15.5.25",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "@ffmpeg/core": "0.12.10"
   },
   "overrides": {
     "postcss": "8.5.26"
