@@ -68,3 +68,23 @@ test("static export strips prices even if an upstream response includes them", a
     assert.deepEqual(JSON.parse(content)[0].profile.packages,[{name:'Pop-up',durationHours:1}]);
   } finally { await rm(dir,{recursive:true,force:true}); }
 });
+
+test("profile has no fixed booking panel and retains contact links", async () => {
+  const source = await readFile('src/app/profile/PublicProfile.tsx', 'utf8');
+  const css = await readFile('src/app/profile/profile.module.css', 'utf8');
+  assert.doesNotMatch(source, /Booking details|contactCard/);
+  assert.doesNotMatch(css, /position:\s*(sticky|fixed)|contactCard/);
+  assert.equal((source.match(/Contact \{displayName\}/g) ?? []).length, 2);
+  assert.match(css, /\.layout\s*\{[^}]*grid-template-columns: minmax\(0, 1fr\)/);
+});
+
+test("sharing disclosure precedes submission and payment explanation follows success", async () => {
+  const source = await readFile('src/components/ContactInstructor.tsx','utf8');
+  const success = source.slice(source.indexOf('if (successId)'),source.indexOf('<p className={styles.eyebrow}>Contact', source.indexOf('if (successId)')));
+  const form = source.slice(source.indexOf('<p className={styles.eyebrow}>Contact', source.indexOf('if (successId)')));
+  assert.match(success,/quote you can sign and pay/);
+  assert.match(success,/full price plus the service fee upfront/);
+  assert.doesNotMatch(form,/Sending an inquiry is free|full price plus the service fee/);
+  assert.ok(form.indexOf('share your full event details and organizer contact information') < form.indexOf('Send inquiry'));
+  assert.match(form,/48 hours/);
+});

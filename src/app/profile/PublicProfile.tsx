@@ -5,7 +5,6 @@ import Link from "next/link";
 import { InstructorContactLink } from "@/components/InstructorContactLink";
 import {
   Award,
-  CalendarCheck,
   Clock,
   Headphones,
   MapPin,
@@ -563,19 +562,7 @@ export function PublicProfile({ initialProfile = null, initialMedia = [] }: { in
           ) : null}
         </div>
 
-        <aside className={styles.contactCard}>
-          <CalendarCheck size={30} aria-hidden="true" />
-          <p className={styles.kicker}>Booking details</p>
-          <h2>Plan your line dance experience</h2>
-          <p>Share the date, location, group size, and event format when you contact the instructor.</p>
-          <ul className={styles.bookingList}>
-            <li>The instructor confirms availability, rates, and next steps.</li>
-            <li>Discuss music, accessibility, travel, sound, and venue requirements before the event.</li>
-          </ul>
-          <p className={styles.finePrint}>You can browse without an account. Sign in is required when you send an inquiry so you can track its status.</p>
-          <p className={styles.finePrint}>When you agree on the details, the instructor sends a booking agreement here. You sign and pay through Hire Line Dancers, and we hold the payment until after the event.</p>
-          <p className={styles.response}><Clock size={15} aria-hidden="true" /> No reply within 48 hours? We will help you explore other instructors.</p>
-        </aside>
+
       </div>
 
       <section className={styles.bottomCta} aria-labelledby="published-profile-bottom-cta">

@@ -188,6 +188,7 @@ export function ContactInstructor() {
             : "Your inquiry is saved in Messages. We will notify the instructor with a link to read and reply."}
         </p>
         <p className={styles.subtitle}>Ask about availability, pricing, insurance, and venue needs. When you agree, the instructor sends a quote you can sign and pay in the conversation.</p>
+        <p className={styles.subtitle}>When you book, you pay the full price plus the service fee upfront. The instructor’s share is paid 24 hours after the event ends, unless a reported problem or payment dispute puts the payout on hold.</p>
         <p className={styles.subtitle}>We ask instructors to respond within 48 hours. If you haven’t heard back by then, we’ll invite other matching instructors to respond to your event. You can compare their profiles and choose who to book.</p>
         <div className={styles.buttonRow} style={{ marginTop: 26 }}>
           <a className={styles.button} href={successThreadId ? `/account/?tab=inquiries&inquiry=${encodeURIComponent(successId)}&thread=${encodeURIComponent(successThreadId)}` : "/account/?tab=inquiries"}>View messages</a>
@@ -275,7 +276,6 @@ export function ContactInstructor() {
           <textarea maxLength={3000} value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} />
         </label>
         <p className={styles.help}>Your inquiry goes to this instructor first. If they do not respond within 48 hours or mark themselves unavailable, we will share your full event details and organizer contact information with other matching instructors. Your private conversations are not shared. You choose who to book.</p>
-        <p className={styles.help}>Sending an inquiry is free and does not confirm a booking. When you book, you pay the full price plus the service fee upfront. The instructor’s share is paid 24 hours after the event ends, unless a reported problem or payment dispute puts the payout on hold.</p>
         <p className={styles.help}>Messages are handled through Hire Line Dancers. Authorized administrators can view them to support the inquiry.</p>
         {error ? <p className={styles.error}>{error}</p> : null}
         <button className={styles.button} disabled={busy} type="submit">{busy ? "Sending inquiry..." : "Send inquiry"}</button>
