@@ -1,3 +1,4 @@
+import { publicProfilePackages } from "./publicProfilePackages.mjs";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { PublicInstructorProfile, ProfileMedia } from "@/app/profile/PublicProfile";
@@ -7,7 +8,8 @@ export type PublishedProfileSnapshot = { profile: PublicInstructorProfile & { up
 // The build step obtains this snapshot only from the published public views.
 export function publishedProfiles(): PublishedProfileSnapshot[] {
   const file = join(process.cwd(), "tmp", "published-profiles.json");
-  return existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : [];
+  const rows: PublishedProfileSnapshot[] = existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : [];
+  return rows.map(row => ({ ...row, profile: { ...row.profile, packages: publicProfilePackages(row.profile.packages) } }));
 }
 
 export function profileIdentifier(profile: PublicInstructorProfile) {

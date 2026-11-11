@@ -12,7 +12,7 @@
     "terms:audit": "node scripts/audit-commercial-terms.mjs",
     "audit:static": "node scripts/audit-static-site.mjs",
     "test:profile-search": "node --test scripts/test-profile-search.mjs",
-    "test:profile-sync": "node --test scripts/test-public-profile-sync.mjs",
+    "test:profile-sync": "node --test scripts/test-public-profile-sync.mjs scripts/test-public-pricing-migration.mjs",
     "test:indexnow": "node --test scripts/test-indexnow-sitemap.mjs",
     "test:approval": "node --test scripts/test-approval-flow.mjs",
     "test:auth": "node --test scripts/test-auth-routing.mjs",

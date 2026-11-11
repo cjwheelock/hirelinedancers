@@ -37,3 +37,14 @@ test("the existing query-based profile remains present", async () => {
   const html = await readFile("out/profile/index.html", "utf8");
   assert.match(html, /Line Dance Instructor Profile/);
 });
+
+test("public profile HTML and serialized packages contain no private prices", async () => {
+  for (const { profile } of snapshot) {
+    for (const item of profile.packages ?? []) {
+      assert.deepEqual(Object.keys(item).filter(key => !['name', 'description', 'durationHours'].includes(key)), []);
+    }
+    const html = await readFile(`out/profile/${profile.slug || profile.id}/index.html`, 'utf8');
+    assert.doesNotMatch(html, /priceCents|minimum_rate_cents|hourly_rate_cents/);
+    assert.doesNotMatch(html, /From \$/);
+  }
+});

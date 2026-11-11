@@ -29,6 +29,7 @@ import {
 } from "@/lib/marketplace";
 import { embedUrl, isVerticalProvider, providerLabel, type VideoProvider } from "@/lib/videoLinks";
 import { isFoundingInstructor } from "@/lib/commercialTerms";
+import { publicProfilePackages, type PublicProfilePackage } from "@/lib/publicProfilePackages.mjs";
 import styles from "./profile.module.css";
 
 export type PublicInstructorProfile = Pick<
@@ -55,7 +56,7 @@ export type PublicInstructorProfile = Pick<
   | "provides_music_playback"
   | "liability_insurance_status"
   | "preferred_response_hours"
-> & { created_at: string | null; highlights: ProfileHighlight[]; packages: ProfilePackage[]; status?: string };
+> & { created_at: string | null; highlights: ProfileHighlight[]; packages: PublicProfilePackage[]; status?: string };
 
 export type ProfileMedia = {
   id: string;
@@ -260,10 +261,6 @@ function ShareButton({ name, identifier, previewing }: { name: string; identifie
   );
 }
 
-function money(cents: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: cents % 100 ? 2 : 0 }).format(cents / 100);
-}
-
 function hoursLabel(hours: number) {
   return `${hours} ${hours === 1 ? "hour" : "hours"}`;
 }
@@ -321,7 +318,7 @@ export function PublicProfile({ initialProfile = null, initialMedia = [] }: { in
               .order("sort_order");
             if (!active) return;
             setPreviewing(true);
-            setProfile({ ...previewProfile, highlights: previewProfile.highlights ?? [], packages: previewProfile.packages ?? [] });
+            setProfile({ ...previewProfile, highlights: previewProfile.highlights ?? [], packages: publicProfilePackages(previewProfile.packages) });
             setMedia((previewMedia ?? []) as ProfileMedia[]);
             setLoading(false);
             return;
@@ -362,7 +359,7 @@ export function PublicProfile({ initialProfile = null, initialMedia = [] }: { in
       const publicProfile: PublicInstructorProfile = {
         ...directoryProfile,
         highlights: extraFields?.highlights ?? [],
-        packages: extraFields?.packages ?? []
+        packages: publicProfilePackages(extraFields?.packages)
       };
 
       if (!active) return;
@@ -479,7 +476,7 @@ export function PublicProfile({ initialProfile = null, initialMedia = [] }: { in
                     <p className={styles.packageMeta}>
                       {item.durationHours ? hoursLabel(item.durationHours) : null}
                       {item.durationHours ? " · " : null}
-                      {item.priceCents ? `From ${money(item.priceCents)}` : "Custom quote"}
+                      Custom quote
                     </p>
                     {item.description ? <p>{item.description}</p> : null}
                     <InstructorContactLink instructorIdentifier={identifier} className={styles.packageLink} packageName={item.name}>

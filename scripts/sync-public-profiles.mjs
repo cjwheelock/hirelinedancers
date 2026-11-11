@@ -1,3 +1,4 @@
+import { publicProfilePackages } from "../src/lib/publicProfilePackages.mjs";
 import { createHash } from "node:crypto";
 import { appendFile, mkdir, writeFile } from "node:fs/promises";
 
@@ -44,7 +45,7 @@ if (!base || !apikey) {
     used.add(identifier);
     const extra = extras.find(item => item.id === row.id);
     return {
-      profile: { ...row, highlights: extra?.highlights ?? [], packages: extra?.packages ?? [] },
+      profile: { ...row, highlights: extra?.highlights ?? [], packages: publicProfilePackages(extra?.packages) },
       media: media.filter(item => item.instructor_profile_id === row.id).sort((a, b) => a.sort_order - b.sort_order || a.id.localeCompare(b.id))
     };
   });
