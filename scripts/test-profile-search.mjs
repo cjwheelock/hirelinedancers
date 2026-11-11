@@ -28,6 +28,7 @@ test("each public profile has an indexable page with its own metadata and visibl
 });
 
 test("the internal booking-test account is not promoted to search", () => {
+  assert.ok(!snapshot.some(({ profile }) => profile.id === "a674e67d-f057-40a5-be1a-d4f63b4e8af8"));
   assert.ok(!routes.includes("cj-wheelock-new-york-ny"));
   assert.ok(!sitemap.includes("/profile/cj-wheelock-new-york-ny/"));
 });

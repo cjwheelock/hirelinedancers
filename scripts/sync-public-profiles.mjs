@@ -8,6 +8,7 @@ const check = process.argv.includes("--check");
 // This published account explicitly identifies itself as an internal booking test.
 // Keep its existing directory URL working, but do not create a search landing page.
 const excludedIdentifiers = new Set(["cj-wheelock-new-york-ny"]);
+const excludedProfileIds = new Set(["a674e67d-f057-40a5-be1a-d4f63b4e8af8"]);
 const fields = "id,slug,status,display_name,business_name,headline,bio,city,region,travel_radius_miles,years_teaching,max_group_size,styles,event_types,age_groups,languages,favorite_song_name,favorite_song_spotify_url,provides_speakers,provides_microphone,provides_music_playback,liability_insurance_status,preferred_response_hours,published_at,created_at,updated_at";
 const mediaFields = "id,instructor_profile_id,media_type,storage_path,external_url,mime_type,caption,alt_text,sort_order,embed_provider,embed_id";
 
@@ -35,7 +36,7 @@ if (!base || !apikey) {
     readRows("profile_media", mediaFields, { status: "eq.ready" })
   ]);
   const used = new Set();
-  profiles = directory.filter(row => !excludedIdentifiers.has(row.slug || row.id)).map(row => {
+  profiles = directory.filter(row => !excludedProfileIds.has(row.id) && !excludedIdentifiers.has(row.slug || row.id)).map(row => {
     const identifier = row.slug || row.id;
     if (row.status !== "published" || !row.display_name || !/^[a-z0-9-]+$/.test(identifier) || used.has(identifier)) {
       throw new Error("Invalid or duplicate published profile identifier.");

@@ -38,6 +38,8 @@ jobs:
         run: npm run test:booking-document
       - name: Test IndexNow sitemap comparison
         run: npm run test:indexnow
+      - name: Test published profile export
+        run: npm run test:profile-sync
       - name: Build static export
         run: npm run build
         env:
