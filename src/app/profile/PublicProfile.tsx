@@ -31,7 +31,7 @@ import { embedUrl, isVerticalProvider, providerLabel, type VideoProvider } from 
 import { isFoundingInstructor } from "@/lib/commercialTerms";
 import styles from "./profile.module.css";
 
-type PublicInstructorProfile = Pick<
+export type PublicInstructorProfile = Pick<
   InstructorProfile,
   | "id"
   | "slug"
@@ -57,7 +57,7 @@ type PublicInstructorProfile = Pick<
   | "preferred_response_hours"
 > & { created_at: string | null; highlights: ProfileHighlight[]; packages: ProfilePackage[]; status?: string };
 
-type ProfileMedia = {
+export type ProfileMedia = {
   id: string;
   instructor_profile_id: string;
   media_type: "headshot" | "image" | "welcome_video" | "video";
@@ -116,6 +116,11 @@ function safeExternalUrl(value: string | null) {
 function mediaUrl(item: ProfileMedia) {
   const external = safeExternalUrl(item.external_url);
   if (external) return external;
+  // Construct public storage URLs on the server too, so static profile pages
+  // render the same approved media before and after browser hydration.
+  if (item.storage_path && process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/instructor-media/${item.storage_path.split("/").map(encodeURIComponent).join("/")}`;
+  }
   const client = getMarketplaceClient();
   if (!client || !item.storage_path) return null;
   return client.storage.from("instructor-media").getPublicUrl(item.storage_path).data.publicUrl;
@@ -221,10 +226,21 @@ function MediaGallery({ media, instructorName }: { media: ProfileMedia[]; instru
   );
 }
 
-function ShareButton({ name }: { name: string }) {
+function ShareButton({ name, identifier, previewing }: { name: string; identifier: string; previewing: boolean }) {
   const [copied, setCopied] = useState(false);
+  const [hasSearchPage, setHasSearchPage] = useState(false);
+  useEffect(() => {
+    let active = true;
+    fetch("/profile-routes.json")
+      .then(response => response.ok ? response.json() : [])
+      .then(routes => { if (active && Array.isArray(routes)) setHasSearchPage(routes.includes(identifier)); })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [identifier]);
   async function share() {
-    const url = window.location.href.replace(/[?&]preview=1/, "");
+    const url = !previewing && hasSearchPage
+      ? new URL(`/profile/${encodeURIComponent(identifier)}/`, window.location.origin).href
+      : window.location.href.replace(/[?&]preview=1/, "");
     try {
       if (navigator.share) {
         await navigator.share({ title: `${name} | Hire Line Dancers`, url });
@@ -252,17 +268,17 @@ function hoursLabel(hours: number) {
   return `${hours} ${hours === 1 ? "hour" : "hours"}`;
 }
 
-export function PublicProfile() {
-  const [profile, setProfile] = useState<PublicInstructorProfile | null>(null);
-  const [media, setMedia] = useState<ProfileMedia[]>([]);
-  const [loading, setLoading] = useState(true);
+export function PublicProfile({ initialProfile = null, initialMedia = [] }: { initialProfile?: PublicInstructorProfile | null; initialMedia?: ProfileMedia[] }) {
+  const [profile, setProfile] = useState<PublicInstructorProfile | null>(initialProfile);
+  const [media, setMedia] = useState<ProfileMedia[]>(initialMedia);
+  const [loading, setLoading] = useState(!initialProfile);
   const [error, setError] = useState<string | null>(null);
   const [previewing, setPreviewing] = useState(false);
 
   useEffect(() => {
     const search = new URLSearchParams(window.location.search);
-    const identifier = search.get("instructor")?.trim();
-    const wantsPreview = search.get("preview") === "1";
+    const identifier = initialProfile ? (initialProfile.slug || initialProfile.id) : search.get("instructor")?.trim();
+    const wantsPreview = !initialProfile && search.get("preview") === "1";
     if (!identifier) {
       setError("Choose a published instructor from the directory to view a profile.");
       setLoading(false);
@@ -365,7 +381,7 @@ export function PublicProfile() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [initialProfile]);
 
   if (loading) {
     return (
@@ -425,7 +441,7 @@ export function PublicProfile() {
           >
             Contact {firstName}
           </InstructorContactLink>
-          <ShareButton name={profile.display_name} />
+          <ShareButton name={profile.display_name} identifier={identifier} previewing={previewing} />
           <div className={styles.heroTags}>
             <span><MapPin size={16} aria-hidden="true" /> {location}</span>
             {profile.max_group_size ? <span><Users size={16} aria-hidden="true" /> Groups up to {profile.max_group_size}</span> : null}

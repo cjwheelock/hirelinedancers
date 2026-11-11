@@ -6,6 +6,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL(site.url),
+  verification: { other: { "msvalidate.01": "E5CE32AF68D9F3A1C82967E36FA44F7D" } },
   title: {
     default: "Hire a Line Dance Instructor for Your Event | Hire Line Dancers",
     template: "%s | Hire Line Dancers"

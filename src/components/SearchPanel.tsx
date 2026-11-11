@@ -203,9 +203,11 @@ function preferenceScore(
   return eventScore + groupScore;
 }
 
-function PublicProfileCard({ profile, compact = false }: { profile: PublicProfile; compact?: boolean }) {
+function PublicProfileCard({ profile, compact = false, publishedRoutes }: { profile: PublicProfile; compact?: boolean; publishedRoutes: Set<string> }) {
   const identifier = profile.slug || profile.id;
-  const profileHref = `/profile/?${new URLSearchParams({ instructor: identifier }).toString()}`;
+  const profileHref = publishedRoutes.has(identifier)
+    ? `/profile/${encodeURIComponent(identifier)}/`
+    : `/profile/?${new URLSearchParams({ instructor: identifier }).toString()}`;
   const highlights = [
     ...profile.styles,
     profile.provides_speakers ? "Can provide speakers" : null,
@@ -316,8 +318,20 @@ export function PublicInstructorResults({
   onCountChange
 }: PublicInstructorResultsProps) {
   const [profiles, setProfiles] = useState<PublicProfile[]>([]);
+  const [publishedRoutes, setPublishedRoutes] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(marketplaceConfigured);
   const [loadFailed, setLoadFailed] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    fetch("/profile-routes.json")
+      .then(response => response.ok ? response.json() : [])
+      .then(routes => {
+        if (active && Array.isArray(routes)) setPublishedRoutes(new Set(routes.filter((route): route is string => typeof route === "string")));
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     if (!marketplaceConfigured) {
@@ -512,7 +526,7 @@ export function PublicInstructorResults({
 
   return (
     <>
-      {results.map((profile) => <PublicProfileCard key={profile.id} profile={profile} compact={compact} />)}
+      {results.map((profile) => <PublicProfileCard key={profile.id} profile={profile} compact={compact} publishedRoutes={publishedRoutes} />)}
       {demoResults.length ? (
         <>
           {results.length || !suppressEmptyMessage ? (

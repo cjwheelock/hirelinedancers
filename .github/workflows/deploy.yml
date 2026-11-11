@@ -36,6 +36,8 @@ jobs:
         run: npm run test:journeys
       - name: Test booking agreement PDFs
         run: npm run test:booking-document
+      - name: Test IndexNow sitemap comparison
+        run: npm run test:indexnow
       - name: Build static export
         run: npm run build
         env:
@@ -45,6 +47,8 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_36gNqu74ysQhY2_VvJlS4A_XTYUFyxe
       - name: Audit generated site
         run: npm run audit:static
+      - name: Verify searchable instructor profiles
+        run: npm run test:profile-search
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
@@ -57,9 +61,12 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - uses: actions/checkout@v4
+      - name: Capture the current sitemap for IndexNow
+        continue-on-error: true
+        run: node scripts/submit-indexnow.mjs --capture
       - id: deployment
         uses: actions/deploy-pages@v4
-      - uses: actions/checkout@v4
       - name: Notify IndexNow about newly published pages
         continue-on-error: true
         run: node scripts/submit-indexnow.mjs

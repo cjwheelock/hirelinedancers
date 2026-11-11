@@ -22,8 +22,15 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://wzmyroeowbsxxibkeejf.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_36gNqu74ysQhY2_VvJlS4A_XTYUFyxe
-      - name: Rebuild the blog
-        if: steps.articles.outputs.changed == 'true'
+      - name: Compare published profiles with the live directory
+        id: profiles
+        continue-on-error: true
+        run: node scripts/sync-public-profiles.mjs --check
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://wzmyroeowbsxxibkeejf.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_36gNqu74ysQhY2_VvJlS4A_XTYUFyxe
+      - name: Rebuild published content
+        if: steps.articles.outputs.changed == 'true' || steps.profiles.outputs.changed == 'true'
         run: gh workflow run deploy.yml --ref main
         env:
           GH_TOKEN: ${{ github.token }}

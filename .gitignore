@@ -13,3 +13,5 @@ output/preview/
 *.inspect.ndjson
 
 public/spotlights-version.json
+public/profile-routes.json
+public/profiles-version.json
