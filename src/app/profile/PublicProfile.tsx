@@ -405,11 +405,13 @@ export function PublicProfile({ initialProfile = null, initialMedia = [] }: { in
   }
 
   const identifier = profile.slug || profile.id;
-  const firstName = profile.display_name.trim().split(/\s+/)[0] || profile.display_name;
+  // Public display names can be a business name, so do not infer a first name.
+  const displayName = profile.display_name.trim() || profile.display_name;
   const headshot = media.find((item) => item.media_type === "headshot");
   const headshotUrl = headshot ? mediaUrl(headshot) : null;
   const location = [profile.city, profile.region].filter(Boolean).join(", ") || "Service area available on request";
   const welcome = media.find((item) => item.media_type === "welcome_video");
+  const bio = profile.bio && /[\p{L}\p{N}]/u.test(profile.bio) ? profile.bio : null;
   const packages = profile.packages ?? [];
   const highlights = profile.highlights ?? [];
 
@@ -439,7 +441,7 @@ export function PublicProfile({ initialProfile = null, initialMedia = [] }: { in
             instructorIdentifier={identifier}
             className={`${styles.primaryButton} ${styles.topContactButton}`}
           >
-            Contact {firstName}
+            Contact {displayName}
           </InstructorContactLink>
           <ShareButton name={profile.display_name} identifier={identifier} previewing={previewing} />
           <div className={styles.heroTags}>
@@ -452,7 +454,7 @@ export function PublicProfile({ initialProfile = null, initialMedia = [] }: { in
 
       <div className={styles.layout}>
         <div className={styles.content}>
-          {profile.bio || welcome ? (
+          {bio || welcome ? (
             <section className={styles.section} aria-labelledby="about-instructor-heading">
               <p className={styles.kicker}>About the instructor</p>
               <h2 id="about-instructor-heading">Meet {profile.display_name}</h2>
@@ -461,14 +463,14 @@ export function PublicProfile({ initialProfile = null, initialMedia = [] }: { in
                   <MediaItem item={welcome} instructorName={profile.display_name} />
                 </div>
               ) : null}
-              {profile.bio ? <p className={styles.bodyCopy}>{profile.bio}</p> : null}
+              {bio ? <p className={styles.bodyCopy}>{bio}</p> : null}
             </section>
           ) : null}
 
           {packages.length ? (
             <section className={styles.section} aria-labelledby="packages-heading">
               <p className={styles.kicker}>Packages</p>
-              <h2 id="packages-heading">Ways to book {firstName}</h2>
+              <h2 id="packages-heading">Ways to book {displayName}</h2>
               <div className={styles.packageGrid}>
                 {packages.map((item) => (
                   <article className={styles.packageCard} key={item.name}>
@@ -495,7 +497,7 @@ export function PublicProfile({ initialProfile = null, initialMedia = [] }: { in
           {highlights.length ? (
             <section className={styles.section} aria-labelledby="highlights-heading">
               <p className={styles.kicker}>Past events</p>
-              <h2 id="highlights-heading">Where {firstName} has taught</h2>
+              <h2 id="highlights-heading">Where {displayName} has taught</h2>
               <ul className={styles.highlightList}>
                 {highlights.map((item, index) => (
                   <li key={`${item.title}-${index}`}>
@@ -582,11 +584,11 @@ export function PublicProfile({ initialProfile = null, initialMedia = [] }: { in
       <section className={styles.bottomCta} aria-labelledby="published-profile-bottom-cta">
         <div>
           <p className={styles.kicker}>Start planning</p>
-          <h2 id="published-profile-bottom-cta">Bring {firstName} to your event.</h2>
+          <h2 id="published-profile-bottom-cta">Bring {displayName} to your event.</h2>
           <p>Share your date, location, group size, and event details to check availability.</p>
         </div>
         <InstructorContactLink instructorIdentifier={identifier} className={styles.primaryButton}>
-          Contact {firstName}
+          Contact {displayName}
         </InstructorContactLink>
       </section>
     </main>
