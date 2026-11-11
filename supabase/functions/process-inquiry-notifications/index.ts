@@ -51,6 +51,7 @@ type WorkerDatabase = {
     };
     Views: Record<string, never>;
     Functions: {
+      get_inquiry_notification_context: { Args: { p_job_id: number }; Returns: { automatic: boolean; opportunity_closed?: boolean; invited_count?: number; brief?: Record<string, string | number> } };
       get_inquiry_recommendations: {
         Args: { p_thread_id: string };
         Returns: InquiryRecommendation[];
@@ -185,6 +186,7 @@ export type ThreadNotificationJob = {
   delivered_to_phone_e164: string | null;
   inquiry_recipient_id: string | null;
   recommendations?: InquiryRecommendation[];
+  opportunity?: { automatic: boolean; opportunity_closed?: boolean; invited_count?: number; brief?: Record<string, string | number> };
   provider_message_id?: string | null;
   attempt_number: number;
   recipient_account_id: string | null;
@@ -593,6 +595,19 @@ export function threadNotificationContent(job: ThreadNotificationJob): {
   description: string;
   instruction: string | null;
 } {
+  if (job.opportunity?.automatic) {
+    if (job.opportunity.opportunity_closed) return { recipientName: greetingFirstName(job.instructor_name, job.recipient_first_name), heading: "Opportunity closed", description: job.message_body ?? "The organizer has booked an instructor for this event. This opportunity is now closed. Thank you for your interest.", instruction: null };
+    const invited = (job.opportunity.invited_count ?? 0) > 0;
+    if (job.notification_type === "response_timeout_organizer" || job.notification_type === "thread_declined") return {
+      recipientName: greetingFirstName(job.organizer_name, job.recipient_first_name),
+      heading: job.notification_type === "thread_declined" ? `${job.instructor_name} is unavailable` : `${job.instructor_name} has not responded`,
+      description: invited ? "We have invited other matching instructors to respond to your event." : "We could not find other matching instructors to invite. Your request has been flagged for our team.",
+      instruction: "You can compare profiles and responses and choose who to book. Your existing conversation remains available.",
+    };
+    if (job.notification_type === "new_thread") return { recipientName: greetingFirstName(job.instructor_name, job.recipient_first_name), heading: "You have a new event opportunity", description: `${job.organizer_name} is looking for an instructor. Their event details and contact information are below.`, instruction: "Open the event and mark yourself available or unavailable. The organizer chooses who to book. Please respond within 48 hours." };
+    if (job.notification_type === "response_reminder_47") return { recipientName: greetingFirstName(job.instructor_name, job.recipient_first_name), heading: "One hour left to respond", description: "This inquiry has been waiting for 47 hours.", instruction: "Reply or mark yourself unavailable. After 48 hours without a response, we invite other matching instructors. You can still reply while the event is open." };
+    if (job.notification_type === "response_timeout_instructor") return { recipientName: greetingFirstName(job.instructor_name, job.recipient_first_name), heading: "The response window has ended", description: "The organizer can now receive responses from other matching instructors.", instruction: "You can still respond and be considered while the opportunity is open." };
+  }
   switch (job.notification_type) {
     case "new_thread":
       return {
@@ -691,6 +706,7 @@ export function threadNotificationText(
     `Event type: ${eventTypeLabel(job.event_type)}`,
     `Event date: ${display(job.event_date)}`,
     `Location: ${display(job.event_location)}`,
+    ...Object.entries(job.opportunity?.brief ?? {}).map(([label, value]) => `${label}: ${value}`),
     "",
     `${job.response_policy_version === 1 || job.notification_type === "booking_update" ? "Open the conversation" : "Read and reply on Hire Line Dancers"}: ${actionUrl}`,
     ...(job.recommendations ?? []).flatMap((candidate) => [
@@ -718,6 +734,7 @@ export function threadNotificationHtml(
             <tr><th align="left" style="padding:7px 12px 7px 0;color:#57607a">Event type</th><td style="padding:7px 0">${escapeHtml(eventTypeLabel(job.event_type))}</td></tr>
             <tr><th align="left" style="padding:7px 12px 7px 0;color:#57607a">Event date</th><td style="padding:7px 0">${escapeHtml(display(job.event_date))}</td></tr>
             <tr><th align="left" style="padding:7px 12px 7px 0;color:#57607a">Location</th><td style="padding:7px 0">${escapeHtml(display(job.event_location))}</td></tr>
+            ${Object.entries(job.opportunity?.brief ?? {}).map(([label, value]) => `<tr><th align="left" style="padding:7px 12px 7px 0;color:#57607a">${escapeHtml(label)}</th><td style="padding:7px 0">${escapeHtml(String(value))}</td></tr>`).join("")}
           </table>
           ${(job.recommendations ?? []).map((candidate) => recommendationHtml(candidate, actionUrl)).join("")}
           <a href="${escapeHtml(actionUrl)}" style="display:inline-block;padding:14px 20px;background:#e7a33c;border:2px solid #1c2a44;color:#1c2a44;font-weight:700;text-decoration:none">${job.response_policy_version === 1 || job.notification_type === "booking_update" ? "Open conversation" : "Read and reply"}</a>
@@ -753,7 +770,9 @@ export function threadNotificationSms(job: ThreadNotificationJob, actionUrl: str
   switch(job.notification_type) {
     case "new_thread": return `${prefix}You have a new event inquiry. Read and reply within 48 hours: ${actionUrl} Reply STOP to opt out.`;
     case "response_reminder_24": return `${prefix}Your event inquiry is waiting for a reply. Read and reply: ${actionUrl}`;
-    case "response_reminder_47": return `${prefix}Please reply within 1 hour before we recommend other instructors: ${actionUrl}`;
+    case "response_reminder_47": return job.opportunity?.automatic
+      ? `${prefix}Please reply within 1 hour before other matching instructors are invited: ${actionUrl}`
+      : `${prefix}Please reply within 1 hour before we recommend other instructors: ${actionUrl}`;
     case "response_timeout_instructor": return `${prefix}We are helping the organizer explore other instructors. You can still reply while the event is open: ${actionUrl}`;
     default: return `${prefix}You have a new message. Read and reply: ${actionUrl}`;
   }
@@ -1495,7 +1514,10 @@ async function processThreadNotificationJob(
     if (job.channel === "email") {
       job.recipient_first_name = await accountFirstName(admin, "id", job.recipient_account_id);
     }
-    if (job.response_policy_version !== 1 && ["response_timeout_organizer","thread_declined"].includes(job.notification_type)) {
+    const { data: opportunity, error: opportunityError } = await admin.rpc("get_inquiry_notification_context", { p_job_id: job.job_id });
+    if (opportunityError) throw new ProviderError("Unable to load event notification details", true);
+    job.opportunity = opportunity ?? undefined;
+    if (!job.opportunity?.automatic && job.response_policy_version !== 1 && ["response_timeout_organizer","thread_declined"].includes(job.notification_type)) {
       const {data, error} = await admin.rpc("get_inquiry_recommendations", {p_thread_id:job.thread_id});
       if (error) throw new ProviderError("Unable to load inquiry recommendations",true);
       job.recommendations=data ?? [];

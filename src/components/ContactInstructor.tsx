@@ -116,7 +116,7 @@ export function ContactInstructor() {
         p_venue_has_speakers: booleanOrNull(form.venueHasSpeakers),
         p_venue_has_microphone: booleanOrNull(form.venueHasMicrophone),
         p_message: form.message || null,
-        p_fallback_consent: false
+        p_fallback_consent: true
       });
       if (submitError) throw submitError;
       const inquiryId = String(data);
@@ -188,7 +188,7 @@ export function ContactInstructor() {
             : "Your inquiry is saved in Messages. We will notify the instructor with a link to read and reply."}
         </p>
         <p className={styles.subtitle}>Ask about availability, pricing, insurance, and venue needs. When you agree, the instructor sends a quote you can sign and pay in the conversation.</p>
-        <p className={styles.subtitle}>No reply within 48 hours? We will follow up and help you connect with other instructors. Your event details stay saved, so reaching out again is easy.</p>
+        <p className={styles.subtitle}>We ask instructors to respond within 48 hours. If you haven’t heard back by then, we’ll invite other matching instructors to respond to your event. You can compare their profiles and choose who to book.</p>
         <div className={styles.buttonRow} style={{ marginTop: 26 }}>
           <a className={styles.button} href={successThreadId ? `/account/?tab=inquiries&inquiry=${encodeURIComponent(successId)}&thread=${encodeURIComponent(successThreadId)}` : "/account/?tab=inquiries"}>View messages</a>
           <Link className={styles.secondaryButton} href="/instructors/">Browse more instructors</Link>
@@ -201,7 +201,7 @@ export function ContactInstructor() {
     <section className={`${styles.shell} ${styles.narrow}`}>
       <p className={styles.eyebrow}>Contact {profile?.display_name}</p>
       <h1 className={styles.title}>Tell the instructor about your event</h1>
-      <p className={styles.subtitle}>Send your event details and message through Hire Line Dancers. The instructor will confirm availability, rates, and terms. If they have not replied within 48 hours, we will help you explore other instructors.</p>
+      <p className={styles.subtitle}>Send your event details and message through Hire Line Dancers. The instructor will confirm availability, rates, and terms. We ask instructors to respond within 48 hours. If there is no reply, or they are unavailable, we will invite other matching instructors to respond.</p>
       <form className={`${styles.card} ${styles.stack} ${contactStyles.form}`} onSubmit={submit}>
         <label className={styles.field}>
           <span>Event type</span>
@@ -274,7 +274,8 @@ export function ContactInstructor() {
           <span>Anything else the instructor should know?</span>
           <textarea maxLength={3000} value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} />
         </label>
-        <p className={styles.help}>Your inquiry goes to this instructor. If we recommend alternatives, you choose who receives your saved event details. Sending an inquiry does not confirm a booking.</p>
+        <p className={styles.help}>Your inquiry goes to this instructor first. If they do not respond within 48 hours or mark themselves unavailable, we will share your full event details and organizer contact information with other matching instructors. Your private conversations are not shared. You choose who to book.</p>
+        <p className={styles.help}>Sending an inquiry is free and does not confirm a booking. When you book, you pay the full price plus the service fee upfront. The instructor’s share is paid 24 hours after the event ends, unless a reported problem or payment dispute puts the payout on hold.</p>
         <p className={styles.help}>Messages are handled through Hire Line Dancers. Authorized administrators can view them to support the inquiry.</p>
         {error ? <p className={styles.error}>{error}</p> : null}
         <button className={styles.button} disabled={busy} type="submit">{busy ? "Sending inquiry..." : "Send inquiry"}</button>

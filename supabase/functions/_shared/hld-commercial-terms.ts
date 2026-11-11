@@ -33,7 +33,7 @@ export const HLD_COMMERCIAL_TERMS = {
   },
   "bookings": {
     "model": "commission",
-    "agreementVersion": "2026-10-26-booking-agreement-v2",
+    "agreementVersion": "2026-11-11-booking-agreement-v3",
     "instructorFeeBps": 1500,
     "clientFeeBps": 500,
     "minimumPriceCents": 5000,

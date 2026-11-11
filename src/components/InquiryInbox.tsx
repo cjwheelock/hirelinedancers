@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ChevronLeft, Clock3, Inbox, RefreshCw, Search, Send } from "lucide-react";
 import { eventTypes } from "@/data/site";
 import { BookingPanel } from "./BookingPanel";
-import { bookingStatusLabels, paidBookingStatuses, type ThreadBookingState } from "@/lib/booking";
+import { displayTime, bookingStatusLabels, paidBookingStatuses, type ThreadBookingState } from "@/lib/booking";
 import {
   getMarketplaceClient,
   readableError,
@@ -16,6 +16,7 @@ import {
   type MarketplaceInquiry
 } from "@/lib/marketplace";
 import { InquiryAttention } from "./InquiryAttention";
+import { InquiryOpportunity } from "./InquiryOpportunity";
 import { InquiryRecommendations } from "./InquiryRecommendations";
 import styles from "./Marketplace.module.css";
 
@@ -30,6 +31,7 @@ function eventTypeLabel(value: string | null | undefined) {
 }
 
 function statusLabel(value: string | null | undefined) {
+  if (value === "declined") return "Unavailable";
   return (value || "active").replaceAll("_", " ");
 }
 
@@ -111,6 +113,7 @@ export function InquiryInbox({
   const [bookingState, setBookingState] = useState<ThreadBookingState | null>(null);
   const [loadingBooking, setLoadingBooking] = useState(false);
   const bookingRequestRef = useRef(0);
+  const requestedSectionRef = useRef<{ threadId: string; quote: boolean } | null>(null);
   const messageEndRef = useRef<HTMLDivElement | null>(null);
   const detailRequestRef = useRef(0);
   const listRequestRef = useRef(0);
@@ -202,6 +205,17 @@ export function InquiryInbox({
       return;
     }
     const normalized = normalizeDetail(data);
+    if (normalized?.inquiry.automatic_sharing) {
+      const { data: opportunity, error: opportunityError } = await client.rpc("get_inquiry_opportunity", { p_thread_id: threadId });
+      if (requestId !== detailRequestRef.current) return;
+      if (opportunityError) { setError("Event status could not be loaded. Refresh to try again."); setLoadingDetail(false); return; }
+      normalized.opportunity = opportunity;
+    }
+    const bookingRequest = ++bookingRequestRef.current;
+    const { data: nextBooking, error: nextBookingError } = await client.rpc("get_thread_booking", { p_thread_id: threadId });
+    if (requestId !== detailRequestRef.current) return;
+    if (nextBookingError) { setError(nextBookingError.message); setLoadingDetail(false); return; }
+    if (bookingRequest === bookingRequestRef.current) { setBookingState(nextBooking as ThreadBookingState | null); setLoadingBooking(false); }
     setDetail(normalized ? { ...normalized, thread: { ...normalized.thread, id: threadId } } : null);
     setLoadingDetail(false);
     if (normalized) {
@@ -241,10 +255,15 @@ export function InquiryInbox({
     setCandidateSearchComplete(false);
     setSelectedCandidateId("");
     setActionMessage(null);
-    setBookingState(null);
     void loadDetail(selectedThreadId);
-    void loadBooking(selectedThreadId);
-  }, [loadBooking, loadDetail, selectedThreadId]);
+  }, [loadDetail, selectedThreadId]);
+
+  useEffect(() => {
+    const request = requestedSectionRef.current;
+    if (!request || request.threadId !== openThreadId) return;
+    requestedSectionRef.current = null;
+    document.querySelector(request.quote ? '[aria-label="Booking"]' : '[aria-label="Messages"] textarea')?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [openThreadId]);
 
   useEffect(() => {
     const client = getMarketplaceClient();
@@ -577,13 +596,27 @@ export function InquiryInbox({
                     <div><dt>Event</dt><dd>{eventTypeLabel(detail.inquiry.event_type)}</dd></div>
                     {detail.inquiry.event_date ? <div><dt>Date</dt><dd>{formatDate(detail.inquiry.event_date)}</dd></div> : null}
                     {(detail.inquiry.event_city || detail.inquiry.event_region) ? <div><dt>Location</dt><dd>{[detail.inquiry.event_city, detail.inquiry.event_region].filter(Boolean).join(", ")}</dd></div> : null}
+                    {detail.inquiry.automatic_sharing ? <>
+                      {detail.inquiry.event_start_time ? <div><dt>Start time</dt><dd>{displayTime(detail.inquiry.event_start_time)}</dd></div> : null}
+                      {detail.inquiry.venue_name ? <div><dt>Venue</dt><dd>{detail.inquiry.venue_name}</dd></div> : null}
+                      {detail.inquiry.event_postal_code ? <div><dt>ZIP code</dt><dd>{detail.inquiry.event_postal_code}</dd></div> : null}
+                      {detail.inquiry.budget_range ? <div><dt>Budget</dt><dd>{detail.inquiry.budget_range}</dd></div> : null}
+                      <div><dt>Venue speakers</dt><dd>{detail.inquiry.venue_has_speakers == null ? "Not sure" : detail.inquiry.venue_has_speakers ? "Yes" : "No"}</dd></div>
+                      <div><dt>Venue microphone</dt><dd>{detail.inquiry.venue_has_microphone == null ? "Not sure" : detail.inquiry.venue_has_microphone ? "Yes" : "No"}</dd></div>
+                      {detail.inquiry.music_requests ? <div><dt>Music requests</dt><dd>{detail.inquiry.music_requests}</dd></div> : null}
+                    </> : null}
                     {detail.inquiry.guest_count ? <div><dt>Attendees</dt><dd>{detail.inquiry.guest_count}</dd></div> : null}
-                    {perspective === "admin" ? <div><dt>Contact</dt><dd>{detail.inquiry.contact_name || detail.inquiry.contact_email || "Organizer"}</dd></div> : null}
+                    {perspective !== "organizer" && detail.inquiry.automatic_sharing ? <>
+                      <div><dt>Organizer</dt><dd>{detail.inquiry.contact_name}</dd></div>
+                      {detail.inquiry.company_name ? <div><dt>Company</dt><dd>{detail.inquiry.company_name}</dd></div> : null}
+                      {detail.inquiry.contact_email ? <div className={styles.organizerEmail}><dt>Email</dt><dd><a href={`mailto:${detail.inquiry.contact_email}`}>{detail.inquiry.contact_email}</a></dd></div> : null}
+                      {detail.inquiry.contact_phone_e164 ? <div><dt>Phone</dt><dd><a href={`tel:${detail.inquiry.contact_phone_e164}`}>{detail.inquiry.contact_phone_e164}</a></dd></div> : null}
+                    </> : perspective === "admin" ? <div><dt>Contact</dt><dd>{detail.inquiry.contact_name || detail.inquiry.contact_email || "Organizer"}</dd></div> : null}
                   </dl>
                   {selectedRow?.counterparty_profile_slug && perspective !== "instructor" ? (
                     <Link href={`/profile/?instructor=${encodeURIComponent(selectedRow.counterparty_profile_slug)}`}>View instructor profile</Link>
                   ) : null}
-                  {!hasPlatformBooking && (perspective !== "instructor" || detail.thread.is_current_assignment === true) ? (
+                  {!detail.inquiry.automatic_sharing && !hasPlatformBooking && (perspective !== "instructor" || detail.thread.is_current_assignment === true) ? (
                     <InquiryOutcomeActions
                       threadId={openThreadId!}
                       inquiry={detail.inquiry}
@@ -594,8 +627,8 @@ export function InquiryInbox({
                       }}
                     />
                   ) : null}
-                  {perspective === "instructor" && !hasPaidBooking && !["declined", "timed_out", "withdrawn", "closed"].includes(threadStatus) ? (
-                    <button className={styles.dangerButton} disabled={busyAction !== null} type="button" onClick={() => void runThreadAction("decline")}>
+                  {perspective === "instructor" && !hasPaidBooking && !["declined", "withdrawn", "closed"].includes(threadStatus) && (threadStatus !== "timed_out" || detail.inquiry.automatic_sharing) ? (
+                    <button className={styles.secondaryButton} disabled={busyAction !== null} type="button" onClick={() => void runThreadAction("decline")}>
                       {busyAction === "decline" ? "Updating..." : "Unavailable"}
                     </button>
                   ) : null}
@@ -607,11 +640,18 @@ export function InquiryInbox({
                 </aside>
 
                 <div className={styles.conversationColumn}>
+                  {openThreadId && detail.inquiry.automatic_sharing ? <InquiryOpportunity threadId={openThreadId} perspective={perspective} state={detail.opportunity ?? null} onOpen={(threadId, quote) => {
+                    if (threadId === openThreadId) document.querySelector(quote ? '[aria-label="Booking"]' : '[aria-label="Messages"] textarea')?.scrollIntoView({ behavior: "smooth", block: "center" });
+                    else { requestedSectionRef.current = { threadId, quote }; chooseThread(threadId); }
+                  }} onChanged={async () => { await Promise.all([loadDetail(openThreadId, true), loadThreads(true)]); }} /> : null}
+                  {threadStatus === "declined" && canReply ? <p className={styles.notice}>You can still message here after the instructor marks themselves unavailable.</p> : null}
                   {openThreadId && (perspective !== "admin" || bookingState?.booking) ? (
                     <BookingPanel
                       threadId={openThreadId}
                       state={bookingState}
                       loading={loadingBooking}
+                      finalizationBlocked={detail.thread.finalization_blocked === true}
+                      automaticSharing={detail.inquiry.automatic_sharing === true}
                       onChanged={async () => {
                         if (openThreadId && selectedThreadRef.current === openThreadId) {
                           await Promise.all([loadBooking(openThreadId), loadDetail(openThreadId, true)]);
@@ -622,7 +662,7 @@ export function InquiryInbox({
                     />
                   ) : null}
                   {threadStatus === "timed_out" && canReply ? <p className={styles.notice}>The response window has ended. Other instructors may be contacted, and you can still reply while the event is open.</p> : null}
-                  {perspective === "organizer" && detail.thread.can_recommend === true && openThreadId ? (
+                  {perspective === "organizer" && !detail.inquiry.automatic_sharing && detail.thread.can_recommend === true && openThreadId ? (
                     <InquiryRecommendations threadId={openThreadId} inquiry={detail.inquiry} onSent={(threadId) => {
                       setSelectedThreadId(threadId);
                       void loadThreads(true);

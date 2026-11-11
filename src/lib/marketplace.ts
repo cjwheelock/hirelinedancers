@@ -148,6 +148,8 @@ export type MarketplaceInquiry = {
   completion_next_ask_at: string | null;
   first_responded_at: string | null;
   fallback_consent: boolean;
+  automatic_sharing?: boolean;
+  contact_phone_e164?: string | null;
 };
 
 export type InquiryThreadStatus =
@@ -207,6 +209,7 @@ export type InquiryAdminNote = {
 };
 
 export type InquiryThreadDetail = {
+  opportunity?: import("@/components/InquiryOpportunity").InquiryOpportunityState | null;
   thread: Record<string, unknown> & {
     id?: string;
     thread_id?: string;

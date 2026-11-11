@@ -2569,3 +2569,24 @@
   .bookingHeaderAside { justify-items: start; }
   .eventSummary { padding: 16px; }
 }
+
+/* Event opportunity follows the existing warm card and button system. */
+.opportunity { border: 1px solid var(--line); border-radius: 12px; background: #fffaf3; padding: 20px; margin-bottom: 20px; }
+.opportunityHeader { display: flex; align-items: center; justify-content: space-between; gap: 16px; color: var(--ink); }
+.opportunityHeader h3 { margin: 2px 0 10px; font-size: 1.25rem; }
+.opportunity > p { line-height: 1.55; }
+.opportunityCount { font-weight: 700; margin: 20px 0 10px; }
+.opportunityCandidates { display: grid; gap: 10px; }
+.opportunityCandidate { display: flex; align-items: center; gap: 12px; padding: 16px; background: #fff; border: 1px solid var(--line); border-radius: 10px; }
+.opportunityAvatar { display: grid; place-items: center; width: 42px; height: 42px; flex-shrink: 0; border-radius: 50%; background: var(--paper-2); color: var(--ink); font-weight: 700; }
+.opportunityIdentity { flex: 1; min-width: 0; }
+.opportunityIdentity h4 { margin: 0 0 3px; font-size: 1rem; }
+.opportunityIdentity p { margin: 0 0 4px; font-size: .85rem; }
+.opportunityActions { display: grid; gap: 8px; justify-items: end; }
+.opportunityActions small { font-weight: 400; }
+.opportunityProfile { font-size: .85rem; }
+.availabilityStatus { display: inline-flex; align-items: center; gap: 6px; color: #32634a; font-size: .85rem; font-weight: 700; }
+.availabilityRow { margin-top: 15px; }
+@media (max-width: 600px) { .opportunity { padding: 15px; } .opportunityCandidate { flex-wrap: wrap; padding: 12px; } .opportunityActions { width: 100%; justify-items: start; margin-left: 54px; } }
+
+.organizerEmail { grid-column: span 2; }

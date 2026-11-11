@@ -44,11 +44,15 @@ export function BookingPanel({
   threadId,
   state,
   loading,
+  finalizationBlocked = false,
+  automaticSharing = false,
   onChanged
 }: {
   threadId: string;
   state: ThreadBookingState | null;
   loading: boolean;
+  finalizationBlocked?: boolean;
+  automaticSharing?: boolean;
   onChanged: () => void | Promise<void>;
 }) {
   const [panel, setPanel] = useState<Panel>("none");
@@ -144,7 +148,7 @@ export function BookingPanel({
   const role = state.role;
   const compactQuote = role === "organizer" && booking && ["quote_sent", "awaiting_payment"].includes(booking.status);
   const open = booking ? openBookingStatuses.includes(booking.status) : false;
-  const canQuote = role === "instructor"
+  const canQuote = !finalizationBlocked && role === "instructor"
     && state.is_current_assignment
     && ["awaiting_response", "active"].includes(state.thread_status)
     && (!booking || ["quote_sent", "awaiting_payment", "expired", "withdrawn", "declined", "payment_failed", "cancelled", "paid_out"].includes(booking.status));
@@ -172,6 +176,7 @@ export function BookingPanel({
         </div>
       ) : null}
 
+      {role === "organizer" && booking && ["quote_sent", "awaiting_payment"].includes(booking.status) ? <div className={styles.bookingCallout}><p><strong>Full payment confirms your booking.</strong> You pay {money(booking.total_cents)} upfront, including the service fee. The instructor’s share is paid {bookingTerms.payoutDelayHours} hours after the event ends, unless a reported problem or payment dispute puts the payout on hold.</p><p>This quote expires on {displayDateTime(booking.expires_at)}. Complete payment before then.{automaticSharing ? " Other instructors are notified once payment succeeds." : null}</p></div> : null}
       {booking ? <BookingSummary booking={booking} role={role} showAgreement={showAgreement} onToggleAgreement={() => setShowAgreement((value) => !value)} /> : null}
       {booking?.paid_at && role === "organizer" ? <InstructorLinks threadId={threadId} /> : null}
       {showAgreement && booking && panel !== "review" ? <BookingAgreementReview booking={booking} onClose={() => setShowAgreement(false)} /> : null}
@@ -189,7 +194,7 @@ export function BookingPanel({
             return "Quote withdrawn.";
           })}>{busy === "withdraw" ? "Withdrawing..." : "Withdraw quote"}</button>
         ) : null}
-        {role === "organizer" && booking?.status === "quote_sent" ? (
+        {role === "organizer" && !finalizationBlocked && booking?.status === "quote_sent" ? (
           <>
             <button className={`${styles.button} ${styles.quoteReviewButton}`} type="button" disabled={busy !== null} onClick={() => setPanel("review")}>
               <FileSignature aria-hidden="true" size={17} /> Review, sign, and pay
@@ -203,10 +208,14 @@ export function BookingPanel({
           </>
         ) : null}
         {role === "organizer" && booking?.status === "awaiting_payment" ? (
-          <button className={styles.button} type="button" disabled={busy !== null} onClick={() => void run("pay", async () => {
+          <><button className={styles.button} type="button" disabled={busy !== null} onClick={() => void run("pay", async () => {
             const result = await invokeBookingFunction<{ url?: string }>("booking-checkout", { bookingId: booking.id });
             if (result.url) window.location.assign(result.url);
           })}>{busy === "pay" ? "Opening payment..." : `Finish payment of ${money(booking.total_cents)}`}</button>
+          {automaticSharing ? <button className={styles.secondaryButton} type="button" disabled={busy !== null} onClick={() => void run("release", async () => {
+            await rpc("decline_booking_quote", { p_booking_id: booking.id, p_reason: null });
+            return "Selection released. You can continue reviewing instructors.";
+          })}>{busy === "release" ? "Updating..." : "Release selection"}</button> : null}</>
         ) : null}
         {booking?.can_cancel && role !== "admin" ? (
           <button className={styles.dangerButton} type="button" disabled={busy !== null} onClick={() => setPanel(panel === "cancel" ? "none" : "cancel")}>Cancel booking</button>

@@ -379,7 +379,7 @@ export function renderAgreement(
     "The Instructor is an independent business, not an employee or agent of the Client or of Hire Line Dancers. The Instructor controls how the services are performed and is responsible for their own taxes, equipment, and conduct.",
     "",
     "9. Booking through Hire Line Dancers",
-    "For 12 months after first connecting through Hire Line Dancers, the parties agree to book each other only through Hire Line Dancers, and to keep messages and payments on Hire Line Dancers.",
+    "For 12 months after first connecting through Hire Line Dancers, the parties agree to book each other only through Hire Line Dancers, and to keep booking agreements and payments on Hire Line Dancers. The parties may communicate by email or through their private conversation.",
     "",
     "10. Disputes between the parties",
     "The Client and the Instructor will resolve any disagreement about the services, the event, or each other's conduct directly with each other. Hire Line Dancers does not guarantee the quality or safety of the services, has no duty to mediate, and is not liable for disputes between the parties, the venue, or other vendors. Each party releases Hire Line Dancers and OMG Goals, Inc. from claims arising from those disputes, to the extent the law allows.",

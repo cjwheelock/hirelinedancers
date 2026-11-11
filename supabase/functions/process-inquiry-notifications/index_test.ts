@@ -120,3 +120,32 @@ Deno.test("greetings prefer an explicit compound first name over public branding
   const job = { ...notification("new_thread"), instructor_name: "Dance Company", recipient_first_name: "Mary Jane" };
   assertEquals(threadNotificationContent(job).recipientName!, "Mary Jane");
 });
+
+Deno.test("automatic sharing notices confirm invitations without guaranteeing availability", () => {
+  const job = notification("thread_declined");
+  job.opportunity = { automatic: true, invited_count: 4 };
+  const content = threadNotificationContent(job);
+  assert(content.description.includes("invited other matching instructors"), "invitations explained");
+  assert(content.instruction!.includes("choose who to book"), "organizer controls choice");
+  job.opportunity.invited_count = 0;
+  assert(threadNotificationContent(job).description.includes("could not find"), "zero matches do not imply invitations");
+});
+Deno.test("instructor opportunity email includes escaped contact details and event brief", () => {
+  const job = notification("new_thread");
+  job.opportunity = { automatic: true, brief: { Organizer: "Sarah <Parker>", Email: "sarah@example.test", Phone: "+15125550100", Venue: "Congress Hall", "Music requests": "Country & pop" } };
+  const html = threadNotificationHtml(job, "https://hirelinedancers.com/account/?thread=thread");
+  assert(html.includes("sarah@example.test") && html.includes("+15125550100"), "organizer contacts included");
+  assert(html.includes("Sarah &lt;Parker&gt;") && html.includes("Country &amp; pop"), "brief is escaped");
+  assert(!html.includes("Reach Out"), "no manual re-inquiry step");
+});
+
+Deno.test("closed opportunity email does not direct other instructors to a booking agreement", () => {
+  const job = notification("booking_update");
+  job.opportunity = { automatic: true, opportunity_closed: true };
+  job.message_body = "The organizer has booked an instructor for this event. This opportunity is now closed. Thank you for your interest.";
+  const content = threadNotificationContent(job);
+  assertEquals(content.heading, "Opportunity closed");
+  assert(content.instruction === null, "no agreement or payment next step for an unsuccessful applicant");
+  const html = threadNotificationHtml(job, "https://hirelinedancers.com/account/");
+  assert(!html.includes("payment status, and next steps"), "booking instructions are omitted");
+});
