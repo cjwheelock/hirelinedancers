@@ -188,7 +188,7 @@ export function ContactInstructor() {
             : "Your inquiry is saved in Messages. We will notify the instructor with a link to read and reply."}
         </p>
         <p className={styles.subtitle}>Ask about availability, pricing, insurance, and venue needs. When you agree, the instructor sends a quote you can sign and pay in the conversation.</p>
-        <p className={styles.subtitle}>When you book, you pay the full price plus the service fee upfront. The instructor’s share is paid 24 hours after the event ends, unless a reported problem or payment dispute puts the payout on hold.</p>
+        <p className={styles.subtitle}>When you book, you pay the full price plus the service fee upfront. We release the instructor’s payout to Stripe 24 hours after the event ends, unless a reported problem or payment dispute puts the payout on hold. Bank delivery may take additional business days.</p>
         <p className={styles.subtitle}>We ask instructors to respond within 48 hours. If you haven’t heard back by then, we’ll invite other matching instructors to respond to your event. You can compare their profiles and choose who to book.</p>
         <div className={styles.buttonRow} style={{ marginTop: 26 }}>
           <a className={styles.button} href={successThreadId ? `/account/?tab=inquiries&inquiry=${encodeURIComponent(successId)}&thread=${encodeURIComponent(successThreadId)}` : "/account/?tab=inquiries"}>View messages</a>

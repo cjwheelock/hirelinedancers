@@ -26,7 +26,7 @@ export function InstructorOnboardingPricing() {
           <li>Hire Line Dancers keeps a {instructorFeePercent} platform fee from each booking paid through the platform.</li>
           <li>Example: on a {example.price} booking, you receive {example.payout}.</li>
           <li>You set your rate, minimum hours, and cancellation policy on every quote.</li>
-          <li>Your payout is sent {payoutDelayLabel} after the event unless the client reports a problem within {problemReportWindowLabel}.</li>
+          <li>We release your payout to Stripe {payoutDelayLabel} after the event unless the client reports a problem within {problemReportWindowLabel}. Bank delivery may take additional business days.</li>
           <li>If you need insurance, you can attach your own certificate or note that you handle insurance outside the agreement.</li>
         </ul>
         <p>See the <Link href="/legal/terms/">Terms of Service</Link> and <Link href="/legal/refund-policy/">booking cancellation and refund policy</Link>.</p>

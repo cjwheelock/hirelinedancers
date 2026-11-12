@@ -171,12 +171,12 @@ export function BookingPanel({
 
       {role === "instructor" && state.payouts_ready === false ? (
         <div className={styles.bookingCallout}>
-          <p><strong>Set up payouts to send quotes.</strong> Clients pay through Hire Line Dancers, and your share goes to your bank account {bookingTerms.payoutDelayHours} hours after each event.</p>
+          <p><strong>Set up payouts to send quotes.</strong> Clients pay through Hire Line Dancers. We release your payout to Stripe {bookingTerms.payoutDelayHours} hours after the event. Bank delivery may take additional business days.</p>
           <Link className={styles.secondaryButton} href="/account/?tab=payouts">Set up payouts</Link>
         </div>
       ) : null}
 
-      {role === "organizer" && booking && ["quote_sent", "awaiting_payment"].includes(booking.status) ? <div className={styles.bookingCallout}><p><strong>Full payment confirms your booking.</strong> You pay {money(booking.total_cents)} upfront, including the service fee. The instructor’s share is paid {bookingTerms.payoutDelayHours} hours after the event ends, unless a reported problem or payment dispute puts the payout on hold.</p><p>This quote expires on {displayDateTime(booking.expires_at)}. Complete payment before then.{automaticSharing ? " Other instructors are notified once payment succeeds." : null}</p></div> : null}
+      {role === "organizer" && booking && ["quote_sent", "awaiting_payment"].includes(booking.status) ? <div className={styles.bookingCallout}><p><strong>Full payment confirms your booking.</strong> You pay {money(booking.total_cents)} upfront, including the service fee. We release the instructor’s payout to Stripe {bookingTerms.payoutDelayHours} hours after the event ends, unless a reported problem or payment dispute puts the payout on hold. Bank delivery may take additional business days.</p><p>This quote expires on {displayDateTime(booking.expires_at)}. Complete payment before then.{automaticSharing ? " Other instructors are notified once payment succeeds." : null}</p></div> : null}
       {booking ? <BookingSummary booking={booking} role={role} showAgreement={showAgreement} onToggleAgreement={() => setShowAgreement((value) => !value)} /> : null}
       {booking?.paid_at && role === "organizer" ? <InstructorLinks threadId={threadId} /> : null}
       {showAgreement && booking && panel !== "review" ? <BookingAgreementReview booking={booking} onClose={() => setShowAgreement(false)} /> : null}

@@ -87,7 +87,7 @@ export function PayoutsCard({
       <div className={styles.card}>
         <p className={styles.eyebrow}><Banknote aria-hidden="true" size={15} /> Payouts</p>
         <h2>Get paid for bookings</h2>
-        <p>Joining Hire Line Dancers is free. Clients pay through Hire Line Dancers when they sign your quote. We hold the payment and send your share to your bank account {bookingTerms.payoutDelayHours} hours after the event.</p>
+        <p>Joining Hire Line Dancers is free. Clients pay through Hire Line Dancers when they sign your quote. We release your payout to Stripe {bookingTerms.payoutDelayHours} hours after the event. Bank delivery may take additional business days.</p>
 
         <div className={styles.payoutStatus}>
           {loading ? <p className={styles.muted}>Checking payout setup...</p> : null}
