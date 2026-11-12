@@ -1,0 +1,130 @@
+.pricingLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.fields {
+  display: grid;
+  min-width: 0;
+  gap: 18px;
+}
+
+.guide {
+  display: grid;
+  min-width: 0;
+  gap: 22px;
+  padding: clamp(18px, 2.5vw, 26px);
+  border: 1px solid #eadfd0;
+  border-radius: 14px;
+  background: #faf7f2;
+  color: #2a1e17;
+  line-height: 1.55;
+}
+
+.guide h4,
+.guide h5,
+.guide p {
+  margin: 0;
+}
+
+.guide h4 {
+  font-size: 1.25rem;
+  line-height: 1.3;
+}
+
+.guide h5 {
+  font-size: 1.05rem;
+  line-height: 1.4;
+}
+
+.recommendation {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+  border-radius: 12px;
+  background: #e4f0ee;
+  color: #1f6f6b;
+}
+
+.recommendedRate {
+  font-size: 1.125rem;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.corporate {
+  font-weight: 700;
+}
+
+.fee {
+  display: grid;
+  gap: 12px;
+}
+
+.fee > p,
+.help {
+  color: #5a4a3e;
+}
+
+.example {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+  padding: 18px;
+  border: 1px solid #eadfd0;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.label {
+  color: #5a4a3e;
+  font-size: 0.69rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.example .amount {
+  margin-top: 8px;
+  font-size: clamp(1.05rem, 1.6vw, 1.4rem);
+  font-weight: 800;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+}
+
+.arrow {
+  align-self: center;
+  color: #8a7a6c;
+  font-size: 1.3rem;
+}
+
+.payout .label,
+.payout .amount {
+  color: #1f6f6b;
+}
+
+.example .help {
+  margin-top: 6px;
+  font-size: 0.75rem;
+}
+
+@media (min-width: 1000px) {
+  .pricingLayout {
+    grid-template-columns: minmax(220px, 0.75fr) minmax(0, 1.25fr);
+    gap: 28px;
+  }
+}
+
+@media (max-width: 540px) {
+  .example {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+
+  .arrow {
+    display: none;
+  }
+}

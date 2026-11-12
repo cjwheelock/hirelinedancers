@@ -11,6 +11,8 @@ import {
 } from "@/lib/booking";
 import { getMarketplaceClient, type InstructorPrivateSettings } from "@/lib/marketplace";
 import { WindowsEditor } from "./BookingPanel";
+import { InstructorPricingGuide } from "./InstructorPricingGuide";
+import pricing from "./InstructorPricingGuide.module.css";
 import styles from "./Marketplace.module.css";
 
 type PayoutStatus = {
@@ -172,9 +174,12 @@ function BookingPreferencesCard({ profileId, settings, onSaved }: { profileId: s
       <p className={styles.eyebrow}>Booking defaults</p>
       <h2>Your rates and policies</h2>
       <p className={styles.help}>These are private and prefill your quotes. You set your own rate and minimum; many instructors choose a 2-hour minimum.</p>
-      <div className={styles.bookingFormGrid}>
-        <label className={styles.field}><span>Hourly rate ($)</span><input type="number" min="10" max="5000" step="0.01" value={hourlyRate} onChange={(event) => setHourlyRate(event.target.value)} /></label>
-        <label className={styles.field}><span>Minimum hours</span><input type="number" min="0.5" max="24" step="0.5" value={minimumHours} onChange={(event) => setMinimumHours(event.target.value)} /></label>
+      <div className={pricing.pricingLayout}>
+        <div className={pricing.fields}>
+          <label className={styles.field}><span>Hourly rate ($)</span><input type="number" min="10" max="5000" step="0.01" value={hourlyRate} onChange={(event) => setHourlyRate(event.target.value)} /></label>
+          <label className={styles.field}><span>Minimum hours</span><input type="number" min="0.5" max="24" step="0.5" value={minimumHours} onChange={(event) => setMinimumHours(event.target.value)} /></label>
+        </div>
+        <InstructorPricingGuide />
       </div>
       <fieldset className={styles.bookingFieldset}>
         <legend className={styles.legend}>Default cancellation policy</legend>

@@ -36,6 +36,8 @@ jobs:
         run: npm run test:auth
       - name: Test instructor and organizer journeys
         run: npm run test:journeys
+      - name: Test instructor pricing guidance
+        run: npm run test:pricing-guidance
       - name: Test booking agreement PDFs
         run: npm run test:booking-document
       - name: Test IndexNow sitemap comparison

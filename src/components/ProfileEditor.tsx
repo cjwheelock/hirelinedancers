@@ -27,6 +27,8 @@ import {
   type ProfilePackage
 } from "@/lib/marketplace";
 import { ProfileMediaManager, type EditorMedia } from "./ProfileMediaManager";
+import { InstructorPricingGuide } from "./InstructorPricingGuide";
+import pricing from "./InstructorPricingGuide.module.css";
 import styles from "./Marketplace.module.css";
 import editor from "./ProfileEditor.module.css";
 
@@ -711,15 +713,20 @@ export function ProfileEditor({
               <label className={styles.field}><span>Website</span><input placeholder="yourwebsite.com" value={form.website} onChange={(e) => setValue("website", e.target.value)} />{form.website ? <small className={editor.fieldHint}>{socialProblem(cleanSocial(form.website, "website"), "website") ?? cleanSocial(form.website, "website")}</small> : null}</label>
             </div>
             <div className={editor.divider} />
+            <div className={pricing.pricingLayout}>
+              <div className={pricing.fields}>
+                <label className={styles.field}>
+                  <span>Typical minimum rate ($)</span>
+                  <input type="number" min="0" step="1" value={form.minimum_rate} onChange={(e) => setValue("minimum_rate", e.target.value)} />
+                </label>
+                <label className={styles.field}>
+                  <span>Minimum booking hours</span>
+                  <input type="number" min="0.5" max="24" step="0.5" value={form.minimum_hours} onChange={(e) => setValue("minimum_hours", e.target.value)} />
+                </label>
+              </div>
+              <InstructorPricingGuide />
+            </div>
             <div className={`${styles.grid} ${styles.alignedGrid}`}>
-              <label className={styles.field}>
-                <span>Typical minimum rate ($)</span>
-                <input type="number" min="0" step="1" value={form.minimum_rate} onChange={(e) => setValue("minimum_rate", e.target.value)} />
-              </label>
-              <label className={styles.field}>
-                <span>Minimum booking hours</span>
-                <input type="number" min="0.5" max="24" step="0.5" value={form.minimum_hours} onChange={(e) => setValue("minimum_hours", e.target.value)} />
-              </label>
               <label className={styles.field}>
                 <span>Inquiry email</span>
                 <input type="email" required autoComplete="email" placeholder="you@example.com" value={form.inquiry_email} onChange={(e) => setValue("inquiry_email", e.target.value)} />

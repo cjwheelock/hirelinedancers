@@ -19,7 +19,8 @@
     "test:journeys": "node --test scripts/test-user-journeys.mjs",
     "test:booking-document": "node --test scripts/test-booking-document.mjs",
     "predev": "node scripts/prepare-video-processor.mjs",
-    "test:video": "node --test scripts/test-video-upload.mjs"
+    "test:video": "node --test scripts/test-video-upload.mjs",
+    "test:pricing-guidance": "node --test scripts/test-instructor-pricing-guidance.mjs"
   },
   "dependencies": {
     "@ffmpeg/ffmpeg": "0.12.15",
