@@ -19,7 +19,7 @@ export const communityPosts: BlogPost[] = [{
           <p>A post shared by Walls (@walls.dance) and Taylor (@taylor.line.dance).</p>
         </blockquote>
       </div>
-      <p >Video not loading? <a href="https://www.instagram.com/p/DeqM4X0P3od/" target="_blank" rel="noopener noreferrer">Watch it on Instagram ↗</a></p>
+      <p ><a href="https://www.instagram.com/p/DeqM4X0P3od/" target="_blank" rel="noopener noreferrer">Watch it on Instagram ↗</a></p>
       <h2>From a phone note to an app</h2>
       <p>Lauren discovered line dancing after a friend invited her to a local dance night. She loved it, but quickly ran into a beginner’s problem: figuring out which dances to learn for the places she actually wanted to go.</p>
       <p>She started recording dance names in a note on her phone. The list grew messy, and it was still difficult to know what to practice next. So she began building the tool she wanted for herself. Lauren shares that origin story in her <a href="https://www.linkedin.com/in/laurenkhoo">Walls launch announcement</a>.</p>
