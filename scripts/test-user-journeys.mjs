@@ -198,9 +198,9 @@ test("message profile links use the public database profile route", async () => 
 });
 test("instructor profile edits survive repeated tab switches", async () => {
   const app = harness("dashboard"); await app.render();
-  app.field("About you").props.onChange(event("Unsaved profile edits")); await app.render();
+  app.field("About you (optional)").props.onChange(event("Unsaved profile edits")); await app.render();
   for (const name of ["Messages", "Membership", "Profile", "Messages", "Profile"]) { app.button(name).props.onClick(); await app.render(); }
-  assert.equal(app.field("About you").props.value, "Unsaved profile edits");
+  assert.equal(app.field("About you (optional)").props.value, "Unsaved profile edits");
 });
 test("directory count excludes featured suggestions when no published profile matches", async () => {
   const app = harness("directory", { citySlug: "new-york-ny", eventSlug: "weddings" }); await app.render(); assert.equal(app.counts.at(-1), 0);
@@ -332,8 +332,8 @@ function editorHarness(status = "draft") {
 }
 test("draft Save and continue saves then advances, without submitting", async () => {
   const app = editorHarness(); await app.render();
-  app.field("About you").props.onChange(event("Hi")); await app.render();
-  assert.equal(app.field("About you").props.maxLength, undefined);
+  app.field("About you (optional)").props.onChange(event("Hi")); await app.render();
+  assert.equal(app.field("About you (optional)").props.maxLength, undefined);
   app.button("Save and continue").props.onClick(); await app.render();
   assert.ok(app.text().includes("Welcome video (optional)"));
   assert.ok(app.text().includes("Your profile changes are saved."));
@@ -353,10 +353,10 @@ test("published Save changes returns to the finished public profile", async () =
 });
 test("failed save stays on current step with a visible error and retains edits", async () => {
   const app = editorHarness(); await app.render();
-  app.field("About you").props.onChange(event("Keep these edits")); await app.render();
+  app.field("About you (optional)").props.onChange(event("Keep these edits")); await app.render();
   app.queue("instructor_profiles", () => ({ error: { message: "Save unavailable" } }));
   app.button("Save and continue").props.onClick(); await app.render();
-  assert.equal(app.field("About you").props.value, "Keep these edits");
+  assert.equal(app.field("About you (optional)").props.value, "Keep these edits");
   assert.ok(app.text().includes("Save unavailable"));
   assert.equal(app.navigations.length, 0);
 });
@@ -373,13 +373,13 @@ test("network exception releases save lock and preserves the current step", asyn
   const app = editorHarness(); await app.render();
   app.queue("instructor_private_settings", () => Promise.reject(new Error("offline")));
   app.button("Save and continue").props.onClick(); await app.render();
-  assert.ok(app.field("About you"));
+  assert.ok(app.field("About you (optional)"));
   assert.ok(app.text().includes("Could not confirm"));
   assert.equal(app.button("Save and continue").props.disabled, false);
 });
 
-test("short bio and no videos or teaching photos can submit; saves alone never submit", async () => {
-  const app = harness("editor", { profile: { ...profile, bio: "Hi" }, settings: { inquiry_email: "account@example.test" }, hasLifetimeAccess: true, onSaved: () => {}, describeEdgeError: async () => "Request failed" });
+for (const bio of ["Hi", "", null]) test(`optional bio (${JSON.stringify(bio)}) and no videos or teaching photos can submit; saves alone never submit`, async () => {
+  const app = harness("editor", { profile: { ...profile, bio }, settings: { inquiry_email: "account@example.test" }, hasLifetimeAccess: true, onSaved: () => {}, describeEdgeError: async () => "Request failed" });
   await app.render();
   app.nodes().find(node => node.type === "button" && text(node).includes("5Preview & submit")).props.onClick(); await app.render();
   assert.ok(app.text().includes("Video (optional)"));

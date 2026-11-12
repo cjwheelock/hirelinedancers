@@ -197,7 +197,7 @@ export function ProfileEditor({
     { label: "Headshot", done: headshotReady, step: "media" as StepId, required: true },
     { label: "Inquiry email", done: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.inquiry_email.trim()), step: "links" as StepId, required: true },
     { label: "Name, location, and event types", done: Boolean(form.display_name.trim() && form.city.trim() && form.region.trim() && form.event_types.length), step: "services" as StepId, required: true },
-    { label: "About you", done: Boolean(form.bio.trim()), step: "basics" as StepId, required: true },
+    { label: "About you (optional)", done: Boolean(form.bio.trim()), step: "basics" as StepId, required: false },
     { label: "Headline", done: Boolean(form.headline.trim()), step: "basics" as StepId, required: false },
     { label: "Video (optional)", done: videoCount > 0, step: "media" as StepId, required: false },
     { label: "One to three photos of you teaching (optional)", done: photoCount >= 1, step: "media" as StepId, required: false },
@@ -243,8 +243,8 @@ export function ProfileEditor({
         setError(localProblem);
         return false;
       }
-      if (continueToSubmission && (!form.display_name.trim() || !form.bio.trim() || !form.city.trim() || !form.region.trim() || !form.event_types.length)) {
-        setError("Add your public name, an About you section, your location, and at least one event type before continuing.");
+      if (continueToSubmission && (!form.display_name.trim() || !form.city.trim() || !form.region.trim() || !form.event_types.length)) {
+        setError("Add your public name, your location, and at least one event type before continuing.");
         return false;
       }
       const inquiryEmail = form.inquiry_email.trim().toLowerCase();
@@ -523,7 +523,7 @@ export function ProfileEditor({
               <small className={editor.counter}>{form.headline.length}/120 · Shown under your name</small>
             </label>
             <label className={styles.field}>
-              <span>About you</span>
+              <span>About you (optional)</span>
               <textarea
                 rows={7}
                 value={form.bio}
