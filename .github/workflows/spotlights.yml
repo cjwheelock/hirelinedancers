@@ -1,7 +1,7 @@
 name: Check for released instructor spotlights
 on:
   schedule:
-    - cron: '17 * * * *'
+    - cron: '*/5 * * * *'
   workflow_dispatch:
 
 permissions:
