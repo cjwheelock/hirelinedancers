@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -158,6 +158,15 @@ export function ProfileEditor({
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const saving = useRef(false);
+  const [mediaBusy, setMediaBusy] = useState(false);
+  const feedbackRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (error || message) {
+      feedbackRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      feedbackRef.current?.focus({ preventScroll: true });
+    }
+  }, [error, message]);
   const paymentSetupRequestKey = useRef<string | null>(null);
   const topRef = useRef<HTMLDivElement>(null);
 
@@ -188,10 +197,10 @@ export function ProfileEditor({
     { label: "Headshot", done: headshotReady, step: "media" as StepId, required: true },
     { label: "Inquiry email", done: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.inquiry_email.trim()), step: "links" as StepId, required: true },
     { label: "Name, location, and event types", done: Boolean(form.display_name.trim() && form.city.trim() && form.region.trim() && form.event_types.length), step: "services" as StepId, required: true },
-    { label: "About you (at least 150 characters)", done: form.bio.trim().length >= 150, step: "basics" as StepId, required: false },
+    { label: "About you", done: Boolean(form.bio.trim()), step: "basics" as StepId, required: true },
     { label: "Headline", done: Boolean(form.headline.trim()), step: "basics" as StepId, required: false },
-    { label: "At least one video", done: videoCount > 0, step: "media" as StepId, required: false },
-    { label: "Two or more photos of you teaching", done: photoCount >= 2, step: "media" as StepId, required: false },
+    { label: "Video (optional)", done: videoCount > 0, step: "media" as StepId, required: false },
+    { label: "One to three photos of you teaching (optional)", done: photoCount >= 1, step: "media" as StepId, required: false },
     { label: "Dance styles", done: form.styles.length > 0, step: "services" as StepId, required: false },
     { label: "A package clients can pick", done: cleanPackages.length > 0, step: "services" as StepId, required: false },
     { label: "A past event highlight", done: cleanHighlights.length > 0, step: "services" as StepId, required: false },
@@ -221,171 +230,192 @@ export function ProfileEditor({
   }
 
   async function save(continueToSubmission: boolean, quiet = false): Promise<boolean> {
-    const client = getMarketplaceClient();
-    if (!client) return false;
-    const localProblem = validateLocal();
-    if (localProblem) {
-      setError(localProblem);
-      return false;
-    }
-    if (continueToSubmission && (!form.display_name.trim() || !form.bio.trim() || !form.city.trim() || !form.region.trim() || !form.event_types.length)) {
-      setError("Add your public name, an About you section, your location, and at least one event type before continuing.");
-      return false;
-    }
-    const inquiryEmail = form.inquiry_email.trim().toLowerCase();
-    const inquiryEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inquiryEmail);
-    if (inquiryEmail && !inquiryEmailValid) {
-      setError("Enter a valid inquiry email in Links & pricing, or leave it blank for now.");
-      return false;
-    }
-    if (continueToSubmission && !inquiryEmailValid) {
-      setError("Add the email where you want inquiry alerts in Links & pricing before continuing.");
-      return false;
-    }
-    if (continueToSubmission && !headshotReady) {
-      setError("Add a headshot in Photos & videos before continuing.");
-      return false;
-    }
-
-    setBusy(continueToSubmission ? "continue" : "save");
-    setError(null);
-    if (!quiet) setMessage(null);
-
-    const profilePayload = {
-      display_name: form.display_name.trim(),
-      business_name: form.business_name.trim() || null,
-      headline: form.headline.trim() || null,
-      bio: form.bio.trim() || null,
-      city: form.city.trim() || null,
-      region: form.region.trim().toUpperCase() || null,
-      postal_code: form.postal_code.trim() || null,
-      travel_radius_miles: form.travel_radius_miles ? Number(form.travel_radius_miles) : null,
-      years_teaching: form.years_teaching ? Number(form.years_teaching) : null,
-      max_group_size: form.max_group_size ? Number(form.max_group_size) : null,
-      styles: form.styles,
-      event_types: form.event_types,
-      age_groups: form.age_groups,
-      languages: form.languages,
-      favorite_dance: form.favorite_dance.trim() || null,
-      favorite_song_name: form.favorite_song_name.trim() || null,
-      favorite_song_spotify_url: form.favorite_song_spotify_url.trim() || null,
-      provides_speakers: form.provides_speakers,
-      provides_microphone: form.provides_microphone,
-      provides_music_playback: form.provides_music_playback,
-      liability_insurance_status: form.liability_insurance_status,
-      preferred_response_hours: Number(form.preferred_response_hours),
-      packages: cleanPackages.map((item) => {
-        const next: ProfilePackage = { name: item.name.trim() };
-        if (item.description.trim()) next.description = item.description.trim();
-        if (item.durationHours) next.durationHours = Number(item.durationHours);
-        next.priceCents = item.price ? Math.round(Number(item.price) * 100) : null;
-        return next;
-      }),
-      highlights: cleanHighlights.map((item) => (item.detail.trim()
-        ? { title: item.title.trim(), detail: item.detail.trim() }
-        : { title: item.title.trim() })),
-      status: profile.status
-    };
-
-    // Private settings need an inquiry email, so a draft without one saves
-    // its public profile only until the instructor adds it.
-    const { error: settingsError } = !inquiryEmailValid ? { error: null } : await client.from("instructor_private_settings").upsert({
-      instructor_profile_id: profile.id,
-      inquiry_email: inquiryEmail,
-      inquiry_phone_e164: null,
-      sms_notifications_enabled: false,
-      minimum_rate_cents: form.minimum_rate ? Math.round(Number(form.minimum_rate) * 100) : null,
-      minimum_hours: form.minimum_hours ? Number(form.minimum_hours) : null,
-      instagram_url: cleanSocial(form.instagram, "instagram"),
-      tiktok_url: cleanSocial(form.tiktok, "tiktok"),
-      youtube_url: cleanSocial(form.youtube, "youtube"),
-      website_url: cleanSocial(form.website, "website")
-    });
-    if (settingsError) {
-      setError(settingsError.message);
-      setBusy(null);
-      return false;
-    }
-
-    const { error: profileError } = await client.from("instructor_profiles").update(profilePayload).eq("id", profile.id);
-    if (profileError) {
-      setError(profileError.message.includes("check constraint")
-        ? "Some profile details are not in the expected format. Check your packages and highlights and try again."
-        : profileError.message);
-      setBusy(null);
-      return false;
-    }
-
-    const emailChanged = inquiryEmailValid && inquiryEmail !== (settings?.inquiry_email ?? "").toLowerCase();
-    if (!continueToSubmission) {
-      setBusy(null);
-      setMessage(emailChanged
-        ? `Saved. We sent a confirmation to ${inquiryEmail} so you know inquiry alerts will arrive there.`
-        : quiet ? "Saved." : "Your profile changes are saved.");
-      onSaved();
-      return true;
-    }
-
-    if (hasLifetimeAccess === null) {
-      setBusy(null);
-      setError("We could not verify your instructor access. Refresh the page before continuing.");
-      return false;
-    }
-
-    if (hasLifetimeAccess) {
-      const { error: submissionError } = await client.rpc("submit_lifetime_instructor_profile_for_review");
-      setBusy(null);
-      if (submissionError) {
-        setError(submissionError.message);
+    if (saving.current || mediaBusy) return false;
+    saving.current = true;
+    try {
+      const client = getMarketplaceClient();
+      if (!client) {
+        setError("Unable to save. Refresh the page and try again.");
         return false;
       }
-      setMessage("Your profile was submitted. We’ll review it ASAP.");
-      onSaved();
-      return true;
-    }
-
-    if (settings?.payment_setup_completed_at) {
-      const { data: resubmissionData, error: resubmissionError } = await client.rpc("resubmit_instructor_profile_after_payment_setup");
-      setBusy(null);
-      if (resubmissionError) {
-        setError(resubmissionError.message.includes("A verified payment setup is required before resubmitting")
-          ? "We could not verify your saved payment method. Refresh the page and try again. If this continues, contact support. You will not be asked to enter your card again unless a replacement is required."
-          : resubmissionError.message);
+      const localProblem = validateLocal();
+      if (localProblem) {
+        setError(localProblem);
         return false;
       }
-      if (resubmissionData?.profileStatus !== "pending_review") {
-        setError("Your updated profile could not be resubmitted for review. Refresh the page and try again.");
+      if (continueToSubmission && (!form.display_name.trim() || !form.bio.trim() || !form.city.trim() || !form.region.trim() || !form.event_types.length)) {
+        setError("Add your public name, an About you section, your location, and at least one event type before continuing.");
         return false;
       }
-      setMessage("Your saved payment method is confirmed. Your updated profile was resubmitted. We’ll review it ASAP.");
-      onSaved();
-      return true;
-    }
+      const inquiryEmail = form.inquiry_email.trim().toLowerCase();
+      const inquiryEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inquiryEmail);
+      if (inquiryEmail && !inquiryEmailValid) {
+        setError("Enter a valid inquiry email in Links & pricing, or leave it blank for now.");
+        return false;
+      }
+      if (continueToSubmission && !inquiryEmailValid) {
+        setError("Add the email where you want inquiry alerts in Links & pricing before continuing.");
+        return false;
+      }
+      if (continueToSubmission && !headshotReady) {
+        setError("Add a headshot in Photos & videos before continuing.");
+        return false;
+      }
 
-    paymentSetupRequestKey.current ??= crypto.randomUUID();
-    const { data, error: setupError } = await client.functions.invoke("create-instructor-payment-setup", {
-      body: { instructorProfileId: profile.id },
-      headers: { "Idempotency-Key": paymentSetupRequestKey.current }
-    });
-    if (setupError) {
-      setBusy(null);
-      setError(await describeEdgeError(setupError));
+      setBusy(continueToSubmission ? "continue" : "save");
+      setError(null);
+      if (!quiet) setMessage(null);
+
+      const profilePayload = {
+        display_name: form.display_name.trim(),
+        business_name: form.business_name.trim() || null,
+        headline: form.headline.trim() || null,
+        bio: form.bio.trim() || null,
+        city: form.city.trim() || null,
+        region: form.region.trim().toUpperCase() || null,
+        postal_code: form.postal_code.trim() || null,
+        travel_radius_miles: form.travel_radius_miles ? Number(form.travel_radius_miles) : null,
+        years_teaching: form.years_teaching ? Number(form.years_teaching) : null,
+        max_group_size: form.max_group_size ? Number(form.max_group_size) : null,
+        styles: form.styles,
+        event_types: form.event_types,
+        age_groups: form.age_groups,
+        languages: form.languages,
+        favorite_dance: form.favorite_dance.trim() || null,
+        favorite_song_name: form.favorite_song_name.trim() || null,
+        favorite_song_spotify_url: form.favorite_song_spotify_url.trim() || null,
+        provides_speakers: form.provides_speakers,
+        provides_microphone: form.provides_microphone,
+        provides_music_playback: form.provides_music_playback,
+        liability_insurance_status: form.liability_insurance_status,
+        preferred_response_hours: Number(form.preferred_response_hours),
+        packages: cleanPackages.map((item) => {
+          const next: ProfilePackage = { name: item.name.trim() };
+          if (item.description.trim()) next.description = item.description.trim();
+          if (item.durationHours) next.durationHours = Number(item.durationHours);
+          next.priceCents = item.price ? Math.round(Number(item.price) * 100) : null;
+          return next;
+        }),
+        highlights: cleanHighlights.map((item) => (item.detail.trim()
+          ? { title: item.title.trim(), detail: item.detail.trim() }
+          : { title: item.title.trim() })),
+        status: profile.status
+      };
+
+      // Private settings need an inquiry email, so a draft without one saves
+      // its public profile only until the instructor adds it.
+      const { error: settingsError } = !inquiryEmailValid ? { error: null } : await client.from("instructor_private_settings").upsert({
+        instructor_profile_id: profile.id,
+        inquiry_email: inquiryEmail,
+        minimum_rate_cents: form.minimum_rate ? Math.round(Number(form.minimum_rate) * 100) : null,
+        minimum_hours: form.minimum_hours ? Number(form.minimum_hours) : null,
+        instagram_url: cleanSocial(form.instagram, "instagram"),
+        tiktok_url: cleanSocial(form.tiktok, "tiktok"),
+        youtube_url: cleanSocial(form.youtube, "youtube"),
+        website_url: cleanSocial(form.website, "website")
+      });
+      if (settingsError) {
+        setError(settingsError.message);
+        setBusy(null);
+        return false;
+      }
+
+      const { error: profileError } = await client.from("instructor_profiles").update(profilePayload).eq("id", profile.id);
+      if (profileError) {
+        setError(profileError.message.includes("check constraint")
+          ? "Some profile details are not in the expected format. Check your packages and highlights and try again."
+          : profileError.message);
+        setBusy(null);
+        return false;
+      }
+
+      const emailChanged = inquiryEmailValid && inquiryEmail !== (settings?.inquiry_email ?? "").toLowerCase();
+      if (!continueToSubmission) {
+        setBusy(null);
+        setMessage(emailChanged
+          ? `Saved. We sent a confirmation to ${inquiryEmail} so you know inquiry alerts will arrive there.`
+          : quiet ? "Saved." : "Your profile changes are saved.");
+        onSaved();
+        if (!quiet) {
+          if (profile.status === "draft") {
+            const index = steps.findIndex((item) => item.id === step);
+            goTo(steps[Math.min(index + 1, steps.length - 1)].id);
+          } else {
+            window.location.assign(publicUrl ?? previewUrl);
+          }
+        }
+        return true;
+      }
+
+      if (hasLifetimeAccess === null) {
+        setBusy(null);
+        setError("We could not verify your instructor access. Refresh the page before continuing.");
+        return false;
+      }
+
+      if (hasLifetimeAccess) {
+        const { error: submissionError } = await client.rpc("submit_lifetime_instructor_profile_for_review");
+        setBusy(null);
+        if (submissionError) {
+          setError(submissionError.message);
+          return false;
+        }
+        goTo("review");
+        setMessage("Your profile was submitted. We’ll review it ASAP.");
+        onSaved();
+        return true;
+      }
+
+      if (settings?.payment_setup_completed_at) {
+        const { data: resubmissionData, error: resubmissionError } = await client.rpc("resubmit_instructor_profile_after_payment_setup");
+        setBusy(null);
+        if (resubmissionError) {
+          setError(resubmissionError.message.includes("A verified payment setup is required before resubmitting")
+            ? "We could not verify your saved payment method. Refresh the page and try again. If this continues, contact support. You will not be asked to enter your card again unless a replacement is required."
+            : resubmissionError.message);
+          return false;
+        }
+        if (resubmissionData?.profileStatus !== "pending_review") {
+          setError("Your updated profile could not be resubmitted for review. Refresh the page and try again.");
+          return false;
+        }
+        goTo("review");
+        setMessage("Your saved payment method is confirmed. Your updated profile was resubmitted. We’ll review it ASAP.");
+        onSaved();
+        return true;
+      }
+
+      paymentSetupRequestKey.current ??= crypto.randomUUID();
+      const { data, error: setupError } = await client.functions.invoke("create-instructor-payment-setup", {
+        body: { instructorProfileId: profile.id },
+        headers: { "Idempotency-Key": paymentSetupRequestKey.current }
+      });
+      if (setupError) {
+        setBusy(null);
+        setError(await describeEdgeError(setupError));
+        return false;
+      }
+      if (!data?.url || typeof data.url !== "string") {
+        setBusy(null);
+        setError("Stripe payment setup did not return a secure link.");
+        return false;
+      }
+      window.location.assign(data.url);
+      return true;
+    } catch {
+      setError("Could not confirm that your changes were saved. Check your connection and try again.");
       return false;
-    }
-    if (!data?.url || typeof data.url !== "string") {
+    } finally {
+      saving.current = false;
       setBusy(null);
-      setError("Stripe payment setup did not return a secure link.");
-      return false;
     }
-    window.location.assign(data.url);
-    return true;
   }
 
   async function next(direction: 1 | -1) {
     const index = steps.findIndex((item) => item.id === step);
     const target = steps[index + direction];
     if (!target) return;
-    if (canEdit && step !== "media" && direction === 1) {
+    if (canEdit && direction === 1) {
       const saved = await save(false, true);
       if (!saved) return;
     }
@@ -438,7 +468,7 @@ export function ProfileEditor({
           <div className={editor.progressTrack}><div className={editor.progressFill} style={{ width: `${score}%` }} /></div>
           <p>
             <strong>Profile strength {score}%</strong>
-            {nextTip ? <> · Next: <button type="button" className={editor.inlineLink} onClick={() => goTo(nextTip.step)}>{nextTip.label.toLowerCase()}</button></> : " · Looking great"}
+            {nextTip ? <> · Next: <button type="button" className={editor.inlineLink} disabled={busy !== null || mediaBusy} onClick={() => goTo(nextTip.step)}>{nextTip.label.toLowerCase()}</button></> : " · Looking great"}
           </p>
         </div>
         <nav className={editor.steps} aria-label="Profile setup steps">
@@ -448,6 +478,7 @@ export function ProfileEditor({
               type="button"
               className={`${editor.stepButton} ${item.id === step ? editor.stepActive : ""}`}
               aria-current={item.id === step ? "step" : undefined}
+              disabled={busy !== null || mediaBusy}
               onClick={() => goTo(item.id)}
             >
               <span className={editor.stepNumber}>{index + 1}</span>
@@ -460,7 +491,11 @@ export function ProfileEditor({
       {profile.status === "pending_review" ? <p className={styles.notice}>Your profile is under review. Editing is paused until we finish.</p> : null}
       {profile.status === "suspended" ? <p className={styles.notice}>Editing is paused while your profile is suspended. Contact support for help.</p> : null}
 
-      <fieldset className={editor.body} disabled={!canEdit}>
+      <div ref={feedbackRef} tabIndex={-1}>
+        {message ? <p className={styles.success} role="status">{message}</p> : null}
+        {error ? <p className={styles.error} role="alert">{error}</p> : null}
+      </div>
+      <fieldset className={editor.body} disabled={!canEdit || busy !== null}>
         {step === "basics" ? (
           <section className={styles.stack} aria-labelledby="step-basics">
             <div>
@@ -490,13 +525,11 @@ export function ProfileEditor({
             <label className={styles.field}>
               <span>About you</span>
               <textarea
-                maxLength={2000}
                 rows={7}
                 value={form.bio}
                 onChange={(e) => setValue("bio", e.target.value)}
                 placeholder="How did you start dancing? What kinds of events do you love? How do you get a shy crowd moving? What will guests remember?"
               />
-              <small className={editor.counter}>{form.bio.length}/2000{form.bio.trim().length < 150 ? ` · Aim for at least 150 characters` : ""}</small>
             </label>
             <div className={`${styles.grid} ${styles.alignedGrid}`}>
               <label className={styles.field}>
@@ -738,9 +771,9 @@ export function ProfileEditor({
       </fieldset>
 
       {step === "media" ? (
-        <ProfileMediaManager profile={profile} canEdit={canEdit} onMediaChange={setMedia} />
+        <ProfileMediaManager profile={profile} canEdit={canEdit && busy === null} onMediaChange={setMedia} onBusyChange={setMediaBusy} />
       ) : (
-        <div hidden><ProfileMediaManager profile={profile} canEdit={false} onMediaChange={setMedia} /></div>
+        <div hidden><ProfileMediaManager profile={profile} canEdit={false} onMediaChange={setMedia} onBusyChange={setMediaBusy} /></div>
       )}
 
       {step === "review" ? (
@@ -754,7 +787,7 @@ export function ProfileEditor({
               <li key={item.label}>
                 {item.done ? <CheckCircle2 size={18} aria-hidden="true" className={editor.done} /> : <Circle size={18} aria-hidden="true" className={editor.todo} />}
                 <span>{item.label}{item.required ? " (required)" : ""}</span>
-                {!item.done ? <button type="button" className={editor.inlineLink} onClick={() => goTo(item.step)}>Add</button> : null}
+                {!item.done ? <button type="button" className={editor.inlineLink} disabled={busy !== null || mediaBusy} onClick={() => goTo(item.step)}>Add</button> : null}
               </li>
             ))}
           </ul>
@@ -786,30 +819,27 @@ export function ProfileEditor({
         </section>
       ) : null}
 
-      {message ? <p className={styles.success} role="status">{message}</p> : null}
-      {error ? <p className={styles.error} role="alert">{error}</p> : null}
-
       <footer className={editor.footer}>
         <div className={editor.footerLeft}>
           {stepIndex > 0 ? (
-            <button type="button" className={styles.secondaryButton} disabled={busy !== null} onClick={() => void next(-1)}><ArrowLeft size={16} aria-hidden="true" /> Back</button>
+            <button type="button" className={styles.secondaryButton} disabled={busy !== null || mediaBusy} onClick={() => void next(-1)}><ArrowLeft size={16} aria-hidden="true" /> Back</button>
           ) : null}
           {canEdit ? (
-            <button type="button" className={editor.textButton} disabled={busy !== null} onClick={() => void save(false)}>
-              {busy === "save" ? "Saving..." : profile.status === "draft" ? "Save draft" : "Save changes"}
+            <button type="button" className={editor.textButton} disabled={busy !== null || mediaBusy} onClick={() => void save(false)}>
+              {busy === "save" ? "Saving..." : profile.status === "draft" ? step === "review" ? "Save draft" : "Save and continue" : "Save changes"}
             </button>
           ) : null}
         </div>
         {step !== "review" ? (
-          <button type="button" className={styles.button} disabled={busy !== null} onClick={() => void next(1)}>
+          <button type="button" className={styles.button} disabled={busy !== null || mediaBusy} onClick={() => void next(1)}>
             Next: {steps[stepIndex + 1]?.label} <ArrowRight size={16} aria-hidden="true" />
           </button>
         ) : canContinue ? (
-          <button type="button" className={styles.button} disabled={busy !== null || hasLifetimeAccess === null} onClick={() => void save(true)}>
+          <button type="button" className={styles.button} disabled={busy !== null || mediaBusy || hasLifetimeAccess === null} onClick={() => void save(true)}>
             {busy === "continue" ? "Submitting..." : hasLifetimeAccess === false && !settings?.payment_setup_completed_at ? "Continue to payment setup" : "Submit for review"}
           </button>
         ) : canEdit ? (
-          <button type="button" className={styles.button} disabled={busy !== null} onClick={() => void save(false)}>
+          <button type="button" className={styles.button} disabled={busy !== null || mediaBusy} onClick={() => void save(false)}>
             {busy === "save" ? "Saving..." : "Save changes"}
           </button>
         ) : null}

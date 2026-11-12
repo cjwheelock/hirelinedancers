@@ -32,13 +32,15 @@ function harness(component = "inbox", props = {}, directoryProfiles = [profile])
   const instances = new Map(), modules = new Map(), timers = new Map(), plans = new Map();
   const calls = [], counts = [];
   let active, tree, dirty = true, nextTimer = 0;
+  const navigations = [];
   const location = new URL("/account/?tab=profile", "https://hirelinedancers.test");
+  location.assign = url => navigations.push(url);
   const window = { location, history: { replaceState: (_s, _t, url) => { location.href = new URL(url, location).href; } }, setTimeout: fn => { const id = ++nextTimer; timers.set(id, fn); return id; }, clearTimeout: id => timers.delete(id) };
   function query(table) {
     let single = false;
-    const data = table === "instructor_profiles" ? [profile] : table === "instructor_private_settings" ? [{ inquiry_email: "account@example.test", subscription_status: "active" }] : table === "instructor_directory_profiles" ? directoryProfiles : [];
-    const result = { then: (yes, no) => Promise.resolve({ data: single ? data[0] ?? null : data, error: null }).then(yes, no) };
-    for (const method of ["select", "eq", "neq", "in", "order", "limit", "update", "upsert"]) result[method] = () => result;
+    const data = table === "instructor_profiles" ? [profile] : table === "instructor_private_settings" ? [{ inquiry_email: "account@example.test", subscription_status: "active" }] : table === "instructor_directory_profiles" ? directoryProfiles : table === "profile_media" && component === "editor" ? [{ id: "headshot", media_type: "headshot", status: "ready", external_url: "https://example.test/headshot.jpg" }] : [];
+    const result = { then: (yes, no) => { const plan = plans.get(table)?.shift(); return Promise.resolve(plan ? plan() : { data: single ? data[0] ?? null : data, error: null }).then(yes, no); } };
+    for (const method of ["select", "eq", "neq", "in", "order", "limit", "update", "upsert"]) result[method] = (...args) => { if (["update", "upsert"].includes(method)) calls.push({ name: `${table}.${method}`, args }); return result; };
     result.maybeSingle = () => { single = true; return result; };
     return result;
   }
@@ -81,7 +83,7 @@ function harness(component = "inbox", props = {}, directoryProfiles = [profile])
       compiled.set(relative, ts.transpileModule(source, { fileName: relative, compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText);
     }
     const commonJsModule = { exports: {} }; modules.set(relative, commonJsModule);
-    new Function("exports", "module", "require", "window", "process", compiled.get(relative))(commonJsModule.exports, commonJsModule, specifier => {
+    new Function("exports", "module", "require", "window", "process", "requestAnimationFrame", compiled.get(relative))(commonJsModule.exports, commonJsModule, specifier => {
       if (specifier === "react") return react;
       if (specifier === "react/jsx-runtime") return require(specifier);
       if (specifier === "next/link") return { __esModule: true, default: ({ children, ...rest }) => require("react/jsx-runtime").jsx("a", { ...rest, children }) };
@@ -94,10 +96,10 @@ function harness(component = "inbox", props = {}, directoryProfiles = [profile])
       if (specifier.includes("commercial-terms.json")) return JSON.parse(readFileSync(new URL("config/commercial-terms.json", root), "utf8"));
       if (specifier.endsWith(".css")) return { __esModule: true, default: new Proxy({}, { get: (_target, key) => String(key) }) };
       return new Proxy({}, { get: (_target, key) => key === "__esModule" ? true : () => null });
-    }, window, { env: { NEXT_PUBLIC_SUPABASE_URL: "https://supabase.test", NEXT_PUBLIC_SUPABASE_ANON_KEY: "publishable-test" } });
+    }, window, { env: { NEXT_PUBLIC_SUPABASE_URL: "https://supabase.test", NEXT_PUBLIC_SUPABASE_ANON_KEY: "publishable-test" } }, fn => fn());
     return commonJsModule.exports;
   }
-  const Component = component === "inbox" ? load("src/components/InquiryInbox.tsx").InquiryInbox : component === "dashboard" ? load("src/components/AccountWorkspace.tsx").InstructorDashboard : component === "onboarding" ? load("src/components/AccountWorkspace.tsx").OnboardingForm : component === "browser" ? load("src/components/SearchPanel.tsx").InstructorDirectoryBrowser : load("src/components/SearchPanel.tsx").PublicInstructorResults;
+  const Component = component === "editor" ? load("src/components/ProfileEditor.tsx").ProfileEditor : component === "inbox" ? load("src/components/InquiryInbox.tsx").InquiryInbox : component === "dashboard" ? load("src/components/AccountWorkspace.tsx").InstructorDashboard : component === "onboarding" ? load("src/components/AccountWorkspace.tsx").OnboardingForm : component === "browser" ? load("src/components/SearchPanel.tsx").InstructorDirectoryBrowser : load("src/components/SearchPanel.tsx").PublicInstructorResults;
   const rootProps = component === "inbox" ? { perspective: "organizer", accountId: "account", ...props } : component === "dashboard" ? { account: { id: "account" }, ...props } : { onCountChange: count => counts.push(count), ...props };
   async function render() {
     for (let iteration = 0; iteration < 40; iteration++) {
@@ -128,7 +130,7 @@ function harness(component = "inbox", props = {}, directoryProfiles = [profile])
   const nodes = () => all(tree);
   const button = name => nodes().find(node => node.type === "button" && text(node) === name);
   const field = name => { const label = nodes().find(node => node.type === "label" && all(node).some(child => child.type === "span" && text(child).trim() === name)); return label?.props.htmlFor ? nodes().find(node => node.props?.id === label.props.htmlFor) : all(label).find(node => ["input", "textarea", "select"].includes(node.type)); };
-  return { render, nodes, button, field, counts, calls, text: () => text(tree), queue: (name, fn) => { if (!plans.has(name)) plans.set(name, []); plans.get(name).push(fn); }, choose: id => nodes().find(node => node.type === "button" && node.props.className?.includes("threadListItem") && text(node).includes(id === a ? "Conversation 1" : "Conversation 2")).props.onClick(), reply: () => nodes().find(node => node.type === "textarea" && node.props.placeholder === "Write a reply"), submit: () => nodes().find(node => node.type === "form" && node.props.className === "messageComposer").props.onSubmit(event()), flushTimers: async () => { const pending = [...timers.values()]; timers.clear(); pending.forEach(fn => fn()); await render(); } };
+  return { render, nodes, button, field, counts, calls, navigations, text: () => text(tree), queue: (name, fn) => { if (!plans.has(name)) plans.set(name, []); plans.get(name).push(fn); }, choose: id => nodes().find(node => node.type === "button" && node.props.className?.includes("threadListItem") && text(node).includes(id === a ? "Conversation 1" : "Conversation 2")).props.onClick(), reply: () => nodes().find(node => node.type === "textarea" && node.props.placeholder === "Write a reply"), submit: () => nodes().find(node => node.type === "form" && node.props.className === "messageComposer").props.onSubmit(event()), flushTimers: async () => { const pending = [...timers.values()]; timers.clear(); pending.forEach(fn => fn()); await render(); } };
 }
 
 for (const perspective of ["organizer", "instructor"]) {
@@ -323,4 +325,68 @@ test("clearing, unmatched cities, state queries, and event preferences retain ex
   app.field("City").props.onChange(event("   ")); await app.render();
   assert.equal(app.field("Event or program").props.value, "weddings");
   assert.deepEqual(resultNames(app).sort(), ["Cole La Brie", "Oakland instructor", "Tulsa instructor"]);
+});
+
+function editorHarness(status = "draft") {
+  return harness("editor", { profile: { ...profile, status, styles: [], event_types: [], languages: [], preferred_response_hours: 24 }, settings: { inquiry_email: "account@example.test" }, hasLifetimeAccess: true, onSaved: () => {}, describeEdgeError: async () => "Request failed" });
+}
+test("draft Save and continue saves then advances, without submitting", async () => {
+  const app = editorHarness(); await app.render();
+  app.field("About you").props.onChange(event("Hi")); await app.render();
+  assert.equal(app.field("About you").props.maxLength, undefined);
+  app.button("Save and continue").props.onClick(); await app.render();
+  assert.ok(app.text().includes("Welcome video (optional)"));
+  assert.ok(app.text().includes("Your profile changes are saved."));
+  assert.ok(!app.calls.some(call => call.name.includes("submit")));
+  const update = app.calls.find(call => call.name === "instructor_profiles.update");
+  assert.equal(update.args[0].bio, "Hi");
+  const privateUpdate = app.calls.find(call => call.name === "instructor_private_settings.upsert").args[0];
+  assert.ok(!("sms_notifications_enabled" in privateUpdate));
+  assert.ok(!("inquiry_phone_e164" in privateUpdate));
+});
+test("published Save changes returns to the finished public profile", async () => {
+  const app = editorHarness("published"); await app.render();
+  app.button("Save changes").props.onClick(); await app.render();
+  assert.equal(app.navigations.length, 1);
+  assert.ok(app.navigations[0].includes("/profile/?instructor="));
+  assert.ok(!app.navigations[0].includes("preview=1"));
+});
+test("failed save stays on current step with a visible error and retains edits", async () => {
+  const app = editorHarness(); await app.render();
+  app.field("About you").props.onChange(event("Keep these edits")); await app.render();
+  app.queue("instructor_profiles", () => ({ error: { message: "Save unavailable" } }));
+  app.button("Save and continue").props.onClick(); await app.render();
+  assert.equal(app.field("About you").props.value, "Keep these edits");
+  assert.ok(app.text().includes("Save unavailable"));
+  assert.equal(app.navigations.length, 0);
+});
+test("rapid double save only writes once; navigation is disabled while saving", async () => {
+  const app = editorHarness(); await app.render();
+  const pending = deferred(); app.queue("instructor_private_settings", () => pending.promise);
+  const click = app.button("Save and continue").props.onClick; click(); click(); await app.render();
+  assert.equal(app.calls.filter(call => call.name === "instructor_private_settings.upsert").length, 1);
+  assert.equal(app.button("Next: Photos & videos ").props.disabled, true);
+  pending.resolve({ error: null }); await app.render();
+  assert.ok(app.text().includes("Welcome video (optional)"));
+});
+test("network exception releases save lock and preserves the current step", async () => {
+  const app = editorHarness(); await app.render();
+  app.queue("instructor_private_settings", () => Promise.reject(new Error("offline")));
+  app.button("Save and continue").props.onClick(); await app.render();
+  assert.ok(app.field("About you"));
+  assert.ok(app.text().includes("Could not confirm"));
+  assert.equal(app.button("Save and continue").props.disabled, false);
+});
+
+test("short bio and no videos or teaching photos can submit; saves alone never submit", async () => {
+  const app = harness("editor", { profile: { ...profile, bio: "Hi" }, settings: { inquiry_email: "account@example.test" }, hasLifetimeAccess: true, onSaved: () => {}, describeEdgeError: async () => "Request failed" });
+  await app.render();
+  app.nodes().find(node => node.type === "button" && text(node).includes("5Preview & submit")).props.onClick(); await app.render();
+  assert.ok(app.text().includes("Video (optional)"));
+  assert.ok(app.text().includes("One to three photos of you teaching (optional)"));
+  app.button("Save draft").props.onClick(); await app.render();
+  assert.ok(!app.calls.some(call => call.name === "submit_lifetime_instructor_profile_for_review"));
+  app.button("Submit for review").props.onClick(); await app.render();
+  assert.equal(app.calls.filter(call => call.name === "submit_lifetime_instructor_profile_for_review").length, 1);
+  assert.ok(app.text().includes("Your profile was submitted."));
 });

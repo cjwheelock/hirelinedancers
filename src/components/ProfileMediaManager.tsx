@@ -50,15 +50,19 @@ function friendlyDbError(message: string) {
 export function ProfileMediaManager({
   profile,
   canEdit,
-  onMediaChange
+  onMediaChange,
+  onBusyChange
 }: {
   profile: InstructorProfile;
   canEdit: boolean;
   onMediaChange?: (media: EditorMedia[]) => void;
+  onBusyChange?: (busy: boolean) => void;
 }) {
   const [media, setMedia] = useState<EditorMedia[]>([]);
   const [cropQueue, setCropQueue] = useState<CropJob[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
+  useEffect(() => { onBusyChange?.(busy !== null || cropQueue.length > 0); }, [busy, cropQueue.length, onBusyChange]);
+  useEffect(() => () => onBusyChange?.(false), [onBusyChange]);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [link, setLink] = useState("");
@@ -399,7 +403,7 @@ export function ProfileMediaManager({
         </div>
 
         <div className={editor.slot}>
-          <span className={styles.legend}>Welcome video</span>
+          <span className={styles.legend}>Welcome video (optional)</span>
           {welcome ? (
             <div className={editor.welcomeTile}>
               <MediaThumb item={welcome} />
