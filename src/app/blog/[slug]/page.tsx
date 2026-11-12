@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { InstagramEmbedLoader } from "@/components/InstagramEmbedLoader";
 import { SpotlightBody } from "@/components/SpotlightBody";
 import { spotlightMediaUrl } from "@/lib/spotlight";
 import { notFound } from "next/navigation";
@@ -89,6 +90,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
       </p>
       {post.spotlight ? <SpotlightBody content={post.spotlight.content} profileId={post.spotlight.profile_id} /> : <>
       <div className="post-body" dangerouslySetInnerHTML={{ __html: post.body }} />
+      {post.instagramEmbed && <InstagramEmbedLoader />}
       <div className="policy-box" style={{ marginTop: 48 }}>
         <h2>Planning an event{city ? ` in ${city.city}` : ""}?</h2>
         <p>Find a line dance instructor and give guests a welcoming way to get moving together. No prior dance experience is required.</p>

@@ -4,6 +4,7 @@ import { cities } from "./site";
 import { spotlightHeading, type Spotlight } from "@/lib/spotlight";
 import { cityPosts } from "./posts/cityPosts";
 import { employeeAdvocacyPosts } from "./posts/employeeAdvocacyPosts";
+import { communityPosts } from "./posts/communityPosts";
 import { weeklyPosts } from "./posts/weeklyPosts";
 
 export type BlogPost = {
@@ -16,7 +17,8 @@ export type BlogPost = {
   /** Only posts explicitly marked ready appear in production pages, feeds, and
    *  sitemaps. Set INCLUDE_DRAFT_POSTS=true for a local editorial preview build. */
   status?: "draft" | "ready";
-  category: "City guide" | "Planning" | "Ideas" | "Instructor spotlight";
+  instagramEmbed?: boolean;
+  category: "Community" | "City guide" | "Planning" | "Ideas" | "Instructor spotlight";
   spotlight?: Spotlight;
   citySlug?: string;
   author?: string;
@@ -26,7 +28,7 @@ export type BlogPost = {
   body: string;
 };
 
-export const allPosts: BlogPost[] = [...cityPosts, ...employeeAdvocacyPosts, ...weeklyPosts];
+export const allPosts: BlogPost[] = [...communityPosts, ...cityPosts, ...employeeAdvocacyPosts, ...weeklyPosts];
 
 // The build writes one public-only snapshot shared by pages, RSS, and the sitemap.
 const spotlightFile = join(process.cwd(), "tmp", "released-spotlights.json");
