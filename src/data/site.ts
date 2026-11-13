@@ -117,9 +117,9 @@ export type ServiceMarket = {
 };
 
 export type LaunchCity = ServiceMarket & {
-  blurb: string;
-  localIntro: string;
-  planningNote: string;
+  blurb?: string;
+  localIntro?: string;
+  planningNote?: string;
 };
 
 // Full launch-market records used for published city pages, navigation,
@@ -223,26 +223,30 @@ export const cities: LaunchCity[] = [
     localIntro: "Las Vegas planners can use a guided group dance to turn a room of conference attendees, wedding guests, or friends into active participants.",
     planningNote: "Hotel and convention venues may have vendor, insurance, load-in, sound, and access requirements, so confirm them early.",
     serviceCities: ["Las Vegas"]
-  }
-];
-
-export const topCities = cities;
-
-export const serviceMarkets: ServiceMarket[] = [
-  ...cities,
+  },
   {
     slug: "los-angeles-ca",
     city: "Los Angeles",
     state: "CA",
-    serviceCities: ["Los Angeles"]
+    serviceCities: ["Los Angeles", "Long Beach", "Santa Monica", "Pasadena", "Burbank", "Glendale", "Torrance", "Manhattan Beach", "Redondo Beach", "Culver City", "West Hollywood"]
+  },
+  {
+    slug: "orange-county-ca",
+    city: "Orange County",
+    state: "CA",
+    serviceCities: ["Aliso Viejo", "Anaheim", "Brea", "Buena Park", "Costa Mesa", "Cypress", "Dana Point", "Fountain Valley", "Fullerton", "Garden Grove", "Huntington Beach", "Irvine", "La Habra", "La Palma", "Laguna Beach", "Laguna Hills", "Laguna Niguel", "Laguna Woods", "Lake Forest", "Los Alamitos", "Mission Viejo", "Newport Beach", "Orange", "Placentia", "Rancho Santa Margarita", "San Clemente", "San Juan Capistrano", "Santa Ana", "Seal Beach", "Stanton", "Tustin", "Villa Park", "Westminster", "Yorba Linda"]
   },
   {
     slug: "san-diego-ca",
     city: "San Diego",
     state: "CA",
-    serviceCities: ["San Diego"]
+    serviceCities: ["San Diego", "Carlsbad", "Chula Vista", "Coronado", "Del Mar", "El Cajon", "Encinitas", "Escondido", "Imperial Beach", "La Mesa", "Lemon Grove", "National City", "Oceanside", "Poway", "San Marcos", "Santee", "Solana Beach", "Vista"]
   }
 ];
+
+export const topCities = cities;
+
+export const serviceMarkets: ServiceMarket[] = cities;
 
 export type Instructor = {
   slug: string;

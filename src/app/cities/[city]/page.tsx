@@ -17,7 +17,7 @@ export async function generateMetadata({ params }: { params: Promise<{ city: str
   const title = isBayArea ? `${city.city} Line Dance Instructors` : `Hire a Line Dance Instructor in ${city.city}, ${city.state}`;
   const description = isBayArea
     ? `Hire a line dance instructor in the ${city.city}. Browse instructors, local planning guidance, and line dancing articles.`
-    : `${city.localIntro} Browse instructors, local planning guidance, and line dancing articles for ${city.city}, ${city.state}.`;
+    : `${city.localIntro ? `${city.localIntro} ` : ""}Browse instructors, local planning guidance, and line dancing articles for ${city.city}, ${city.state}.`;
   return {
     title,
     description,
@@ -64,7 +64,7 @@ export default async function CityPage({ params }: { params: Promise<{ city: str
           {
             "@type": "Question",
             name: `What should I share when contacting a line dance instructor in ${city.city}?`,
-            acceptedAnswer: { "@type": "Answer", text: `Share your date, venue location, guest count, available floor space and sound, preferred music, and event goals. ${city.planningNote}` }
+            acceptedAnswer: { "@type": "Answer", text: `Share your date, venue location, guest count, available floor space and sound, preferred music, and event goals. ${city.planningNote ?? ""}` }
           },
           {
             "@type": "Question",
@@ -81,11 +81,11 @@ export default async function CityPage({ params }: { params: Promise<{ city: str
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <p className="eyebrow">City directory</p>
       <h1>Hire a line dance instructor in {city.city}, {city.state}.</h1>
-      <p className="lede">{city.localIntro}</p>
-      <div className="policy-box">
+      {city.localIntro && <p className="lede">{city.localIntro}</p>}
+      {city.planningNote && <div className="policy-box">
         <h2>Plan for the local details</h2>
         <p>{city.planningNote}</p>
-      </div>
+      </div>}
       <div className="card-grid">
         <PublicInstructorResults
           citySlug={city.slug}

@@ -390,3 +390,20 @@ for (const bio of ["Hi", "", null]) test(`optional bio (${JSON.stringify(bio)}) 
   assert.equal(app.calls.filter(call => call.name === "submit_lifetime_instructor_profile_for_review").length, 1);
   assert.ok(app.text().includes("Your profile was submitted."));
 });
+
+test("Southern California launch markets match their own city and surrounding service cities", async () => {
+  const profiles = [
+    { ...profile, id: "la", city: "Los Angeles", region: "CA" },
+    { ...profile, id: "lb", city: "Long Beach", region: "CA" },
+    { ...profile, id: "oc", city: "Orange County", region: "CA" },
+    { ...profile, id: "irvine", city: "Irvine", region: "CA" },
+    { ...profile, id: "sd", city: "San Diego", region: "CA" },
+    { ...profile, id: "enc", city: "Encinitas", region: "CA" },
+    { ...profile, id: "sf", city: "San Francisco", region: "CA" }
+  ];
+  for (const citySlug of ["los-angeles-ca", "orange-county-ca", "san-diego-ca"]) {
+    const app = harness("directory", { citySlug }, profiles);
+    await app.render();
+    assert.equal(app.counts.at(-1), 2, citySlug);
+  }
+});
