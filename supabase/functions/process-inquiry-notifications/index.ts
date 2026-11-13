@@ -6,6 +6,8 @@ import { BILLING_RECOVERY_GRACE_DAYS } from "../_shared/hld-commercial-terms.ts"
 import { supabaseServerOptions } from "../_shared/hld-supabase-admin.ts";
 import { maskContactDetails } from "../_shared/hld-booking.ts";
 
+import { AdminInquiryEmailError, type AdminInquiryNotificationJob, sendAdminInquiryEmail } from "../_shared/hld-admin-inquiry-email.ts";
+
 type ReadOnlyTable<Row extends Record<string, unknown>> = {
   Row: Row;
   Insert: Row;
@@ -51,6 +53,8 @@ type WorkerDatabase = {
     };
     Views: Record<string, never>;
     Functions: {
+      claim_admin_inquiry_notification_jobs: { Args: ClaimArgs; Returns: AdminInquiryNotificationJob[] };
+      complete_admin_inquiry_notification_job: { Args: CompletionArgs & { p_attempt_number: number }; Returns: string };
       get_inquiry_notification_context: { Args: { p_job_id: number }; Returns: { automatic: boolean; opportunity_closed?: boolean; invited_count?: number; brief?: Record<string, string | number> } };
       get_inquiry_recommendations: {
         Args: { p_thread_id: string };
@@ -1701,6 +1705,29 @@ async function processInstructorServiceJob(
   }
 }
 
+async function processAdminInquiryJob(admin: AdminClient, job: AdminInquiryNotificationJob): Promise<string> {
+  let providerMessageId: string | undefined;
+  let failure: AdminInquiryEmailError | undefined;
+  try {
+    providerMessageId = await sendAdminInquiryEmail(job, {
+      apiKey: requiredEnv("RESEND_API_KEY"), from: requiredEnv("RESEND_FROM_EMAIL"),
+      appUrl: configuredAppUrl(),
+      supportEmail: Deno.env.get("SUPPORT_EMAIL")?.trim() || "hello@hirelinedancers.com",
+    });
+  } catch (error) {
+    failure = error instanceof AdminInquiryEmailError ? error : new AdminInquiryEmailError("Administrator notification failed", true);
+  }
+  // Keep acknowledgement failures separate: a provider-accepted send must never
+  // be recorded as a send failure. The next lease uses the same idempotency key.
+  const { data, error } = await admin.rpc("complete_admin_inquiry_notification_job", {
+    p_job_id: job.job_id, p_attempt_number: job.attempt_number,
+    p_success: !!providerMessageId, p_provider_message_id: providerMessageId ?? null,
+    p_error: failure?.message ?? null, p_retryable: failure?.retryable ?? false,
+  });
+  if (error) throw new Error(`Unable to acknowledge administrator notification ${job.job_id}`);
+  return String(data);
+}
+
 export default {
   fetch: withSupabase<WorkerDatabase>(
     {
@@ -1725,6 +1752,17 @@ export default {
     const body = await req.json().catch(() => ({})) as { limit?: number };
     const requestedLimit = Number.isInteger(body.limit) ? Number(body.limit) : 10;
     const limit = Math.max(1, Math.min(requestedLimit, 25));
+    // A separate queue means one administrator copy per inquiry, independent of
+    // instructor routing, fallback recipients, and later thread notifications.
+    const { data: adminInquiryData, error: adminInquiryError } = await ctx.supabaseAdmin.rpc(
+      "claim_admin_inquiry_notification_jobs", { p_limit: limit, p_lock_timeout: "10 minutes" },
+    );
+    if (adminInquiryError) console.error("Unable to claim administrator inquiry notifications", adminInquiryError.code);
+    const adminInquiryJobs = (adminInquiryData ?? []) as AdminInquiryNotificationJob[];
+    const adminInquirySettled = await Promise.allSettled(
+      adminInquiryJobs.map((job) => processAdminInquiryJob(ctx.supabaseAdmin, job)),
+    );
+
     const { data: expiredGracePeriods, error: expiryError } = await ctx
       .supabaseAdmin.rpc("expire_instructor_billing_grace_periods");
     if (expiryError) {
@@ -1835,10 +1873,13 @@ export default {
       ...threadOutcomes,
       ...profileOutcomes,
       ...serviceOutcomes,
+      ...adminInquirySettled.map((result) => result.status === "fulfilled" ? result.value : "worker_error"),
     ];
 
     return Response.json({
-      claimed: jobs.length + threadJobs.length + profileJobs.length + serviceJobs.length,
+      claimed: jobs.length + threadJobs.length + profileJobs.length + serviceJobs.length + adminInquiryJobs.length,
+      adminInquiryClaimed: adminInquiryJobs.length,
+      adminInquiryClaimError: !!adminInquiryError,
       inquiryClaimed: jobs.length,
       threadClaimed: threadJobs.length,
       profileClaimed: profileJobs.length,

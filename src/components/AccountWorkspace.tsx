@@ -34,6 +34,7 @@ import { InquiryInbox } from "./InquiryInbox";
 import { MembershipCreditAdmin } from "./MembershipCreditAdmin";
 import { PayoutsCard } from "./PayoutsCard";
 import { AdminBookings } from "./AdminBookings";
+import { AdminInquiries } from "./AdminInquiries";
 import {
   accountEntryRedirect,
   cleanAccountIntent,
@@ -2054,7 +2055,7 @@ function MembershipGuaranteeAdmin({ isOwner }: { isOwner: boolean }) {
 }
 
 function AdminDashboard({ isOwner }: { isOwner: boolean }) {
-  const [tab, setTab] = useState<"overview" | "messages" | "bookings" | "profiles" | "memberships" | "invitations" | "delivery" | "access">("overview");
+  const [tab, setTab] = useState<"overview" | "inquiries" | "messages" | "bookings" | "profiles" | "memberships" | "invitations" | "delivery" | "access">("overview");
   const [focusedProfileId, setFocusedProfileId] = useState<string | null>(null);
   const [focusedInquiryId, setFocusedInquiryId] = useState<string | null>(null);
   const [focusedThreadId, setFocusedThreadId] = useState<string | null>(null);
@@ -2202,7 +2203,7 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const requestedTab = params.get("tab");
-    if (["overview", "messages", "bookings", "profiles", "memberships", "invitations", "delivery", "access"].includes(requestedTab ?? "")) {
+    if (["overview", "inquiries", "messages", "bookings", "profiles", "memberships", "invitations", "delivery", "access"].includes(requestedTab ?? "")) {
       setTab(requestedTab as typeof tab);
     }
     setFocusedProfileId(params.get("profile"));
@@ -2461,6 +2462,7 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
     url.searchParams.set("tab", nextTab);
     if (nextTab !== "profiles") url.searchParams.delete("profile");
     if (nextTab !== "messages") {
+      setFocusedInquiryId(null);
       url.searchParams.delete("inquiry");
       url.searchParams.delete("thread");
     }
@@ -2471,8 +2473,8 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
     <>
       <div className={styles.tabs} role="tablist" aria-label="Admin dashboard sections">
         {(isOwner
-          ? (["overview", "messages", "bookings", "profiles", "memberships", "invitations", "delivery", "access"] as const)
-          : (["overview", "messages", "bookings", "profiles", "memberships", "invitations", "delivery"] as const)
+          ? (["overview", "inquiries", "messages", "bookings", "profiles", "memberships", "invitations", "delivery", "access"] as const)
+          : (["overview", "inquiries", "messages", "bookings", "profiles", "memberships", "invitations", "delivery"] as const)
         ).map((name) => (
           <button key={name} className={`${styles.tab} ${tab === name ? styles.activeTab : ""}`} type="button" onClick={() => selectAdminTab(name)}>
             {name[0].toUpperCase() + name.slice(1)}
@@ -2484,6 +2486,16 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
       {loading ? <div className={styles.loading}>Loading marketplace operations...</div> : null}
 
       {!loading && tab === "bookings" ? <AdminBookings /> : null}
+
+      {!loading && tab === "inquiries" ? <AdminInquiries focusInquiryId={focusedInquiryId} onOpenThread={(threadId) => {
+        setFocusedInquiryId(null);
+        setFocusedThreadId(threadId);
+        selectAdminTab("messages");
+        const url = new URL(window.location.href);
+        url.searchParams.delete("inquiry");
+        url.searchParams.set("thread", threadId);
+        window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+      }} /> : null}
 
       {!loading && tab === "messages" ? (
         <InquiryInbox
@@ -2591,6 +2603,7 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
 
           <div className={`${styles.card} ${styles.compactAdminCard}`}>
             <h2>Recent inquiries</h2>
+            <button type="button" className={styles.secondaryButton} onClick={() => selectAdminTab("inquiries")}>View all inquiries</button>
             <div className={`${styles.tableWrap} ${styles.compactTableWrap}`}>
               <table className={`${styles.dataTable} ${styles.compactDataTable}`}>
                 <thead><tr><th>Submitted</th><th>Company</th><th>Instructor</th><th>Event</th><th>Booking</th><th>Completion</th></tr></thead>
