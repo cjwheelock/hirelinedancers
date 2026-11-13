@@ -2,6 +2,52 @@ import type { BlogPost } from "../blog";
 
 export const cityPosts: BlogPost[] = [
   {
+    slug: "where-to-line-dance-austin",
+    title: "Where to Go Line Dancing in Austin and Nearby",
+    description: "Four Austin-area venues with line-dance lessons or announced events, including Pflugerville, Cedar Park and Austin's queer country dance nights.",
+    publishDate: "2026-11-13",
+    updatedDate: "2026-11-13",
+    status: "ready",
+    category: "City guide",
+    citySlug: "austin-tx",
+    author: "Hire Line Dancers",
+    body: `
+<p>Austin has plenty of country dancing, but a country dance floor does not automatically mean line dancing. Some venues focus on partner two-step; others offer a specific lesson window or a special line-dance event. These four places have line-dancing programming supported by current venue or organizer information.</p>
+<p>This is a practical shortlist, not a ranked competition. It includes nearby Pflugerville and Cedar Park as well as Austin itself.</p>
+<p><strong>Last checked: November 13, 2026.</strong> Times below are local to Austin. Confirm the exact date, admission rules and any cover charge on the linked calendar before traveling, especially around holidays.</p>
+<h2>1. Mavericks Dance Hall North, Pflugerville</h2>
+<p><strong>Address:</strong> 1700 Grand Avenue Parkway, Suite 230, Pflugerville, TX 78660.</p>
+<p>Boot Stompin’ ATX lists Tuesday line dancing at Mavericks North. Its schedule separates a $5 advanced lesson at 6:30 p.m. from free line dancing beginning at 7 p.m., with beginner nights on the first Tuesday of each month. If you are new, choose the beginner session rather than assuming the early advanced lesson will start from scratch.</p>
+<p>The venue identifies itself as 21 and over. Use the North/Pflugerville location when planning your trip; other Mavericks locations have their own calendars. The organizer's early Tuesday lesson is an exception to the venue's general 7 p.m. opening time, so confirm that session before arriving early.</p>
+<p><a href="https://north.mavericksdancehall.com/contact-us/">Mavericks North location</a> · <a href="https://north.mavericksdancehall.com/about-the-venue/">Venue and age policy</a> · <a href="https://www.bootstompinatx.com/public-line-dance-lessons">Boot Stompin’ ATX lesson schedule</a></p>
+<h2>2. Wild West Cedar Park</h2>
+<p><strong>Address:</strong> 401 East Whitestone Boulevard, Cedar Park, TX 78613.</p>
+<p>Wild West's official schedule lists all-level line-dance lessons on Thursdays from 6:15 to 7 p.m., followed by line dancing until 8 p.m. Saturday's later program has line-dance lessons from 9:15 to 10 p.m. Boot Stompin’ ATX also identifies these as its regular teaching nights.</p>
+<p>Choose the time deliberately: Wednesday and Friday lessons are two-step, and Thursday's main-floor program switches to Latin dancing at 8 p.m. Saturday's teen event is separate from the later evening session. Check the venue's age, dress and admission rules for the particular event you plan to attend.</p>
+<p><a href="https://wildwestcedarpark.com/contact-2/">Official lesson times and location</a> · <a href="https://wildwestcedarpark.com/">Wild West events and visitor information</a></p>
+<h2>3. 29th Street Ballroom, Austin</h2>
+<p><strong>Address:</strong> 2906 Fruth Street, Austin, TX.</p>
+<p>For a queer line-dance night, look for Bronco from Neon Rainbows and Country Fried Dance. The organizer advertises November 18 at 29th Street Ballroom, and instructor Nico's current calendar also lists December 2, both at 7 p.m. The November listing explicitly calls this a new location, so an older flyer may send you somewhere else.</p>
+<p>Country Fried Dance lists these events as all ages with an additional fee for attendees 20 and under. Check the ticket page for current availability and terms. These are announced dates, not a promise that every Wednesday at the ballroom is a line-dance night.</p>
+<p><a href="https://neonrainbowstx.com/">Neon Rainbows event and ticket links</a> · <a href="https://countryfrieddance.com/">Country Fried Dance calendar</a> · <a href="https://www.29thstreetballroom.com/about-1">Ballroom location</a></p>
+<h2>4. Sagebrush, South Austin</h2>
+<p><strong>Address:</strong> 5500 South Congress Avenue, Austin, TX 78745.</p>
+<p>Sagebrush is another stop to check for special country dance events. Country Fried Dance's current calendar lists the Neon Rainbows Fall Social there on November 16 at 7 p.m., for ages 21 and up.</p>
+<p>Use that event's details rather than assuming every Sagebrush music night includes line-dance instruction. The venue's older calendar did not display this event during our check, so the date above is supported by the instructor's current listing. Follow the organizer for the final program and any changes.</p>
+<p><a href="https://countryfrieddance.com/">Instructor's current event calendar</a> · <a href="https://sagebrushtexas.com/">Sagebrush location and venue information</a></p>
+<h2>Choose the night, not just the venue</h2>
+<ul>
+<li><strong>Look for the word “line.”</strong> Two-step, swing and line dancing are different formats, even when they share a dance floor.</li>
+<li><strong>Arrive for instruction.</strong> A beginner lesson is a more useful starting point than joining open dancing halfway through a familiar sequence.</li>
+<li><strong>Check ages and tickets.</strong> A special all-ages event does not establish the venue's policy for every night.</li>
+<li><strong>Confirm the location.</strong> Austin-area travel can mean crossing town or heading to a neighboring city.</li>
+</ul>
+<h2>Bring a lesson to your event</h2>
+<p>Want line dancing at a wedding, party or company gathering instead? <a href="/cities/austin-tx/">Explore Austin-area instructors</a> and include your location, group size and experience level when you inquire.</p>
+`,
+  },
+
+  {
     slug: "where-to-line-dance-san-francisco-bay-area",
     title: "Where to Go Line Dancing in the San Francisco Bay Area",
     description: "Six Bay Area places to explore for line dancing, from Thursday nights in San Francisco to lessons in Pleasanton, Walnut Creek, San Mateo and San Jose.",
