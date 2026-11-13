@@ -91,6 +91,7 @@ export default async function CityPage({ params }: { params: Promise<{ city: str
           citySlug={city.slug}
           emptyTitle={`No published ${city.city} profiles yet`}
           emptyBody={`We are reviewing instructors for ${city.city}. Instructors can apply now to be considered for the directory.`}
+          matchingQuery={`${city.city}, ${city.state}`}
         />
       </div>
       <div className="faq-block">

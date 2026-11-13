@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Award, CalendarDays, MapPin, Search } from "lucide-react";
 import { isFoundingInstructor } from "@/lib/commercialTerms";
 import { DirectoryCityField } from "./DirectoryCityField";
+import { MatchingRequestCard } from "./MatchingRequestCard";
 import { eventTypes, instructors, serviceMarkets, type Instructor } from "@/data/site";
 import {
   getMarketplaceClient,
@@ -61,6 +62,8 @@ type PublicInstructorResultsProps = {
   suppressEmptyMessage?: boolean;
   emptyTitle?: string;
   emptyBody?: string;
+  /** When nothing matches, offer personal matching for this typed place instead of an empty message. */
+  matchingQuery?: string;
   onCountChange?: (count: number | null) => void;
 };
 
@@ -129,7 +132,7 @@ function marketMatches(profile: Pick<PublicProfile, "city" | "region">, citySlug
   return Boolean(profileCity && marketCities.includes(profileCity));
 }
 
-const stateNames: Record<string, string> = {
+export const stateNames: Record<string, string> = {
   alabama: "AL", alaska: "AK", arizona: "AZ", arkansas: "AR", california: "CA", colorado: "CO", connecticut: "CT",
   delaware: "DE", "district of columbia": "DC", florida: "FL", georgia: "GA", hawaii: "HI", idaho: "ID", illinois: "IL",
   indiana: "IN", iowa: "IA", kansas: "KS", kentucky: "KY", louisiana: "LA", maine: "ME", maryland: "MD",
@@ -315,6 +318,7 @@ export function PublicInstructorResults({
   suppressEmptyMessage = false,
   emptyTitle = "No published instructor matches yet.",
   emptyBody = "Try another filter, or check back as new instructors are approved.",
+  matchingQuery,
   onCountChange
 }: PublicInstructorResultsProps) {
   const [profiles, setProfiles] = useState<PublicProfile[]>([]);
@@ -514,7 +518,12 @@ export function PublicInstructorResults({
     );
   }
 
+  const matchingCard = !results.length && matchingQuery
+    ? <MatchingRequestCard query={matchingQuery} eventSlug={eventSlug} />
+    : null;
+
   if (!results.length && !demoResults.length) {
+    if (matchingCard) return matchingCard;
     if (suppressEmptyMessage) return null;
     return (
       <div className={stateClass}>
@@ -527,9 +536,10 @@ export function PublicInstructorResults({
   return (
     <>
       {results.map((profile) => <PublicProfileCard key={profile.id} profile={profile} compact={compact} publishedRoutes={publishedRoutes} />)}
+      {matchingCard}
       {demoResults.length ? (
         <>
-          {results.length || !suppressEmptyMessage ? (
+          {!matchingCard && (results.length || !suppressEmptyMessage) ? (
             <div className={stateClass}>
               <h3>{results.length ? "Featured instructor profile" : emptyTitle}</h3>
               <p>
@@ -581,6 +591,7 @@ export function InstructorDirectoryBrowser() {
           suppressEmptyMessage={!trimmedCity && !event}
           emptyTitle={freeCityQuery ? `No published instructors in ${freeCityQuery} yet.` : undefined}
           emptyBody={freeCityQuery ? "Instructors are joining across the US. Try a nearby city or your state, or check back soon." : undefined}
+          matchingQuery={trimmedCity || undefined}
           onCountChange={setResultCount}
         />
       </div>

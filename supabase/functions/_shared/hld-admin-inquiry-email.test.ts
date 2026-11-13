@@ -57,3 +57,11 @@ Deno.test('network uncertainty remains retryable with the same key', async () =>
     throw Error('should reject');
   } catch (error) { assert(error instanceof AdminInquiryEmailError && error.retryable && !error.message.includes('private provider details')); }
 });
+Deno.test('matching requests email the owner with contact details and no instructor route', () => {
+  const email = adminInquiryEmail({ ...job, inquiry_id: null, matching_request_id: '00000000-0000-4000-8000-000000000002',
+    inquiry: { kind: 'matching_request', id: '00000000-0000-4000-8000-000000000002', contact_name: 'Pat <b>', contact_email: 'pat@example.test', contact_phone: '208-555-0100', event_city: 'Boise', event_region: 'ID', search_query: 'Boise, ID', guest_count: 120 } }, config.appUrl, config.supportEmail);
+  assert(email.subject === 'New matching request · Boise, ID');
+  assert(email.text.includes('Phone: 208-555-0100') && email.text.includes('Searched for: Boise, ID'));
+  assert(email.html.includes('Pat &lt;b&gt;') && !email.text.includes('/admin/'));
+  assert(email.reply_to === 'pat@example.test' && email.to[0] === 'cjwheelock1@gmail.com');
+});
