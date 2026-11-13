@@ -13,10 +13,10 @@ function harness(props = {}) {
     useEffect(fn, deps) { const i = cursor++; if (!effects[i] || deps.some((v,j) => !Object.is(v,effects[i].deps[j]))) { effects[i]?.cleanup?.(); effects[i] = { deps, pending: fn }; } }
   };
   const client = { from(table) { const call = { table, methods: [] }; calls.push(call); const query = {}; for (const name of ['select','order','range','or','eq']) query[name] = (...args) => { call.methods.push([name,...args]); return query; }; query.abortSignal = () => Promise.resolve(replies.shift() ?? { data: [], count: 0 }); return query; }, async rpc(name,args) { calls.push({name,args}); return replies.shift() ?? {data:null}; } };
-  const module = {exports:{}};
-  new Function('require','module','exports', compiled)((name) => name === 'react' ? react : name === 'react/jsx-runtime' ? {jsx:(type,props)=>({type,props}),jsxs:(type,props)=>({type,props})} : name.includes('marketplace') ? {getMarketplaceClient:()=>client,readableError:e=>e.message} : {default:{}}, module,module.exports);
-  function render() { cursor=0; dirty=false; tree=module.exports.AdminInquiries({...props,onOpenThread:id=>opened.push(id)}); for(const effect of effects) if(effect?.pending) {const fn=effect.pending; delete effect.pending; effect.cleanup=fn();} }
-  return {calls,replies,opened,filter:module.exports.inquirySearchFilter, async settle() { for(let n=0;n<15;n++){if(dirty)render(); await Promise.resolve();} }, nodes() { function walk(n){return !n || typeof n!=='object'?[]:Array.isArray(n)?n.flatMap(walk):[n,...walk(n.props?.children)];} return walk(tree); } };
+  const compiledModule = {exports:{}};
+  new Function('require','module','exports', compiled)((name) => name === 'react' ? react : name === 'react/jsx-runtime' ? {jsx:(type,props)=>({type,props}),jsxs:(type,props)=>({type,props})} : name.includes('marketplace') ? {getMarketplaceClient:()=>client,readableError:e=>e.message} : {default:{}}, compiledModule,compiledModule.exports);
+  function render() { cursor=0; dirty=false; tree=compiledModule.exports.AdminInquiries({...props,onOpenThread:id=>opened.push(id)}); for(const effect of effects) if(effect?.pending) {const fn=effect.pending; delete effect.pending; effect.cleanup=fn();} }
+  return {calls,replies,opened,filter:compiledModule.exports.inquirySearchFilter, async settle() { for(let n=0;n<15;n++){if(dirty)render(); await Promise.resolve();} }, nodes() { function walk(n){return !n || typeof n!=='object'?[]:Array.isArray(n)?n.flatMap(walk):[n,...walk(n.props?.children)];} return walk(tree); } };
 }
 const row = { id:'test-id',contact_name:'Test organizer',contact_email:'test@example.test',contact_phone_e164:'+15555550123',instructor_name:'Test instructor',status:'timed_out',created_at:'2020-01-01T00:00:00Z',message:'Old inquiry',booking_outcome:'unknown',completion_status:'unknown' };
 const button=(h,label)=>h.nodes().find(n=>n.type==='button' && n.props.children===label);
