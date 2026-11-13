@@ -202,5 +202,33 @@ export const weeklyPosts: BlogPost[] = [
 </ul>
 <p>One instructor, one hour, and your event markets itself. <a href="/instructors/">Find one near you</a>.</p>
 `
+  }  ,
+  {
+    slug: "one-percent-of-weddings-line-dance",
+    title: "Nobody at Weddings Knows How to Dance. Let's Fix That.",
+    description: "About 2 million US weddings happen every year, and most guests just flail on the dance floor. If 1% of them added line dance instruction, millions of people would share a real moment together.",
+    publishDate: "2026-11-13",
+    status: "ready",
+    category: "Ideas",
+    body: `
+<p>I've been to so many weddings, and here's what I've noticed: no one knows how to dance.</p>
+<p>They all have DJs. They all have music. The DJ encourages everyone to get up and dance, and everyone does. Then they flail wildly. Some people are on time, and we commend them. It's applaudable. But at a 100-person or 200-person wedding, how many people would you actually say know how to dance? I'd wager pretty few.</p>
+<h2>The numbers</h2>
+<p>There were an estimated <a href="https://wedding.report/index.cfm/action/wedding_statistics/view/market/" target="_blank" rel="noopener">2,011,044 weddings in the US in 2025</a>, according to The Wedding Report. The average wedding had <a href="https://www.theknot.com/content/average-wedding-guest-list-size" target="_blank" rel="noopener">117 guests</a>, according to The Knot Real Weddings Study.</p>
+<h2>My vision: start with 1%</h2>
+<p>I'm not asking for every wedding. 1% of US weddings should have line dance instruction. That's it. Here's what that looks like, along with where I think it should go:</p>
+<ul>
+<li><strong>1% of weddings:</strong> about 20,000 weddings and 2.4 million guests</li>
+<li><strong>5% of weddings:</strong> about 100,000 weddings and 11.8 million guests</li>
+<li><strong>10% of weddings:</strong> about 200,000 weddings and 23.5 million guests</li>
+</ul>
+<p>Even at 1%, that's millions of people every year learning something together on the same dance floor.</p>
+<h2>Why line dancing</h2>
+<p>Teaching a line dance at a wedding gets everyone doing something together. People create memories, have an awesome experience, move to music, and learn something. It's a group activity, and it's easy and inclusive for all ages.</p>
+<p>You can get the kids' table up. You can get multiple generations on the same floor. You can get three generations of one family dancing at once. What other activity gives you that? None.</p>
+<h2>Why this matters</h2>
+<p>That's a significant number of people having a great time, making memories, and doing something together. I think that offers tremendous value, and it's what I'm working to make a reality with Hire Line Dancers.</p>
+<p>Planning a wedding? Be part of the first 1%. <a href="/events/weddings/">Find a wedding line dance instructor</a>.</p>
+`
   }
 ];
