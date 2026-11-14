@@ -99,13 +99,13 @@ export function matchingRequestConfirmationEmail(job: AdminInquiryNotificationJo
   ];
   const shownDetails = details.filter(([, value]) => value !== null && value !== undefined && value !== '');
   const closing = 'Questions or a tight timeline? Reply to this email and it comes straight to CJ.';
-  const signature = 'CJ, founder of Hire Line Dancers';
+  const signature = ['CJ', 'Founder, Hire Line Dancers'];
   return {
     to: [to],
     reply_to: MATCHING_REPLY_TO,
     subject: city ? `We're on it: finding your ${city} line dance instructor` : "We're on it: finding your line dance instructor",
-    text: [greeting, '', intro, '', ...steps.map(step => `- ${step}`), '', 'Your request:', ...shownDetails.map(([label, value]) => `${label}: ${String(value)}`), '', closing, '', signature].join('\n'),
-    html: `<!doctype html><html lang="en"><body style="font-family:Arial,sans-serif;line-height:1.55;color:#2a1e17"><p>${escapeHtml(greeting)}</p><p>${escapeHtml(intro)}</p><ul>${steps.map(step => `<li style="margin-bottom:6px">${escapeHtml(step)}</li>`).join('')}</ul><p style="margin-bottom:4px"><strong>Your request</strong></p><table>${shownDetails.map(([label, value]) => `<tr><th align="left" style="padding:3px 16px 3px 0">${escapeHtml(label)}</th><td>${escapeHtml(String(value))}</td></tr>`).join('')}</table><p>${escapeHtml(closing)}</p><p>${escapeHtml(signature)}</p></body></html>`,
+    text: [greeting, '', intro, '', ...steps.map(step => `- ${step}`), '', 'Your request:', ...shownDetails.map(([label, value]) => `${label}: ${String(value)}`), '', closing, '', ...signature].join('\n'),
+    html: `<!doctype html><html lang="en"><body style="font-family:Arial,sans-serif;line-height:1.55;color:#2a1e17"><p>${escapeHtml(greeting)}</p><p>${escapeHtml(intro)}</p><ul>${steps.map(step => `<li style="margin-bottom:6px">${escapeHtml(step)}</li>`).join('')}</ul><p style="margin-bottom:4px"><strong>Your request</strong></p><table>${shownDetails.map(([label, value]) => `<tr><th align="left" style="padding:3px 16px 3px 0">${escapeHtml(label)}</th><td>${escapeHtml(String(value))}</td></tr>`).join('')}</table><p>${escapeHtml(closing)}</p><p>${signature.map(escapeHtml).join('<br>')}</p></body></html>`,
   };
 }
 

@@ -73,6 +73,7 @@ Deno.test('matching requests also confirm to the requester, once per key', async
   assert(confirmation.subject === "We're on it: finding your Boise line dance instructor");
   assert(confirmation.text.startsWith('Hi Pat,') && confirmation.text.includes('Event type: Corporate events'));
   assert(!confirmation.text.includes('private note') && !confirmation.html.includes('<b>'));
+  assert(confirmation.text.endsWith('\n\nCJ\nFounder, Hire Line Dancers') && confirmation.html.includes('<p>CJ<br>Founder, Hire Line Dancers</p>'));
   assert(!/\u2014/.test(confirmation.text + confirmation.html));
   const sent: { to: string; key: string }[] = [];
   const fetcher = ((_url: unknown, init: RequestInit) => {
