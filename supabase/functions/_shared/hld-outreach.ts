@@ -135,21 +135,44 @@ export type SendInput = {
   inReplyTo?: string | null;
 };
 
+// Renders the plain-text body like an email typed in Gmail: full-width paragraphs, blank line between them.
+export function bodyToHtml(body: string): string {
+  const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const link = (t: string) => t.replace(/https?:\/\/[^\s<]+[^\s<.,;:!?)]/g, (u) => `<a href="${u}">${u}</a>`);
+  return `<div dir="ltr">${link(esc(body)).split("\n").map((line) => line ? `<div>${line}</div>` : "<div><br></div>").join("")}</div>`;
+}
+
 export async function gmailSend(input: SendInput): Promise<{ id: string; threadId: string }> {
   if (/[\r\n]/.test(input.to + input.subject + input.fromEmail + input.fromName)) {
     throw new GmailError("Header contains a line break", false);
   }
+  const boundary = `hld-${crypto.randomUUID()}`;
   const lines = [
     `From: ${encodeHeader(input.fromName)} <${input.fromEmail}>`,
     `To: ${input.to}`,
     `Subject: ${encodeHeader(input.subject)}`,
     "MIME-Version: 1.0",
-    "Content-Type: text/plain; charset=UTF-8",
-    "Content-Transfer-Encoding: base64",
+    `Content-Type: multipart/alternative; boundary="${boundary}"`,
   ];
   if (input.inReplyTo) lines.push(`In-Reply-To: ${input.inReplyTo}`, `References: ${input.inReplyTo}`);
-  const wrapped = b64(input.body).replace(/(.{76})/g, "$1\r\n");
-  const raw = b64url(`${lines.join("\r\n")}\r\n\r\n${wrapped}`);
+  const wrap = (text: string) => b64(text).replace(/(.{76})/g, "$1\r\n");
+  const mime = [
+    lines.join("\r\n"),
+    "",
+    `--${boundary}`,
+    "Content-Type: text/plain; charset=UTF-8",
+    "Content-Transfer-Encoding: base64",
+    "",
+    wrap(input.body),
+    `--${boundary}`,
+    "Content-Type: text/html; charset=UTF-8",
+    "Content-Transfer-Encoding: base64",
+    "",
+    wrap(bodyToHtml(input.body)),
+    `--${boundary}--`,
+    "",
+  ].join("\r\n");
+  const raw = b64url(mime);
   let response: Response;
   try {
     response = await gmail("messages/send", {
