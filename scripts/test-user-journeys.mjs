@@ -33,7 +33,7 @@ function harness(component = "inbox", props = {}, directoryProfiles = [profile])
   const calls = [], counts = [];
   let active, tree, dirty = true, nextTimer = 0;
   const navigations = [];
-  const location = new URL(component === "contact" ? "/contact/?instructor=instructor-one" : "/account/?tab=profile", "https://hirelinedancers.test");
+  const location = new URL(component === "contact" ? (props.contactPath ?? "/contact/?instructor=instructor-one") : "/account/?tab=profile", "https://hirelinedancers.test");
   location.assign = url => navigations.push(url);
   const window = { location, history: { replaceState: (_s, _t, url) => { location.href = new URL(url, location).href; } }, setTimeout: fn => { const id = ++nextTimer; timers.set(id, fn); return id; }, clearTimeout: id => timers.delete(id) };
   function query(table) {
@@ -51,7 +51,8 @@ function harness(component = "inbox", props = {}, directoryProfiles = [profile])
     if (plan) return plan(options?.body);
     return { data: { ok: true }, error: null };
   } };
-  const client = { from: query, functions, channel: () => channel, removeChannel: async () => {}, rpc: async (name, args) => {
+  const auth = { signInWithOAuth: async (options) => { calls.push({ name: "signInWithOAuth", args: options }); return { error: null }; } };
+  const client = { from: query, functions, auth, channel: () => channel, removeChannel: async () => {}, rpc: async (name, args) => {
     calls.push({ name, args });
     const plan = plans.get(name)?.shift();
     if (plan) return plan(args);
@@ -98,6 +99,7 @@ function harness(component = "inbox", props = {}, directoryProfiles = [profile])
       if (specifier === "@/lib/commercialTerms") return load("src/lib/commercialTerms.ts");
       if (specifier === "@/data/site") return load("src/data/site.ts");
       if (specifier === "@/lib/videoLinks") return load("src/lib/videoLinks.ts");
+      if (specifier === "@/lib/inquiryDraft") return load("src/lib/inquiryDraft.ts");
       if (specifier === "@/hooks/useMarketplaceSession") return { useMarketplaceSession: () => props.marketplaceSession ?? { session: null, account: null, isAdmin: false, loading: false } };
       if (specifier === "./ProfileEditor" || specifier === "./ProfileMediaManager" || specifier === "./InquiryRecommendations" || specifier === "./DirectoryCityField") return load(`src/components/${specifier.slice(2)}.tsx`);
       if (specifier.includes("commercial-terms.json")) return JSON.parse(readFileSync(new URL("config/commercial-terms.json", root), "utf8"));
@@ -137,7 +139,7 @@ function harness(component = "inbox", props = {}, directoryProfiles = [profile])
   const nodes = () => all(tree);
   const button = name => nodes().find(node => node.type === "button" && text(node) === name);
   const field = name => { const label = nodes().find(node => node.type === "label" && all(node).some(child => child.type === "span" && text(child).trim() === name)); return label?.props.htmlFor ? nodes().find(node => node.props?.id === label.props.htmlFor) : all(label).find(node => ["input", "textarea", "select"].includes(node.type)); };
-  return { render, nodes, button, field, counts, calls, navigations, text: () => text(tree), queue: (name, fn) => { if (!plans.has(name)) plans.set(name, []); plans.get(name).push(fn); }, choose: id => nodes().find(node => node.type === "button" && node.props.className?.includes("threadListItem") && text(node).includes(id === a ? "Conversation 1" : "Conversation 2")).props.onClick(), reply: () => nodes().find(node => node.type === "textarea" && node.props.placeholder === "Write a reply"), submit: () => nodes().find(node => node.type === "form" && node.props.className === "messageComposer").props.onSubmit(event()), flushTimers: async () => { const pending = [...timers.values()]; timers.clear(); pending.forEach(fn => fn()); await render(); } };
+  return { render, nodes, button, field, counts, calls, navigations, location, text: () => text(tree), queue: (name, fn) => { if (!plans.has(name)) plans.set(name, []); plans.get(name).push(fn); }, choose: id => nodes().find(node => node.type === "button" && node.props.className?.includes("threadListItem") && text(node).includes(id === a ? "Conversation 1" : "Conversation 2")).props.onClick(), reply: () => nodes().find(node => node.type === "textarea" && node.props.placeholder === "Write a reply"), submit: () => nodes().find(node => node.type === "form" && node.props.className === "messageComposer").props.onSubmit(event()), flushTimers: async () => { const pending = [...timers.values()]; timers.clear(); pending.forEach(fn => fn()); await render(); } };
 }
 
 for (const perspective of ["organizer", "instructor"]) {
@@ -415,56 +417,139 @@ test("Southern California launch markets match their own city and surrounding se
   }
 });
 
-test("an organizer without an account can send an inquiry with name and email", async () => {
+function memoryStorage() {
+  const items = new Map();
+  return { getItem: key => items.has(key) ? items.get(key) : null, setItem: (key, value) => items.set(key, String(value)), removeItem: key => items.delete(key), items };
+}
+async function fillGuestEvent(app) {
+  app.field("First name").props.onChange(event("Pat")); await app.render();
+  app.field("Last name").props.onChange(event("Guest")); await app.render();
+  app.field("Event date").props.onChange(event("2027-02-01")); await app.render();
+  app.field("City").props.onChange(event("Austin")); await app.render();
+  app.field("State").props.onChange(event("tx")); await app.render();
+}
+const submitForm = async (app, index = 0) => { await app.nodes().filter(node => node.type === "form")[index].props.onSubmit(event()); await app.render(); };
+
+test("anyone can fill in the inquiry form, and sending asks them to sign in without losing the details", async () => {
+  const app = harness("contact");
+  await app.render();
+  assert.ok(!app.text().includes("Sign in and continue"), "no sign-in wall before the form");
+  assert.equal(app.field("Email address"), undefined, "email is asked for at the sign-in step");
+  await fillGuestEvent(app);
+  await submitForm(app);
+  assert.ok(app.text().includes("One more step to send your inquiry"));
+  assert.ok(app.button("Continue with Google"), "Google sign-in offered");
+  assert.ok(app.field("Email address"), "email option offered");
+  assert.ok(app.text().includes("We'll email you when an instructor replies. Sign in with this email to read and respond."));
+  assert.ok(!app.calls.some(call => ["submit_inquiry", "guest-inquiry"].includes(call.name)), "nothing is sent yet");
+  app.button("Edit event details").props.onClick(); await app.render();
+  assert.equal(app.field("City").props.value, "Austin", "details kept");
+});
+
+test("the email option holds the inquiry and asks them to click the link", async () => {
   const app = harness("contact");
   await app.render();
   app.queue("guest-inquiry", async () => ({ data: { ok: true, held: true }, error: null }));
-  assert.ok(app.text().includes("We'll email you when an instructor replies. Sign in with this email to read and respond."));
-  app.field("First name").props.onChange(event("Pat")); await app.render();
-  app.field("Last name").props.onChange(event("Guest")); await app.render();
-  app.field("Email").props.onChange(event("pat@example.test")); await app.render();
-  app.field("Event date").props.onChange(event("2027-02-01")); await app.render();
-  app.field("City").props.onChange(event("Austin")); await app.render();
-  app.field("State").props.onChange(event("tx"));
-  await app.render();
-  await app.nodes().find(node => node.type === "form").props.onSubmit(event()); await app.render();
+  await fillGuestEvent(app);
+  await submitForm(app);
+  app.field("Email address").props.onChange(event("pat@example.test")); await app.render();
+  await submitForm(app);
   const sent = app.calls.find(call => call.name === "guest-inquiry");
   assert.ok(sent, "guest inquiries go through the guest-inquiry function");
   assert.equal(sent.args.email, "pat@example.test");
   assert.equal(sent.args.firstName, "Pat");
+  assert.equal(sent.args.lastName, "Guest");
   assert.equal(sent.args.instructorSlug, "instructor-one");
   assert.equal(sent.args.region, "TX");
   assert.equal(sent.args.website, "");
   assert.ok(!app.calls.some(call => call.name === "submit_inquiry"), "the signed-in path is not used");
-  assert.ok(app.text().includes("Check your email to confirm"));
-  assert.ok(app.text().includes("We sent a confirmation link to pat@example.test."));
-  assert.ok(!app.text().includes("has your event details"), "nothing claims the instructor has it before confirmation");
+  assert.ok(app.text().includes("Check your email to send it"));
+  assert.ok(app.text().includes("We sent a link to pat@example.test. Click it to send your inquiry to"));
+  assert.ok(!app.text().includes("has your event details"), "nothing claims the instructor has it before the click");
 });
 
-test("a guest inquiry that was not held is reported as an error", async () => {
-  const app = harness("contact");
-  await app.render();
-  app.queue("guest-inquiry", async () => ({ data: { ok: true }, error: null }));
-  app.field("First name").props.onChange(event("Pat")); await app.render();
-  app.field("Email").props.onChange(event("pat@example.test")); await app.render();
-  app.field("Event date").props.onChange(event("2027-02-01")); await app.render();
-  app.field("City").props.onChange(event("Austin")); await app.render();
-  app.field("State").props.onChange(event("tx")); await app.render();
-  await app.nodes().find(node => node.type === "form").props.onSubmit(event()); await app.render();
-  assert.ok(!app.text().includes("Check your email to confirm"));
-  assert.ok(app.text().includes("We could not send your inquiry. Please try again."));
-});
-
-test("a guest inquiry error is shown and the form stays filled", async () => {
+test("an email-option failure is shown and the details stay filled", async () => {
   const app = harness("contact");
   await app.render();
   app.queue("guest-inquiry", async () => ({ data: null, error: { message: "Edge Function returned a non-2xx status code", context: { json: async () => ({ error: "Too many requests. Please try again later" }) } } }));
-  app.field("First name").props.onChange(event("Pat")); await app.render();
-  app.field("Email").props.onChange(event("pat@example.test"));
-  await app.render();
-  await app.nodes().find(node => node.type === "form").props.onSubmit(event()); await app.render();
+  await fillGuestEvent(app);
+  await submitForm(app);
+  app.field("Email address").props.onChange(event("pat@example.test")); await app.render();
+  await submitForm(app);
   assert.ok(app.text().includes("Too many requests. Please try again later"));
-  assert.equal(app.field("First name").props.value, "Pat");
+  assert.equal(app.field("Email address").props.value, "pat@example.test");
+  app.queue("guest-inquiry", async () => ({ data: { ok: true }, error: null }));
+  await submitForm(app);
+  assert.ok(app.text().includes("We could not send your inquiry. Please try again."), "an unheld result is an error");
+});
+
+test("Continue with Google saves the draft and returns to this page to send it", async () => {
+  const session = memoryStorage();
+  globalThis.sessionStorage = session;
+  try {
+    const app = harness("contact");
+    await app.render();
+    await fillGuestEvent(app);
+    await submitForm(app);
+    await app.button("Continue with Google").props.onClick(); await app.render();
+    const oauth = app.calls.find(call => call.name === "signInWithOAuth");
+    assert.equal(oauth.args.provider, "google");
+    const next = new URL(new URL(oauth.args.options.redirectTo).searchParams.get("next"), "https://hirelinedancers.test");
+    assert.equal(next.pathname, "/contact/");
+    assert.equal(next.searchParams.get("instructor"), "instructor-one");
+    assert.equal(next.searchParams.get("send"), "1");
+    const saved = JSON.parse(session.getItem("hld-inquiry-draft:instructor-one"));
+    assert.equal(saved.form.city, "Austin");
+    assert.equal(saved.firstName, "Pat");
+    assert.ok(!app.calls.some(call => call.name === "submit_inquiry"), "nothing sent before sign-in");
+  } finally {
+    delete globalThis.sessionStorage;
+  }
+});
+
+test("returning from Google with no account sets up an organizer account and sends the draft exactly once", async () => {
+  const session = memoryStorage();
+  globalThis.sessionStorage = session;
+  try {
+    session.setItem("hld-inquiry-draft:instructor-one", JSON.stringify({ v: 1, instructor: "instructor-one", firstName: "Pat", lastName: "Guest", savedAt: Date.now(),
+      form: { eventType: "weddings", eventDate: "2027-02-01", startTime: "", venueName: "", city: "Austin", region: "TX", postalCode: "", guestCount: "", budget: "", musicRequests: "", venueHasSpeakers: "unknown", venueHasMicrophone: "unknown", message: "Hello" } }));
+    let refreshed = 0;
+    const marketplaceSession = { session: { user: { id: "account", user_metadata: { given_name: "Pat", family_name: "Google" } } }, account: { id: "account", role: null }, isAdmin: false, loading: false, refresh: async () => { refreshed += 1; } };
+    const app = harness("contact", { contactPath: "/contact/?instructor=instructor-one&send=1", marketplaceSession });
+    await app.render(); await app.render();
+    const onboarding = app.calls.find(call => call.name === "complete_account_onboarding_with_names");
+    assert.deepEqual(onboarding.args, { p_role: "organizer", p_first_name: "Pat", p_last_name: "Guest", p_company_name: null, p_invitation_token_hash: null });
+    assert.equal(refreshed, 1);
+    const sends = app.calls.filter(call => call.name === "submit_inquiry");
+    assert.equal(sends.length, 1, "sent once");
+    assert.equal(sends[0].args.p_event_city, "Austin");
+    assert.equal(sends[0].args.p_message, "Hello");
+    assert.equal(session.getItem("hld-inquiry-draft:instructor-one"), null, "draft cleared");
+    assert.equal(app.location.searchParams.get("send"), null, "return flag removed from the address");
+    await app.render(); await app.render();
+    assert.equal(app.calls.filter(call => call.name === "submit_inquiry").length, 1, "no second send on re-render");
+    const reload = harness("contact", { contactPath: "/contact/?instructor=instructor-one&send=1", marketplaceSession: { ...marketplaceSession, account: { id: "account", role: "organizer" } } });
+    await reload.render(); await reload.render();
+    assert.ok(!reload.calls.some(call => call.name === "submit_inquiry"), "a refresh after sending does not send again");
+  } finally {
+    delete globalThis.sessionStorage;
+  }
+});
+
+test("returning from Google as an instructor keeps the draft and sends nothing", async () => {
+  const session = memoryStorage();
+  globalThis.sessionStorage = session;
+  try {
+    session.setItem("hld-inquiry-draft:instructor-one", JSON.stringify({ v: 1, instructor: "instructor-one", firstName: "Pat", lastName: "Guest", savedAt: Date.now(),
+      form: { eventType: "weddings", eventDate: "2027-02-01", startTime: "", venueName: "", city: "Austin", region: "TX", postalCode: "", guestCount: "", budget: "", musicRequests: "", venueHasSpeakers: "unknown", venueHasMicrophone: "unknown", message: "" } }));
+    const app = harness("contact", { contactPath: "/contact/?instructor=instructor-one&send=1", marketplaceSession: { session: { user: { id: "account" } }, account: { id: "account", role: "instructor" }, isAdmin: false, loading: false, refresh: async () => {} } });
+    await app.render(); await app.render();
+    assert.ok(!app.calls.some(call => ["submit_inquiry", "complete_account_onboarding_with_names"].includes(call.name)));
+    assert.ok(app.text().includes("Planner account required"));
+    assert.ok(session.getItem("hld-inquiry-draft:instructor-one"), "draft kept");
+  } finally {
+    delete globalThis.sessionStorage;
+  }
 });
 
 test("signed-in organizers keep the existing inquiry flow", async () => {

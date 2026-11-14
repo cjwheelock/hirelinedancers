@@ -272,6 +272,28 @@ select public.enqueue_due_inquiry_response_actions();
 reset role;
 select pg_temp.messaging_assert((select count(*)=1 from public.admin_inquiry_notification_jobs where inquiry_id=:'lonely_inquiry' and alert_kind='sharing_no_matches'),
  'one owner alert when nobody else could be invited');
+-- Selected instructor times out and nobody else matches: the organizer's timeout
+-- email carries the network message right away, so no second still-looking email.
+select pg_temp.messaging_set_request('31000000-0000-0000-0000-000000000010','cx-organizer@example.test','authenticated');
+set local role authenticated;
+select public.submit_inquiry('32000000-0000-0000-0000-000000000020','weddings',current_date+48,'18:00','America/Chicago',
+ 'Cx Hall','Austin','TX','78701',90,null,null,true,true,'Fourth event',null,true) as quiet_inquiry \gset
+select public.get_inquiry_primary_thread(:'quiet_inquiry') as quiet_source \gset
+reset role;
+update public.inquiry_threads set response_clock_started_at=now()-interval '49 hours', response_due_at=now()-interval '1 minute' where id=:'quiet_source';
+select pg_temp.messaging_set_request(null,null,'service_role');
+select public.enqueue_due_inquiry_response_actions();
+reset role;
+select pg_temp.messaging_assert((select status='timed_out' from public.inquiry_threads where id=:'quiet_source'),'selected instructor timed out');
+select pg_temp.messaging_assert((select count(*)=1 from public.admin_inquiry_notification_jobs where inquiry_id=:'quiet_inquiry' and alert_kind='sharing_no_matches'),
+ 'owner alerted when the timeout finds nobody to invite');
+update public.inquiries set automatic_sharing_started_at=now()-interval '49 hours' where id=:'quiet_inquiry';
+select pg_temp.messaging_assert(not private.inquiry_still_looking_due(:'quiet_inquiry'),'no second still-looking after a no-match timeout');
+select pg_temp.messaging_set_request(null,null,'service_role');
+select public.enqueue_due_inquiry_response_actions();
+reset role;
+select pg_temp.messaging_assert(not exists(select 1 from public.inquiry_thread_notification_jobs where dedupe_key='inquiry:'||:'quiet_inquiry'||':still-looking'),
+ 'organizer gets exactly one network message after a no-match timeout');
 update public.instructor_service_markets set accepting_inquiries=true
  where instructor_profile_id in ('32000000-0000-0000-0000-000000000021','32000000-0000-0000-0000-000000000022');
 

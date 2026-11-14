@@ -41,6 +41,11 @@ create or replace function private.inquiry_still_looking_due(p_inquiry_id uuid)
 returns boolean language sql stable security definer set search_path='' as $$
  select private.inquiry_sharing_unanswered(i.id)
    and i.automatic_sharing_started_at <= now() - interval '48 hours'
+   -- When the selected instructor timed out and nobody could be invited, the
+   -- organizer's timeout email already carried the network message.
+   and (exists(select 1 from public.inquiry_threads f where f.inquiry_id=i.id and f.assignment_source='fallback')
+     or not exists(select 1 from public.inquiry_threads s where s.inquiry_id=i.id
+       and s.assignment_source<>'fallback' and s.status='timed_out'))
  from public.inquiries i where i.id=p_inquiry_id;
 $$;
 

@@ -31,7 +31,7 @@ Deno.test("legacy static-support jobs use the admin messages inbox", () => {
   );
 });
 
-import { DECLINE_NOTICE_BODY, DECLINE_NOTICE_SUBJECT, recommendationUrl, threadActionLabel, threadActionUrl, threadNotificationContent, threadNotificationHtml, threadNotificationSms, threadNotificationSubject, threadNotificationText, type ThreadNotificationJob } from "./index.ts";
+import { DECLINE_NOTICE_BODY, DECLINE_NOTICE_SUBJECT, STILL_LOOKING_BODY, STILL_LOOKING_SUBJECT, recommendationUrl, threadActionLabel, threadActionUrl, threadNotificationContent, threadNotificationHtml, threadNotificationSms, threadNotificationSubject, threadNotificationText, type ThreadNotificationJob } from "./index.ts";
 const notification = (type: ThreadNotificationJob["notification_type"], version = 2): ThreadNotificationJob => ({
   job_id: 1, notification_type: type, channel: "email", response_policy_version: version,
   delivered_to_phone_e164: null, inquiry_recipient_id: null, attempt_number: 1, recipient_account_id: "account",
@@ -121,14 +121,22 @@ Deno.test("greetings prefer an explicit compound first name over public branding
   assertEquals(threadNotificationContent(job).recipientName!, "Mary Jane");
 });
 
-Deno.test("automatic sharing notices confirm invitations without guaranteeing availability", () => {
+Deno.test("automatic timeout notice never blames the instructor and only mentions other instructors when some were invited", () => {
   const job = notification("response_timeout_organizer");
   job.opportunity = { automatic: true, invited_count: 4 };
   const content = threadNotificationContent(job);
-  assert(content.description.includes("invited other matching instructors"), "invitations explained");
+  assertEquals(content.description, "That instructor may not be available. We're contacting other instructors to find you someone for your event.");
+  assertEquals(threadNotificationSubject(job), "An update on your event inquiry");
   assert(content.instruction!.includes("choose who to book"), "organizer controls choice");
+  const invitedText = threadNotificationText(job, "https://hirelinedancers.com/account/");
+  assert(!invitedText.includes("has not responded") && !invitedText.includes("may be busy"), "no blame");
   job.opportunity.invited_count = 0;
-  assert(threadNotificationContent(job).description.includes("could not find"), "zero matches do not imply invitations");
+  const lonely = threadNotificationContent(job);
+  assertEquals(lonely.description, STILL_LOOKING_BODY);
+  assertEquals(threadNotificationSubject(job), STILL_LOOKING_SUBJECT);
+  assert(!threadNotificationText(job, "https://hirelinedancers.com/account/").includes("contacting other instructors"), "no false claim of invitations");
+  const html = threadNotificationHtml(job, "https://hirelinedancers.com/account/");
+  assert(html.includes("Open conversation") && !html.includes("Please reply on Hire Line Dancers"), "no reply request to the organizer");
 });
 Deno.test("unavailable notices use the warm approved wording and never blame the instructor", () => {
   for (const job of [notification("thread_declined"), notification("thread_declined", 1), { ...notification("thread_declined"), opportunity: { automatic: true, invited_count: 2 } }]) {
@@ -142,7 +150,7 @@ Deno.test("unavailable notices use the warm approved wording and never blame the
 });
 Deno.test("still-looking notice is one calm update without a reply request", () => {
   const job = notification("still_looking_organizer");
-  assertEquals(threadNotificationContent(job).description, "We're still looking for an instructor for your event. Our team is reaching out personally and will be in touch soon.");
+  assertEquals(threadNotificationContent(job).description, "We're reaching out to our network separately, because finding you someone for this event is really important to us. We'll be in touch soon.");
   const html = threadNotificationHtml(job, "https://hirelinedancers.com/account/");
   assert(html.includes("Open conversation") && !html.includes("Please reply on Hire Line Dancers"), "no reply request");
 });

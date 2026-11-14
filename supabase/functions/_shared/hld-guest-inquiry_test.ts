@@ -54,10 +54,10 @@ Deno.test("the confirmation link keeps the token out of the server request", () 
 });
 Deno.test("the confirmation email names the instructor, the expiry, and is safe HTML", () => {
   const email = guestConfirmationEmail({ to: "pat@example.test", firstName: "Pat", instructorName: "Tara <B>", link: "https://hirelinedancers.com/confirm-inquiry/#token=abc" });
-  assert(email.subject === "Confirm your inquiry to Tara <B>", email.subject);
-  assert(email.text.includes("Nothing is sent until you confirm. This link expires in 7 days."), "explains the hold");
-  assert(email.text.includes("Confirm and send inquiry: https://hirelinedancers.com/confirm-inquiry/#token=abc"), "plain-text link");
+  assert(email.subject === "One click to send your inquiry to Tara <B>", email.subject);
+  assert(email.text.includes("Your inquiry to Tara <B> has not been sent yet. Click the button below to send it. This link expires in 7 days."), "explains it is not sent yet");
+  assert(email.text.includes("Send my inquiry: https://hirelinedancers.com/confirm-inquiry/#token=abc"), "plain-text link");
   assert(email.html.includes("Tara &lt;B&gt;") && !email.html.includes("<B>"), "escaped");
   assert(!email.text.includes("—") && !email.html.includes("—"), "no em dashes");
-  assert(guestConfirmationEmail({ to: "p@e.test", firstName: "P", instructorName: null, link: "x" }).subject === "Confirm your inquiry to the instructor", "fallback name");
+  assert(guestConfirmationEmail({ to: "p@e.test", firstName: "P", instructorName: null, link: "x" }).subject === "One click to send your inquiry to the instructor", "fallback name");
 });

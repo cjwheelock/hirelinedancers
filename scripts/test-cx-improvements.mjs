@@ -24,7 +24,8 @@ test("the Unavailable dialog previews exactly the email the organizer receives",
 
 test("the still-looking email uses the approved wording", () => {
   const worker = read("supabase/functions/process-inquiry-notifications/index.ts");
-  assert.equal(constant(worker, "STILL_LOOKING_BODY"), "We're still looking for an instructor for your event. Our team is reaching out personally and will be in touch soon.");
+  assert.equal(constant(worker, "STILL_LOOKING_BODY"), "We're reaching out to our network separately, because finding you someone for this event is really important to us. We'll be in touch soon.");
+  assert.equal(constant(worker, "TIMEOUT_NOTICE_BODY"), "That instructor may not be available. We're contacting other instructors to find you someone for your event.");
 });
 
 test("the inquiry form no longer promises to share organizer contact details", () => {
@@ -51,9 +52,15 @@ test("reviews appear on public profiles and in paid conversations", () => {
 
 test("guest inquiries wait for email confirmation before reaching an instructor", () => {
   const form = read("src/components/ContactInstructor.tsx");
-  assert.match(form, /Check your email to confirm/);
-  assert.match(form, /Your inquiry goes to \{profile\?\.display_name \|\| "the instructor"\} after you confirm\./);
+  assert.match(form, /Check your email to send it/);
+  assert.match(form, /Nothing is sent until you do\./);
   assert.match(form, /!data\?\.held/);
+  assert.match(form, /One more step to send your inquiry/);
+  assert.match(form, /Continue with Google/);
+  assert.doesNotMatch(form, /Sign in and continue/, "no sign-in wall before the form");
+  const email = read("supabase/functions/_shared/hld-guest-inquiry.ts");
+  assert.match(email, /subject: `One click to send your inquiry to \$\{instructor\}`/);
+  assert.match(email, /has not been sent yet/);
   const fn = read("supabase/functions/guest-inquiry/index.ts");
   assert.match(fn, /hold_guest_inquiry/);
   assert.match(fn, /confirm_guest_inquiry/);
@@ -80,7 +87,8 @@ test("still looking waits 48 hours and owner alerts go to CJ", () => {
   const dueStart = migration.indexOf("function private.inquiry_still_looking_due");
   const due = migration.slice(dueStart, migration.indexOf("$$;", dueStart));
   assert.match(due, /automatic_sharing_started_at <= now\(\) - interval '48 hours'/);
-  assert.doesNotMatch(due, /\bor\b/);
+  assert.doesNotMatch(due, /inquiry_all_invited_declined/, "no early send when everyone declines");
+  assert.match(due, /s\.status='timed_out'/, "no second network message after a no-match timeout");
   assert.match(migration, /'sharing_all_declined'/);
   assert.match(migration, /'sharing_no_response'/);
   assert.match(read("supabase/functions/_shared/hld-admin-inquiry-email.ts"), /DEFAULT_OWNER_ALERT_EMAIL = 'cjwheelock1@gmail\.com'/);

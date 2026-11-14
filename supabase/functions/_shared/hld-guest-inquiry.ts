@@ -155,12 +155,12 @@ export function confirmationLink(appUrl: URL, token: string): string {
 export function guestConfirmationEmail(input: { to: string; firstName: string; instructorName: string | null; link: string }) {
   const instructor = input.instructorName?.trim() || "the instructor";
   const greeting = `Hi ${input.firstName},`;
-  const body = `Please confirm your email address to send your event inquiry to ${instructor}. Nothing is sent until you confirm. This link expires in 7 days.`;
+  const body = `Your inquiry to ${instructor} has not been sent yet. Click the button below to send it. This link expires in 7 days.`;
   const ignore = "If you did not request this, you can ignore this email.";
-  const button = "Confirm and send inquiry";
+  const button = "Send my inquiry";
   return {
     to: [input.to],
-    subject: `Confirm your inquiry to ${instructor}`,
+    subject: `One click to send your inquiry to ${instructor}`,
     text: [greeting, "", body, "", `${button}: ${input.link}`, "", ignore].join("\n"),
     html: `<!doctype html><html lang="en"><body style="margin:0;background:#f6eee2;font-family:Arial,sans-serif;color:#2a1e17;line-height:1.55"><div style="max-width:560px;margin:0 auto;padding:32px 20px"><div style="background:#ffffff;border:1px solid #eadfd0;border-radius:18px;padding:28px"><p style="margin:0 0 14px">${escapeHtml(greeting)}</p><p style="margin:0 0 22px">${escapeHtml(body)}</p><p style="margin:0 0 22px"><a href="${escapeHtml(input.link)}" style="display:inline-block;padding:14px 22px;background:#e9a94b;border-radius:12px;color:#2a1e17;font-weight:bold;text-decoration:none">${escapeHtml(button)}</a></p><p style="margin:0;color:#5a4a3e;font-size:14px">${escapeHtml(ignore)}</p></div></div></body></html>`,
   };

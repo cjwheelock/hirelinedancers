@@ -4,9 +4,11 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { eventTypes, instructors } from "@/data/site";
 import { useMarketplaceSession } from "@/hooks/useMarketplaceSession";
-import { getMarketplaceClient, signInUrl, readableError, type InstructorProfile } from "@/lib/marketplace";
+import { callbackUrl, getMarketplaceClient, readableError, type InstructorProfile } from "@/lib/marketplace";
+import { clearInquiryDraft, readInquiryDraft, saveInquiryDraft, type InquiryDraftForm } from "@/lib/inquiryDraft";
 import styles from "./Marketplace.module.css";
 import contactStyles from "./ContactInstructor.module.css";
+import loginStyles from "./LoginScreen.module.css";
 
 export const GUEST_INQUIRY_NOTE = "We'll email you when an instructor replies. Sign in with this email to read and respond.";
 const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() || "";
@@ -74,19 +76,24 @@ type ContactProfile = Pick<InstructorProfile, "id" | "slug" | "display_name" | "
   isStaticListing: boolean;
 };
 
+/** Query parameter that marks the return from Google sign-in with a saved draft. */
+export const SEND_AFTER_SIGN_IN_PARAM = "send";
+
 export function ContactInstructor() {
-  const { session, account, isAdmin, loading: authLoading } = useMarketplaceSession();
+  const { session, account, isAdmin, loading: authLoading, refresh } = useMarketplaceSession();
   const [profile, setProfile] = useState<ContactProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [successId, setSuccessId] = useState<string | null>(null);
   const [successThreadId, setSuccessThreadId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [guestSent, setGuestSent] = useState(false);
+  const [step, setStep] = useState<"form" | "signin" | "emailSent">("form");
+  const [resuming, setResuming] = useState(false);
+  const resumeStarted = useRef(false);
   const [guest, setGuest] = useState({ firstName: "", lastName: "", email: "", website: "" });
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [turnstileReset, setTurnstileReset] = useState(0);
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<InquiryDraftForm>({
     eventType: "corporate-events",
     eventDate: "",
     startTime: "",
@@ -155,11 +162,125 @@ export function ContactInstructor() {
     return null;
   }
 
-  function budgetText() {
-    return form.budget === "" ? null : Number(form.budget).toLocaleString("en-US", { style: "currency", currency: "USD" });
+  function budgetText(budget: string) {
+    return budget === "" ? null : Number(budget).toLocaleString("en-US", { style: "currency", currency: "USD" });
   }
 
-  async function submitGuest() {
+  function instructorKey() {
+    return profile?.slug || profile?.id || "";
+  }
+
+  async function sendSignedIn(values: InquiryDraftForm) {
+    const client = getMarketplaceClient();
+    if (!client || !profile) return;
+    setBusy(true);
+    setError(null);
+    setSuccessId(null);
+    setSuccessThreadId(null);
+    try {
+      const { data, error: submitError } = await client.rpc("submit_inquiry", {
+        p_instructor_profile_id: profile.id || null,
+        p_instructor_slug: profile.slug,
+        p_event_type: values.eventType,
+        p_event_date: values.eventDate,
+        p_event_start_time: values.startTime || null,
+        p_time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        p_venue_name: values.venueName || null,
+        p_event_city: values.city || null,
+        p_event_region: values.region || null,
+        p_event_postal_code: values.postalCode || null,
+        p_guest_count: values.guestCount ? Number(values.guestCount) : null,
+        p_budget_range: budgetText(values.budget),
+        p_music_requests: values.musicRequests || null,
+        p_venue_has_speakers: booleanOrNull(values.venueHasSpeakers),
+        p_venue_has_microphone: booleanOrNull(values.venueHasMicrophone),
+        p_message: values.message || null,
+        p_fallback_consent: true
+      });
+      if (submitError) throw submitError;
+      const inquiryId = String(data);
+      setSuccessId(inquiryId);
+      const { data: threadId } = await client.rpc("get_inquiry_primary_thread", {
+        p_inquiry_id: inquiryId
+      });
+      if (typeof threadId === "string") setSuccessThreadId(threadId);
+    } catch (submitError) {
+      setError(readableError(submitError));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Back from Google sign-in: send the saved draft once, then forget it.
+  useEffect(() => {
+    if (authLoading || profileLoading || !profile || !session || resumeStarted.current) return;
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has(SEND_AFTER_SIGN_IN_PARAM)) return;
+    resumeStarted.current = true;
+    url.searchParams.delete(SEND_AFTER_SIGN_IN_PARAM);
+    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+    const key = profile.slug || profile.id || "";
+    const draft = readInquiryDraft(key);
+    if (!draft) return;
+    setForm(draft.form);
+    setGuest((current) => ({ ...current, firstName: draft.firstName, lastName: draft.lastName }));
+    // Instructor accounts cannot send inquiries; keep the draft and show the usual message.
+    if (account?.role && account.role !== "organizer" && !isAdmin) return;
+    // Clear before sending so a refresh can never send twice.
+    clearInquiryDraft(key);
+    void (async () => {
+      setResuming(true);
+      try {
+        if (!account?.role && !isAdmin) {
+          const client = getMarketplaceClient();
+          if (!client) return;
+          const metadata = session.user.user_metadata ?? {};
+          const firstName = draft.firstName.trim() || String(metadata.given_name ?? "").trim();
+          const lastName = draft.lastName.trim() || String(metadata.family_name ?? "").trim();
+          const { error: onboardingError } = await client.rpc("complete_account_onboarding_with_names", {
+            p_role: "organizer",
+            p_first_name: firstName,
+            p_last_name: lastName,
+            p_company_name: null,
+            p_invitation_token_hash: null
+          });
+          if (onboardingError) throw onboardingError;
+          await refresh();
+        }
+        await sendSignedIn(draft.form);
+      } catch (resumeError) {
+        setError(readableError(resumeError));
+      } finally {
+        setResuming(false);
+      }
+    })();
+    // Runs once per page load when the session and profile are ready.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, profileLoading, profile, session, account?.role, isAdmin]);
+
+  async function continueWithGoogle() {
+    const client = getMarketplaceClient();
+    if (!client || !profile) return;
+    setError(null);
+    saveInquiryDraft({ v: 1, instructor: instructorKey(), form, firstName: guest.firstName, lastName: guest.lastName, savedAt: Date.now() });
+    const back = new URL(window.location.href);
+    back.searchParams.set(SEND_AFTER_SIGN_IN_PARAM, "1");
+    setBusy(true);
+    const { error: authError } = await client.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: callbackUrl(`${back.pathname}${back.search}`),
+        queryParams: { prompt: "select_account" }
+      }
+    });
+    if (authError) {
+      setError(readableError(authError));
+      setBusy(false);
+    }
+  }
+
+  async function submitGuest(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     const client = getMarketplaceClient();
     if (!client || !profile) return;
     if (turnstileSiteKey && !turnstileToken) {
@@ -187,7 +308,7 @@ export function ContactInstructor() {
           region: form.region || null,
           postalCode: form.postalCode || null,
           guestCount: form.guestCount ? Number(form.guestCount) : null,
-          budgetRange: budgetText(),
+          budgetRange: budgetText(form.budget),
           musicRequests: form.musicRequests || null,
           venueHasSpeakers: booleanOrNull(form.venueHasSpeakers),
           venueHasMicrophone: booleanOrNull(form.venueHasMicrophone),
@@ -196,7 +317,7 @@ export function ContactInstructor() {
       });
       if (invokeError) throw invokeError;
       if (!data?.ok || !data?.held) throw new Error("We could not send your inquiry. Please try again.");
-      setGuestSent(true);
+      setStep("emailSent");
     } catch (submitError) {
       setError(await functionErrorMessage(submitError));
       setTurnstileToken(null);
@@ -209,58 +330,24 @@ export function ContactInstructor() {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!session) {
-      await submitGuest();
+      // The browser already checked the required fields. Ask how to sign in next.
+      setError(null);
+      setStep("signin");
+      if (typeof window.scrollTo === "function") window.scrollTo({ top: 0 });
       return;
     }
-    const client = getMarketplaceClient();
-    if (!client || !profile) return;
-    setBusy(true);
-    setError(null);
-    setSuccessId(null);
-    setSuccessThreadId(null);
-
-    try {
-      const { data, error: submitError } = await client.rpc("submit_inquiry", {
-        p_instructor_profile_id: profile.id || null,
-        p_instructor_slug: profile.slug,
-        p_event_type: form.eventType,
-        p_event_date: form.eventDate,
-        p_event_start_time: form.startTime || null,
-        p_time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        p_venue_name: form.venueName || null,
-        p_event_city: form.city || null,
-        p_event_region: form.region || null,
-        p_event_postal_code: form.postalCode || null,
-        p_guest_count: form.guestCount ? Number(form.guestCount) : null,
-        p_budget_range: budgetText(),
-        p_music_requests: form.musicRequests || null,
-        p_venue_has_speakers: booleanOrNull(form.venueHasSpeakers),
-        p_venue_has_microphone: booleanOrNull(form.venueHasMicrophone),
-        p_message: form.message || null,
-        p_fallback_consent: true
-      });
-      if (submitError) throw submitError;
-      const inquiryId = String(data);
-      setSuccessId(inquiryId);
-      const { data: threadId } = await client.rpc("get_inquiry_primary_thread", {
-        p_inquiry_id: inquiryId
-      });
-      if (typeof threadId === "string") setSuccessThreadId(threadId);
-    } catch (submitError) {
-      setError(readableError(submitError));
-    } finally {
-      setBusy(false);
-    }
+    await sendSignedIn(form);
   }
 
   if (authLoading || profileLoading) return <div className={styles.loading}>Preparing your inquiry...</div>;
+  if (resuming) return <div className={styles.loading}>Sending inquiry...</div>;
 
-  if (!session && guestSent) {
+  if (!session && step === "emailSent") {
     return (
       <section className={`${styles.shell} ${styles.narrow}`}>
         <p className={styles.eyebrow}>Almost done</p>
-        <h1 className={styles.title}>Check your email to confirm</h1>
-        <p className={styles.success}>We sent a confirmation link to {guest.email.trim()}. Your inquiry goes to {profile?.display_name || "the instructor"} after you confirm.</p>
+        <h1 className={styles.title}>Check your email to send it</h1>
+        <p className={styles.success}>We sent a link to {guest.email.trim()}. Click it to send your inquiry to {profile?.display_name || "the instructor"}. Nothing is sent until you do.</p>
         <p className={styles.subtitle}>{GUEST_INQUIRY_NOTE}</p>
         <div className={styles.buttonRow} style={{ marginTop: 26 }}>
           <Link className={styles.secondaryButton} href="/instructors/">Browse more instructors</Link>
@@ -319,6 +406,36 @@ export function ContactInstructor() {
     );
   }
 
+  if (!session && step === "signin") {
+    const name = profile?.display_name || "the instructor";
+    return (
+      <section className={`${styles.shell} ${styles.narrow}`}>
+        <p className={styles.eyebrow}>Contact {profile?.display_name}</p>
+        <h1 className={styles.title}>One more step to send your inquiry</h1>
+        <p className={styles.subtitle}>Sign in so {name} can reply to you. Your event details are saved.</p>
+        <div className={`${styles.card} ${loginStyles.card}`}>
+          <button className={loginStyles.googleButton} type="button" disabled={busy} onClick={() => void continueWithGoogle()}>
+            {busy ? "Connecting to Google..." : "Continue with Google"}
+          </button>
+          <div className={loginStyles.divider}>or use your email</div>
+          <form className={loginStyles.stack} onSubmit={submitGuest}>
+            <label className={loginStyles.field}>
+              <span>Email address</span>
+              <input required type="email" autoComplete="email" maxLength={254} placeholder="you@company.com" value={guest.email} onChange={(e) => setGuest({ ...guest, email: e.target.value })} />
+            </label>
+            <TurnstileWidget onToken={setTurnstileToken} resetKey={turnstileReset} />
+            <button className={loginStyles.button} type="submit" disabled={busy}>{busy ? "Sending link..." : "Email me a link to send it"}</button>
+          </form>
+          {error ? <p className={loginStyles.error} role="alert">{error}</p> : null}
+          <p className={loginStyles.help}>{GUEST_INQUIRY_NOTE}</p>
+        </div>
+        <div className={styles.buttonRow} style={{ marginTop: 18 }}>
+          <button className={styles.quietLink} type="button" disabled={busy} onClick={() => { setError(null); setStep("form"); }}>Edit event details</button>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className={`${styles.shell} ${styles.narrow}`}>
       <p className={styles.eyebrow}>Contact {profile?.display_name}</p>
@@ -334,14 +451,9 @@ export function ContactInstructor() {
               </label>
               <label className={styles.field}>
                 <span>Last name</span>
-                <input autoComplete="family-name" maxLength={80} value={guest.lastName} onChange={(e) => setGuest({ ...guest, lastName: e.target.value })} />
+                <input required autoComplete="family-name" maxLength={80} value={guest.lastName} onChange={(e) => setGuest({ ...guest, lastName: e.target.value })} />
               </label>
             </div>
-            <label className={styles.field}>
-              <span>Email</span>
-              <input required type="email" autoComplete="email" maxLength={254} value={guest.email} onChange={(e) => setGuest({ ...guest, email: e.target.value })} />
-            </label>
-            <p className={styles.help}>{GUEST_INQUIRY_NOTE} <a href={signInUrl(`${window.location.pathname}${window.location.search}`, "organizer")}>Sign in and continue</a></p>
             <label className={styles.honeypot} aria-hidden="true">
               <span>Website</span>
               <input tabIndex={-1} autoComplete="off" value={guest.website} onChange={(e) => setGuest({ ...guest, website: e.target.value })} />
@@ -421,7 +533,6 @@ export function ContactInstructor() {
         </label>
         <p className={styles.help}>Your inquiry goes to this instructor first. If they do not respond within 48 hours or mark themselves unavailable, we will share your full event details with other matching instructors. Your email and phone number stay private until you book. Your private conversations are not shared. You choose who to book.</p>
         <p className={styles.help}>Messages are handled through Hire Line Dancers. Authorized administrators can view them to support the inquiry.</p>
-        {!session ? <TurnstileWidget onToken={setTurnstileToken} resetKey={turnstileReset} /> : null}
         {error ? <p className={styles.error}>{error}</p> : null}
         <button className={styles.button} disabled={busy} type="submit">{busy ? "Sending inquiry..." : "Send inquiry"}</button>
       </form>

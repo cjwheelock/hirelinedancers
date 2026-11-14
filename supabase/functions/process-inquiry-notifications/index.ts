@@ -231,17 +231,28 @@ export type ThreadNotificationJob = {
 export const DECLINE_NOTICE_SUBJECT = "An update on your event inquiry";
 export const DECLINE_NOTICE_BODY = "Unfortunately, the instructor you reached out to isn't available for your event. We're working hard to find you someone else, and we'll let you know.";
 export const STILL_LOOKING_SUBJECT = "We're still looking for your instructor";
-export const STILL_LOOKING_BODY = "We're still looking for an instructor for your event. Our team is reaching out personally and will be in touch soon.";
+export const STILL_LOOKING_BODY = "We're reaching out to our network separately, because finding you someone for this event is really important to us. We'll be in touch soon.";
+// The selected instructor did not reply within 48 hours and other instructors were invited.
+export const TIMEOUT_NOTICE_SUBJECT = "An update on your event inquiry";
+export const TIMEOUT_NOTICE_BODY = "That instructor may not be available. We're contacting other instructors to find you someone for your event.";
+
+/** Organizer timeout email for automatic sharing: never blames the instructor, and never
+ * claims other instructors were contacted when nobody could be invited. */
+function automaticTimeoutInvited(job: ThreadNotificationJob): boolean {
+  return (job.opportunity?.invited_count ?? 0) > 0;
+}
 
 export function threadActionLabel(job: ThreadNotificationJob, format: "text" | "html"): string {
   if (job.notification_type === "review_request") return "Leave a review";
-  if (job.response_policy_version === 1 || job.notification_type === "booking_update" || job.notification_type === "still_looking_organizer") {
+  if (job.response_policy_version === 1 || job.notification_type === "booking_update" || job.notification_type === "still_looking_organizer"
+    || (job.notification_type === "response_timeout_organizer" && job.opportunity?.automatic)) {
     return format === "text" ? "Open the conversation" : "Open conversation";
   }
   return format === "text" ? "Read and reply on Hire Line Dancers" : "Read and reply";
 }
 
 function threadAsksForReply(job: ThreadNotificationJob): boolean {
+  if (job.notification_type === "response_timeout_organizer" && job.opportunity?.automatic) return false;
   return job.response_policy_version !== 1 && !["booking_update", "still_looking_organizer", "review_request"].includes(job.notification_type);
 }
 
@@ -612,6 +623,7 @@ export function threadNotificationSubject(job: ThreadNotificationJob): string {
     case "response_timeout_instructor":
       return "Your inquiry response window has ended";
     case "response_timeout_organizer":
+      if (job.opportunity?.automatic) return automaticTimeoutInvited(job) ? TIMEOUT_NOTICE_SUBJECT : STILL_LOOKING_SUBJECT;
       return `${job.instructor_name} has not responded`;
     case "thread_declined":
       return DECLINE_NOTICE_SUBJECT;
@@ -641,11 +653,16 @@ export function threadNotificationContent(job: ThreadNotificationJob): {
       description: DECLINE_NOTICE_BODY,
       instruction: invited ? "You can compare profiles and responses and choose who to book. Your existing conversation remains available." : null,
     };
-    if (job.notification_type === "response_timeout_organizer") return {
+    if (job.notification_type === "response_timeout_organizer") return invited ? {
       recipientName: greetingFirstName(job.organizer_name, job.recipient_first_name),
-      heading: `${job.instructor_name} has not responded`,
-      description: invited ? "We have invited other matching instructors to respond to your event." : "We could not find other matching instructors to invite. Your request has been flagged for our team.",
+      heading: TIMEOUT_NOTICE_SUBJECT,
+      description: TIMEOUT_NOTICE_BODY,
       instruction: "You can compare profiles and responses and choose who to book. Your existing conversation remains available.",
+    } : {
+      recipientName: greetingFirstName(job.organizer_name, job.recipient_first_name),
+      heading: STILL_LOOKING_SUBJECT,
+      description: STILL_LOOKING_BODY,
+      instruction: null,
     };
     if (job.notification_type === "new_thread") return { recipientName: greetingFirstName(job.instructor_name, job.recipient_first_name), heading: "You have a new event opportunity", description: `${job.organizer_name} is looking for an instructor. Their event details and contact information are below.`, instruction: "Open the event and mark yourself available or unavailable. The organizer chooses who to book. Please respond within 48 hours." };
     if (job.notification_type === "response_reminder_47") return { recipientName: greetingFirstName(job.instructor_name, job.recipient_first_name), heading: "One hour left to respond", description: "This inquiry has been waiting for 47 hours.", instruction: "Reply or mark yourself unavailable. After 48 hours without a response, we invite other matching instructors. You can still reply while the event is open." };
