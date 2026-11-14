@@ -168,7 +168,7 @@ async function researchStep(db: Db, log: string[]): Promise<void> {
 }
 
 async function sendStep(db: Db, cfg: Config, log: string[]): Promise<void> {
-  const { data: claimed, error } = await db.rpc("outreach_claim_batch", { p_limit: 3 });
+  const { data: claimed, error } = await db.rpc("outreach_claim_batch", { p_limit: 10 });
   if (error) throw error;
   if (!claimed?.length) return;
   const [{ data: templates }, { data: markets }, { data: serviceMarkets }] = await Promise.all([
@@ -229,7 +229,7 @@ async function sendStep(db: Db, cfg: Config, log: string[]): Promise<void> {
       log.push(`send error lead ${lead.id}: ${err.message}`);
       if (/sign-in failed/.test(err.message)) break;
     }
-    await new Promise((r) => setTimeout(r, 4000));
+    await new Promise((r) => setTimeout(r, 3000));
   }
 }
 
@@ -261,6 +261,16 @@ export default {
       const { data: cfg, error } = await db.rpc("outreach_get_config");
       if (error || !cfg) return Response.json({ error: "Outreach config unavailable" }, { status: 500 });
 
+      if (gmailConfigured() && !skip.has("send")) {
+        // Sends every day from send_hour_start until the daily cap is reached.
+        const { hour, minute } = localHourAndDay(cfg.send_timezone);
+        try {
+          if (cfg.enabled && hour >= cfg.send_hour_start && hour < cfg.send_hour_end) await sendStep(db, cfg, log);
+          if (minute < 15 || body.skip?.includes("force-replies")) await replyStep(db, cfg, log);
+        } catch (e) {
+          log.push(`send error: ${(e as Error).message}`);
+        }
+      }
       if (cfg.research_enabled && !skip.has("research")) {
         try {
           await db.rpc("outreach_queue_new_markets");
@@ -270,16 +280,6 @@ export default {
         }
       }
 
-      if (gmailConfigured() && !skip.has("send")) {
-        const { hour, minute, weekday } = localHourAndDay(cfg.send_timezone);
-        const weekdayOk = !["Sat", "Sun"].includes(weekday);
-        try {
-          if (cfg.enabled && weekdayOk && hour >= cfg.send_hour_start && hour < cfg.send_hour_end) await sendStep(db, cfg, log);
-          if (minute < 15 || body.skip?.includes("force-replies")) await replyStep(db, cfg, log);
-        } catch (e) {
-          log.push(`send error: ${(e as Error).message}`);
-        }
-      }
       if (log.length) console.log("outreach-worker", log.join(" | "));
       return Response.json({ ok: true, log });
     },
