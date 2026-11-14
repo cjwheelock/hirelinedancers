@@ -38,3 +38,26 @@ Deno.test("only known database errors reach the person", () => {
   assert(publicGuestError("ERROR: Too many requests. Please try again later") === "Too many requests. Please try again later", "rate limit shown");
   assert(publicGuestError("relation private.x does not exist") === "We could not send your inquiry. Please try again.", "internal error hidden");
 });
+
+import { confirmationLink, confirmationTokenHash, guestConfirmationEmail, isConfirmationToken, newConfirmationToken } from "./hld-guest-inquiry.ts";
+
+Deno.test("confirmation tokens are random, url safe, and hashed for storage", async () => {
+  const a = newConfirmationToken(), b = newConfirmationToken();
+  assert(a !== b && isConfirmationToken(a) && isConfirmationToken(b), "two valid distinct tokens");
+  assert(!isConfirmationToken("short") && !isConfirmationToken(a + "x") && !isConfirmationToken(null), "rejects malformed tokens");
+  const hash = await confirmationTokenHash(a);
+  assert(/^[0-9a-f]{64}$/.test(hash) && hash === await confirmationTokenHash(a) && hash !== await confirmationTokenHash(b), "stable sha-256 hex");
+});
+Deno.test("the confirmation link keeps the token out of the server request", () => {
+  const link = confirmationLink(new URL("https://hirelinedancers.com/"), "t".repeat(43));
+  assert(link === `https://hirelinedancers.com/confirm-inquiry/#token=${"t".repeat(43)}`, link);
+});
+Deno.test("the confirmation email names the instructor, the expiry, and is safe HTML", () => {
+  const email = guestConfirmationEmail({ to: "pat@example.test", firstName: "Pat", instructorName: "Tara <B>", link: "https://hirelinedancers.com/confirm-inquiry/#token=abc" });
+  assert(email.subject === "Confirm your inquiry to Tara <B>", email.subject);
+  assert(email.text.includes("Nothing is sent until you confirm. This link expires in 7 days."), "explains the hold");
+  assert(email.text.includes("Confirm and send inquiry: https://hirelinedancers.com/confirm-inquiry/#token=abc"), "plain-text link");
+  assert(email.html.includes("Tara &lt;B&gt;") && !email.html.includes("<B>"), "escaped");
+  assert(!email.text.includes("—") && !email.html.includes("—"), "no em dashes");
+  assert(guestConfirmationEmail({ to: "p@e.test", firstName: "P", instructorName: null, link: "x" }).subject === "Confirm your inquiry to the instructor", "fallback name");
+});

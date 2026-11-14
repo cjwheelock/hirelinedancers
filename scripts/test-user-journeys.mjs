@@ -418,6 +418,7 @@ test("Southern California launch markets match their own city and surrounding se
 test("an organizer without an account can send an inquiry with name and email", async () => {
   const app = harness("contact");
   await app.render();
+  app.queue("guest-inquiry", async () => ({ data: { ok: true, held: true }, error: null }));
   assert.ok(app.text().includes("We'll email you when an instructor replies. Sign in with this email to read and respond."));
   app.field("First name").props.onChange(event("Pat")); await app.render();
   app.field("Last name").props.onChange(event("Guest")); await app.render();
@@ -435,7 +436,23 @@ test("an organizer without an account can send an inquiry with name and email", 
   assert.equal(sent.args.region, "TX");
   assert.equal(sent.args.website, "");
   assert.ok(!app.calls.some(call => call.name === "submit_inquiry"), "the signed-in path is not used");
-  assert.ok(app.text().includes("has your event details"));
+  assert.ok(app.text().includes("Check your email to confirm"));
+  assert.ok(app.text().includes("We sent a confirmation link to pat@example.test."));
+  assert.ok(!app.text().includes("has your event details"), "nothing claims the instructor has it before confirmation");
+});
+
+test("a guest inquiry that was not held is reported as an error", async () => {
+  const app = harness("contact");
+  await app.render();
+  app.queue("guest-inquiry", async () => ({ data: { ok: true }, error: null }));
+  app.field("First name").props.onChange(event("Pat")); await app.render();
+  app.field("Email").props.onChange(event("pat@example.test")); await app.render();
+  app.field("Event date").props.onChange(event("2027-02-01")); await app.render();
+  app.field("City").props.onChange(event("Austin")); await app.render();
+  app.field("State").props.onChange(event("tx")); await app.render();
+  await app.nodes().find(node => node.type === "form").props.onSubmit(event()); await app.render();
+  assert.ok(!app.text().includes("Check your email to confirm"));
+  assert.ok(app.text().includes("We could not send your inquiry. Please try again."));
 });
 
 test("a guest inquiry error is shown and the form stays filled", async () => {

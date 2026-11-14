@@ -118,8 +118,50 @@ export function publicGuestError(message: string | undefined): string {
     "Event type is required",
     "Enter a valid email address",
     "Your name is required",
+    "Event date is required",
     "One or more fields are too long",
   ];
   const match = safe.find((item) => message?.includes(item));
   return match ?? "We could not send your inquiry. Please try again.";
+}
+
+/** A one-time confirmation secret for the emailed link. Only its hash is stored. */
+export function newConfirmationToken(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+/** Confirmation links carry a 43-character base64url token. */
+export function isConfirmationToken(value: unknown): value is string {
+  return typeof value === "string" && /^[A-Za-z0-9_-]{43}$/.test(value);
+}
+
+export function confirmationTokenHash(token: string): Promise<string> {
+  return sha256Hex(`hld-guest-confirm:${token}`);
+}
+
+const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (character) => ({
+  "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+})[character]!);
+
+/** The link lives in the URL fragment so the token never reaches a server log. */
+export function confirmationLink(appUrl: URL, token: string): string {
+  const url = new URL("confirm-inquiry/", appUrl);
+  url.hash = `token=${token}`;
+  return url.toString();
+}
+
+/** Email asking a guest organizer to confirm their address before anything is sent. */
+export function guestConfirmationEmail(input: { to: string; firstName: string; instructorName: string | null; link: string }) {
+  const instructor = input.instructorName?.trim() || "the instructor";
+  const greeting = `Hi ${input.firstName},`;
+  const body = `Please confirm your email address to send your event inquiry to ${instructor}. Nothing is sent until you confirm. This link expires in 7 days.`;
+  const ignore = "If you did not request this, you can ignore this email.";
+  const button = "Confirm and send inquiry";
+  return {
+    to: [input.to],
+    subject: `Confirm your inquiry to ${instructor}`,
+    text: [greeting, "", body, "", `${button}: ${input.link}`, "", ignore].join("\n"),
+    html: `<!doctype html><html lang="en"><body style="margin:0;background:#f6eee2;font-family:Arial,sans-serif;color:#2a1e17;line-height:1.55"><div style="max-width:560px;margin:0 auto;padding:32px 20px"><div style="background:#ffffff;border:1px solid #eadfd0;border-radius:18px;padding:28px"><p style="margin:0 0 14px">${escapeHtml(greeting)}</p><p style="margin:0 0 22px">${escapeHtml(body)}</p><p style="margin:0 0 22px"><a href="${escapeHtml(input.link)}" style="display:inline-block;padding:14px 22px;background:#e9a94b;border-radius:12px;color:#2a1e17;font-weight:bold;text-decoration:none">${escapeHtml(button)}</a></p><p style="margin:0;color:#5a4a3e;font-size:14px">${escapeHtml(ignore)}</p></div></div></body></html>`,
+  };
 }

@@ -172,22 +172,53 @@ reset role;
 select pg_temp.messaging_assert(not private.inquiry_notification_needed((select id from public.inquiry_thread_notification_jobs where thread_id=:'fb_two' and notification_type='thread_declined')),
  'invited instructor declines are not emailed to the organizer');
 select pg_temp.messaging_assert(not private.inquiry_still_looking_due(:'inquiry_id'),'one invited instructor still open, so not due yet');
+select pg_temp.messaging_assert(not exists(select 1 from public.admin_inquiry_notification_jobs where inquiry_id=:'inquiry_id' and alert_kind<>'new_inquiry'),
+ 'no owner alert while an invited instructor is still open');
 
--- 48 hours after sharing with no engagement: one notice, one attention item.
+-- Every invited instructor declines inside 48 hours: the owner is alerted
+-- right away, and the organizer hears nothing yet.
+select pg_temp.messaging_set_request('31000000-0000-0000-0000-000000000022','cx-three@example.test','authenticated');
+set local role authenticated;
+select public.decline_inquiry_thread(:'fb_three',null);
+reset role;
+select pg_temp.messaging_set_request(null,null,'service_role');
+select public.enqueue_due_inquiry_response_actions();
+select public.enqueue_due_inquiry_response_actions();
+reset role;
+select pg_temp.messaging_assert((select count(*)=1 from public.admin_inquiry_notification_jobs where inquiry_id=:'inquiry_id' and alert_kind='sharing_all_declined'
+  and delivered_to_email='cjwheelock1@gmail.com' and inquiry->>'kind'='sharing_all_declined' and inquiry->>'thread_id'=:'source_thread'
+  and inquiry->>'organizer'='Jordan R.' and (inquiry->>'invited_count')::int=2),
+ 'exactly one owner alert when every invited instructor declined');
+select pg_temp.messaging_assert((select still_looking_notified_at is null from public.inquiries where id=:'inquiry_id')
+  and not exists(select 1 from public.inquiry_thread_notification_jobs where notification_type='still_looking_organizer' and thread_id=:'source_thread'),
+ 'the organizer is not told early when every invited instructor declines');
+select pg_temp.messaging_assert(not private.inquiry_still_looking_due(:'inquiry_id'),'still looking waits the full 48 hours');
+
+-- 48 hours after sharing with no engagement: one notice, one attention item,
+-- one owner alert.
 update public.inquiries set automatic_sharing_started_at=now()-interval '49 hours' where id=:'inquiry_id';
-update public.inquiry_threads set status='timed_out',timed_out_at=now() where id=:'fb_three';
 select pg_temp.messaging_assert(not private.inquiry_notification_needed((select id from public.inquiry_thread_notification_jobs where thread_id=:'fb_three' and notification_type='response_timeout_organizer')),
  'invited instructor timeouts are not emailed to the organizer');
 select pg_temp.messaging_set_request(null,null,'service_role');
 select public.enqueue_due_inquiry_response_actions();
 select public.enqueue_due_inquiry_response_actions();
 reset role;
+select pg_temp.messaging_assert((select count(*)=1 from public.admin_inquiry_notification_jobs where inquiry_id=:'inquiry_id' and alert_kind='sharing_no_response'),
+ 'exactly one owner alert at the 48-hour no-response point');
+select pg_temp.messaging_assert((select count(*)=1 from public.admin_inquiry_notification_jobs where inquiry_id=:'inquiry_id' and alert_kind='new_inquiry'),
+ 'the new-inquiry owner alert is unchanged');
 select pg_temp.messaging_assert((select count(*)=1 from public.inquiry_thread_notification_jobs where dedupe_key='inquiry:'||:'inquiry_id'||':still-looking' and notification_type='still_looking_organizer' and thread_id=:'source_thread'),
  'exactly one still-looking email to the organizer');
 select pg_temp.messaging_assert((select count(*)=1 from public.inquiry_attention_items where thread_id=:'source_thread' and reason='no_response_after_sharing' and resolved_at is null),
  'the inquiry appears in admin Needs attention');
 select pg_temp.messaging_assert(private.inquiry_notification_needed((select id from public.inquiry_thread_notification_jobs where notification_type='still_looking_organizer' and thread_id=:'source_thread')),
  'still-looking email is sendable while nobody has engaged');
+
+-- Manual routing never sends an interim update on an automatically shared event.
+insert into public.inquiry_thread_notification_jobs(thread_id,recipient_account_id,recipient_email,notification_type,dedupe_key)
+values (:'source_thread','31000000-0000-0000-0000-000000000010','cx-organizer@example.test','fallback_routed_organizer','test:routed:'||:'source_thread');
+select pg_temp.messaging_assert(not private.inquiry_notification_needed((select id from public.inquiry_thread_notification_jobs where dedupe_key='test:routed:'||:'source_thread')),
+ 'no routed-to-another-instructor update during automatic sharing');
 
 -- A late reply from an invited instructor cancels a still-pending notice.
 update public.inquiry_threads set status='active',first_instructor_message_at=now() where id=:'fb_three';
@@ -216,6 +247,33 @@ select public.enqueue_due_inquiry_response_actions();
 reset role;
 select pg_temp.messaging_assert((select still_looking_notified_at is null from public.inquiries where id=:'engaged_inquiry'),
  'an available invited instructor means no still-looking notice');
+select pg_temp.messaging_assert(not exists(select 1 from public.admin_inquiry_notification_jobs where inquiry_id=:'engaged_inquiry' and alert_kind<>'new_inquiry'),
+ 'no owner alert once an invited instructor is available');
+select pg_temp.messaging_assert(private.inquiry_notification_needed((select id from public.inquiry_thread_notification_jobs
+  where thread_id=:'engaged_fb' and notification_type='new_message' and recipient_account_id='31000000-0000-0000-0000-000000000010' limit 1)),
+ 'the organizer hears when an invited instructor marks available');
+
+-- Nobody else matches: the owner is alerted so manual outreach can start.
+update public.instructor_service_markets set accepting_inquiries=false
+ where instructor_profile_id in ('32000000-0000-0000-0000-000000000021','32000000-0000-0000-0000-000000000022');
+select pg_temp.messaging_set_request('31000000-0000-0000-0000-000000000010','cx-organizer@example.test','authenticated');
+set local role authenticated;
+select public.submit_inquiry('32000000-0000-0000-0000-000000000020','weddings',current_date+47,'18:00','America/Chicago',
+ 'Cx Hall','Austin','TX','78701',90,null,null,true,true,'Third event',null,true) as lonely_inquiry \gset
+select public.get_inquiry_primary_thread(:'lonely_inquiry') as lonely_source \gset
+reset role;
+select pg_temp.messaging_set_request('31000000-0000-0000-0000-000000000020','cx-one@example.test','authenticated');
+set local role authenticated;
+select public.decline_inquiry_thread(:'lonely_source',null);
+reset role;
+select pg_temp.messaging_set_request(null,null,'service_role');
+select public.enqueue_due_inquiry_response_actions();
+select public.enqueue_due_inquiry_response_actions();
+reset role;
+select pg_temp.messaging_assert((select count(*)=1 from public.admin_inquiry_notification_jobs where inquiry_id=:'lonely_inquiry' and alert_kind='sharing_no_matches'),
+ 'one owner alert when nobody else could be invited');
+update public.instructor_service_markets set accepting_inquiries=true
+ where instructor_profile_id in ('32000000-0000-0000-0000-000000000021','32000000-0000-0000-0000-000000000022');
 
 ---------------------------------------------------------------------------
 -- 2. Organizer contact details stay hidden from instructors before payment
@@ -264,29 +322,66 @@ insert into auth.users(id,email) values ('33000000-0000-0000-0000-000000000001',
 select pg_temp.messaging_set_request(null,null,'service_role');
 select pg_temp.messaging_assert(public.guest_inquiry_account('GUEST@example.test')->>'account_id'='33000000-0000-0000-0000-000000000001','existing sign-in is found case-insensitively');
 select pg_temp.messaging_assert(public.guest_inquiry_account('nobody@example.test') is null,'unknown email has no account');
-select public.submit_guest_inquiry('33000000-0000-0000-0000-000000000001','guest@example.test','Pat','Guest','iphash-1',
-  '32000000-0000-0000-0000-000000000022',null,'weddings',current_date+50,null,'America/Chicago',null,'Austin','TX',null,40) as guest_inquiry \gset
+-- A guest inquiry is held: nothing reaches any instructor until the emailed link is clicked.
+select (select count(*) from public.inquiries) as inquiries_before \gset
+select public.hold_guest_inquiry(repeat('a',64),'Guest@Example.test','Pat','Guest','iphash-1',
+  '32000000-0000-0000-0000-000000000022',null,'weddings',current_date+50,null,'America/Chicago',null,'Austin','TX',null,40) as held \gset
+select pg_temp.messaging_assert((:'held')::jsonb->>'instructor_name'='Cx Three' and (:'held')::jsonb->>'first_name'='Pat'
+  and (:'held')::jsonb->>'email'='guest@example.test','hold returns what the confirmation email needs');
+select pg_temp.messaging_assert((select count(*) from public.inquiries)=:inquiries_before,'holding creates no inquiry');
+select pg_temp.messaging_assert(not exists(select 1 from public.inquiry_thread_notification_jobs j join public.inquiry_threads t on t.id=j.thread_id
+  where t.instructor_profile_id='32000000-0000-0000-0000-000000000022' and j.recipient_email='cx-three@example.test' and j.created_at>now()-interval '1 second'
+  and t.inquiry_id not in (select id from public.inquiries where organizer_account_id='31000000-0000-0000-0000-000000000010')),
+ 'holding emails no instructor');
+select pg_temp.messaging_assert(public.guest_inquiry_hold_status(repeat('a',64))->>'status'='pending','a held inquiry is pending');
+select pg_temp.messaging_assert(public.guest_inquiry_hold_status(repeat('f',64))->>'status'='invalid','an unknown token is invalid');
+select pg_temp.messaging_assert((select role is null from public.accounts where id='33000000-0000-0000-0000-000000000001'),
+ 'holding does not change any account');
+
+-- Confirmation sends it as the guest and starts the 48-hour clock now.
+select public.confirm_guest_inquiry(repeat('a',64),'33000000-0000-0000-0000-000000000001') as confirmed \gset
 reset role;
+select (:'confirmed')::jsonb->>'inquiry_id' as guest_inquiry, (:'confirmed')::jsonb->>'thread_id' as guest_thread \gset
+select pg_temp.messaging_assert((:'confirmed')::jsonb->>'status'='sent','confirmation sends the inquiry');
 select pg_temp.messaging_assert((select role='organizer' and full_name='Pat Guest' from public.accounts where id='33000000-0000-0000-0000-000000000001'),'guest becomes an organizer account');
 select pg_temp.messaging_assert((select organizer_account_id='33000000-0000-0000-0000-000000000001' and automatic_sharing from public.inquiries where id=:'guest_inquiry'),
  'guest inquiry belongs to the guest and allows sharing');
-select pg_temp.messaging_assert(coalesce(current_setting('request.jwt.claims',true),'') not like '%33000000%','guest claims are restored after submission');
+select pg_temp.messaging_assert((select response_clock_started_at>now()-interval '1 minute' from public.inquiry_threads where id=:'guest_thread'),
+ 'the response clock starts at confirmation');
+select pg_temp.messaging_assert(coalesce(current_setting('request.jwt.claims',true),'') not like '%33000000%','guest claims are restored after confirmation');
 select pg_temp.messaging_set_request(null,null,'service_role');
-select public.submit_guest_inquiry('33000000-0000-0000-0000-000000000001','guest@example.test','Pat','Guest','iphash-1',
+select pg_temp.messaging_assert(public.confirm_guest_inquiry(repeat('a',64),'33000000-0000-0000-0000-000000000001')->>'status'='confirmed'
+  and (select count(*)=1 from public.inquiries where organizer_account_id='33000000-0000-0000-0000-000000000001'),
+ 'a second click does not send it twice');
+
+-- Unconfirmed holds expire after 7 days with nothing sent.
+select public.hold_guest_inquiry(repeat('b',64),'guest@example.test','Pat','Guest','iphash-1',
   '32000000-0000-0000-0000-000000000022',null,'weddings',current_date+51,null,'America/Chicago',null,'Austin','TX',null,40);
-select public.submit_guest_inquiry('33000000-0000-0000-0000-000000000001','guest@example.test','Pat','Guest','iphash-1',
+reset role;
+update private.held_guest_inquiries set expires_at=now()-interval '1 minute' where token_hash=repeat('b',64);
+select pg_temp.messaging_set_request(null,null,'service_role');
+select pg_temp.messaging_assert(public.guest_inquiry_hold_status(repeat('b',64))->>'status'='expired'
+  and public.confirm_guest_inquiry(repeat('b',64),'33000000-0000-0000-0000-000000000001')->>'status'='expired'
+  and (select count(*)=1 from public.inquiries where organizer_account_id='33000000-0000-0000-0000-000000000001'),
+ 'an expired hold sends nothing');
+
+-- Limits: three per email per day, and instructors must sign in.
+select public.hold_guest_inquiry(repeat('c',64),'guest@example.test','Pat','Guest','iphash-1',
   '32000000-0000-0000-0000-000000000022',null,'weddings',current_date+52,null,'America/Chicago',null,'Austin','TX',null,40);
-select pg_temp.messaging_expect_error($q$select public.submit_guest_inquiry('33000000-0000-0000-0000-000000000001','guest@example.test','Pat','Guest','iphash-1',
+select pg_temp.messaging_expect_error($q$select public.hold_guest_inquiry(repeat('d',64),'guest@example.test','Pat','Guest','iphash-1',
   '32000000-0000-0000-0000-000000000022',null,'weddings',current_date+53,null,'America/Chicago',null,'Austin','TX',null,40)$q$,
   'Too many requests','fourth inquiry from one email in a day is refused');
-select pg_temp.messaging_expect_error($q$select public.submit_guest_inquiry('31000000-0000-0000-0000-000000000021','cx-two@example.test','Cx','Two','iphash-2',
+select pg_temp.messaging_expect_error($q$select public.hold_guest_inquiry(repeat('e',64),'cx-two@example.test','Cx','Two','iphash-2',
   '32000000-0000-0000-0000-000000000022',null,'weddings',current_date+53,null,'America/Chicago',null,'Austin','TX',null,40)$q$,
   'Sign in to send this inquiry','an instructor email must sign in instead');
-select pg_temp.messaging_expect_error($q$select public.submit_guest_inquiry('33000000-0000-0000-0000-000000000001','other@example.test','Pat','Guest','iphash-3',
-  '32000000-0000-0000-0000-000000000022',null,'weddings',current_date+53,null,'America/Chicago',null,'Austin','TX',null,40)$q$,
-  'Account not found','account and email must match');
+select public.hold_guest_inquiry(repeat('1',64),'someone@example.test','Sam','Other','iphash-4',
+  '32000000-0000-0000-0000-000000000022',null,'weddings',current_date+53,null,'America/Chicago',null,'Austin','TX',null,40);
+select pg_temp.messaging_expect_error($q$select public.confirm_guest_inquiry(repeat('1',64),'33000000-0000-0000-0000-000000000001')$q$,
+  'Account not found','the confirming account must own the held email');
 reset role;
-select pg_temp.messaging_assert(not has_function_privilege('anon','public.submit_guest_inquiry(uuid,text,text,text,text,uuid,text,text,date,time,text,text,text,text,text,integer,text,text,boolean,boolean,text)','execute')
+select pg_temp.messaging_assert(not has_function_privilege('anon','public.hold_guest_inquiry(text,text,text,text,text,uuid,text,text,date,time,text,text,text,text,text,integer,text,text,boolean,boolean,text)','execute')
+  and not has_function_privilege('authenticated','public.confirm_guest_inquiry(text,uuid)','execute')
+  and not has_function_privilege('authenticated','public.guest_inquiry_hold_status(text)','execute')
   and not has_function_privilege('authenticated','public.guest_inquiry_account(text)','execute'),'guest functions are service-role only');
 
 ---------------------------------------------------------------------------

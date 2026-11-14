@@ -170,6 +170,8 @@ begin
    t.status='timed_out' and t.first_instructor_message_at is null and t.assignment_source<>'fallback'
  when j.notification_type='thread_declined' then t.status='declined' and t.assignment_source<>'fallback'
  when j.notification_type='still_looking_organizer' then private.inquiry_sharing_unanswered(t.inquiry_id)
+ -- Automatic sharing keeps the organizer quiet until an instructor responds.
  when j.notification_type='fallback_routed_organizer' then t.status in ('awaiting_response','active','declined','timed_out')
+   and not coalesce(i.automatic_sharing,false)
  else false end;
 end; $function$;

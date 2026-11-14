@@ -49,6 +49,43 @@ test("reviews appear on public profiles and in paid conversations", () => {
   assert.match(reviews, /get_instructor_reviews/);
 });
 
+test("guest inquiries wait for email confirmation before reaching an instructor", () => {
+  const form = read("src/components/ContactInstructor.tsx");
+  assert.match(form, /Check your email to confirm/);
+  assert.match(form, /Your inquiry goes to \{profile\?\.display_name \|\| "the instructor"\} after you confirm\./);
+  assert.match(form, /!data\?\.held/);
+  const fn = read("supabase/functions/guest-inquiry/index.ts");
+  assert.match(fn, /hold_guest_inquiry/);
+  assert.match(fn, /confirm_guest_inquiry/);
+  assert.doesNotMatch(fn, /submit_guest_inquiry/);
+  const migration = read("supabase/migrations/20261115000300_guest_inquiries.sql");
+  assert.match(migration, /expires_at timestamptz not null default now\(\) \+ interval '7 days'/);
+  assert.doesNotMatch(migration, /function public\.submit_guest_inquiry/);
+});
+
+test("the confirmation page reads the token from the URL fragment only", async () => {
+  const source = read("src/components/ConfirmGuestInquiry.tsx");
+  const body = source.slice(source.indexOf("export function confirmationTokenFromHash"), source.indexOf("export function ConfirmGuestInquiry"));
+  const fn = new Function(`${body.replace("export ", "").replace(/: string \| null/, "").replace("(hash: string)", "(hash)")}; return confirmationTokenFromHash;`)();
+  const token = "A".repeat(43);
+  assert.equal(fn(`#token=${token}`), token);
+  assert.equal(fn("#token=short"), null);
+  assert.equal(fn(""), null);
+  assert.match(source, /window\.history\.replaceState\(\{\}, "", window\.location\.pathname\)/);
+  assert.match(source, /token_hash: result\.signInTokenHash, type: "email"/);
+});
+
+test("still looking waits 48 hours and owner alerts go to CJ", () => {
+  const migration = read("supabase/migrations/20261115000100_inquiry_still_looking_round.sql");
+  const dueStart = migration.indexOf("function private.inquiry_still_looking_due");
+  const due = migration.slice(dueStart, migration.indexOf("$$;", dueStart));
+  assert.match(due, /automatic_sharing_started_at <= now\(\) - interval '48 hours'/);
+  assert.doesNotMatch(due, /\bor\b/);
+  assert.match(migration, /'sharing_all_declined'/);
+  assert.match(migration, /'sharing_no_response'/);
+  assert.match(read("supabase/functions/_shared/hld-admin-inquiry-email.ts"), /DEFAULT_OWNER_ALERT_EMAIL = 'cjwheelock1@gmail\.com'/);
+});
+
 test("changed files contain no em dashes", () => {
   const files = [
     "src/lib/notificationCopy.ts", "src/components/ContactInstructor.tsx", "src/components/InquiryInbox.tsx",
@@ -56,6 +93,8 @@ test("changed files contain no em dashes", () => {
     "src/components/ProfileEditor.tsx", "src/components/InquiryAttention.tsx",
     "supabase/functions/process-inquiry-notifications/index.ts", "supabase/functions/_shared/hld-profile-reminder.ts",
     "supabase/functions/_shared/hld-guest-inquiry.ts", "supabase/functions/guest-inquiry/index.ts",
+    "supabase/functions/_shared/hld-admin-inquiry-email.ts", "src/components/ConfirmGuestInquiry.tsx",
+    "src/app/confirm-inquiry/page.tsx",
     "supabase/migrations/20261115000100_inquiry_still_looking_round.sql",
     "supabase/migrations/20261115000200_hide_organizer_contact_from_instructors.sql",
     "supabase/migrations/20261115000300_guest_inquiries.sql",

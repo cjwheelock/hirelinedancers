@@ -195,7 +195,7 @@ export function ContactInstructor() {
         }
       });
       if (invokeError) throw invokeError;
-      if (!data?.ok) throw new Error("We could not send your inquiry. Please try again.");
+      if (!data?.ok || !data?.held) throw new Error("We could not send your inquiry. Please try again.");
       setGuestSent(true);
     } catch (submitError) {
       setError(await functionErrorMessage(submitError));
@@ -258,10 +258,10 @@ export function ContactInstructor() {
   if (!session && guestSent) {
     return (
       <section className={`${styles.shell} ${styles.narrow}`}>
-        <p className={styles.eyebrow}>Inquiry sent</p>
-        <h1 className={styles.title}>{profile?.display_name} has your event details</h1>
-        <p className={styles.success}>{GUEST_INQUIRY_NOTE}</p>
-        <p className={styles.subtitle}>We ask instructors to respond within 48 hours. If you haven’t heard back by then, we’ll invite other matching instructors to respond to your event. You can compare their profiles and choose who to book.</p>
+        <p className={styles.eyebrow}>Almost done</p>
+        <h1 className={styles.title}>Check your email to confirm</h1>
+        <p className={styles.success}>We sent a confirmation link to {guest.email.trim()}. Your inquiry goes to {profile?.display_name || "the instructor"} after you confirm.</p>
+        <p className={styles.subtitle}>{GUEST_INQUIRY_NOTE}</p>
         <div className={styles.buttonRow} style={{ marginTop: 26 }}>
           <Link className={styles.secondaryButton} href="/instructors/">Browse more instructors</Link>
         </div>

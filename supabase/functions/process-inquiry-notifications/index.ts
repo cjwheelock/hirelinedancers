@@ -1782,6 +1782,7 @@ async function processAdminInquiryJob(admin: AdminClient, job: AdminInquiryNotif
       apiKey: requiredEnv("RESEND_API_KEY"), from: requiredEnv("RESEND_FROM_EMAIL"),
       appUrl: configuredAppUrl(),
       supportEmail: Deno.env.get("SUPPORT_EMAIL")?.trim() || "hello@hirelinedancers.com",
+      alertEmail: Deno.env.get("HLD_OWNER_ALERT_EMAIL")?.trim() || undefined,
     });
   } catch (error) {
     failure = error instanceof AdminInquiryEmailError ? error : new AdminInquiryEmailError("Administrator notification failed", true);

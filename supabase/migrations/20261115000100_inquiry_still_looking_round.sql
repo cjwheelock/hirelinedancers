@@ -1,8 +1,10 @@
 -- Second routing round. After automatic sharing invites matching instructors,
--- the organizer hears once if nobody invited engages within 48 hours (or every
--- invited instructor declines sooner), and the inquiry lands in admin Needs
--- attention. Invited instructors' individual timeouts and declines no longer
--- email the organizer, because the organizer never chose them.
+-- the organizer hears nothing until an invited instructor responds, except one
+-- "still looking" update if nobody has responded 48 hours after the fan-out.
+-- Invited instructors' individual timeouts and declines never email the
+-- organizer, because the organizer never chose them. The owner gets a personal
+-- email when every invited instructor declines, when nobody could be invited,
+-- and at the 48-hour no-response point, so manual outreach can start.
 
 alter table public.inquiries add column if not exists still_looking_notified_at timestamptz;
 
@@ -33,14 +35,85 @@ returns boolean language sql stable security definer set search_path='' as $$
        and b.status in ('quote_sent','awaiting_payment','payment_processing','confirmed','completed','paid_out')));
 $$;
 
+-- The organizer's update waits the full 48 hours, even when every invited
+-- instructor declined sooner. Early declines only alert the owner.
 create or replace function private.inquiry_still_looking_due(p_inquiry_id uuid)
 returns boolean language sql stable security definer set search_path='' as $$
- select private.inquiry_sharing_unanswered(i.id) and (
-   i.automatic_sharing_started_at <= now() - interval '48 hours'
-   or not exists(select 1 from public.inquiry_threads f where f.inquiry_id=i.id and f.assignment_source='fallback'
-     and f.status not in ('declined','withdrawn','closed')))
+ select private.inquiry_sharing_unanswered(i.id)
+   and i.automatic_sharing_started_at <= now() - interval '48 hours'
  from public.inquiries i where i.id=p_inquiry_id;
 $$;
+
+-- True when every instructor invited by automatic sharing has declined (or
+-- dropped out) and nobody on the event has responded.
+create or replace function private.inquiry_all_invited_declined(p_inquiry_id uuid)
+returns boolean language sql stable security definer set search_path='' as $$
+ select private.inquiry_sharing_unanswered(p_inquiry_id)
+   and not exists(select 1 from public.inquiry_threads f where f.inquiry_id=p_inquiry_id
+     and f.assignment_source='fallback' and f.status not in ('declined','withdrawn','closed'));
+$$;
+
+-- Owner alerts share the existing owner inquiry email queue. One row per
+-- inquiry and alert kind, so each alert is sent at most once.
+alter table public.admin_inquiry_notification_jobs
+  add column if not exists alert_kind text not null default 'new_inquiry';
+alter table public.admin_inquiry_notification_jobs
+  add constraint admin_inquiry_notification_jobs_alert_kind_check
+  check (alert_kind = any (array['new_inquiry','sharing_all_declined','sharing_no_response','sharing_no_matches']));
+alter table public.admin_inquiry_notification_jobs drop constraint if exists admin_inquiry_notification_jobs_inquiry_id_key;
+alter table public.admin_inquiry_notification_jobs
+  add constraint admin_inquiry_notification_jobs_inquiry_alert_key unique (inquiry_id, alert_kind);
+
+create or replace function private.enqueue_admin_inquiry_notification()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  insert into public.admin_inquiry_notification_jobs(inquiry_id,alert_kind,inquiry)
+  values (new.id, 'new_inquiry', jsonb_build_object(
+    'id',new.id,'created_at',new.created_at,
+    'instructor_name',new.instructor_name,'instructor_slug',new.instructor_slug,
+    'name',new.name,'email',new.email,'contact_name',new.contact_name,
+    'contact_email',new.contact_email,'contact_phone_e164',new.contact_phone_e164,
+    'company_name',new.company_name,'event_type',new.event_type,
+    'event_date',new.event_date,'event_start_time',new.event_start_time,
+    'time_zone',new.time_zone,'location',new.location,'venue_name',new.venue_name,
+    'event_city',new.event_city,'event_region',new.event_region,
+    'event_postal_code',new.event_postal_code,'guest_count',new.guest_count,
+    'budget_range',new.budget_range,'music_requests',new.music_requests,
+    'venue_has_speakers',new.venue_has_speakers,'venue_has_microphone',new.venue_has_microphone,
+    'reply_by_date',new.reply_by_date,'message',new.message,'status',new.status
+  )) on conflict(inquiry_id, alert_kind) do nothing;
+  return new;
+end $$;
+
+create or replace function private.notify_owner_sharing_alert(p_inquiry_id uuid, p_kind text)
+returns boolean language plpgsql security definer set search_path='' as $$
+declare i public.inquiries%rowtype; source_thread uuid; organizer_label text; first_name text; last_name text; inserted integer;
+begin
+ if p_kind not in ('sharing_all_declined','sharing_no_response','sharing_no_matches') then
+   raise exception 'Unknown owner alert';
+ end if;
+ select * into i from public.inquiries where id=p_inquiry_id;
+ if i.id is null then return false; end if;
+ select t.id into source_thread from public.inquiry_threads t where t.inquiry_id=i.id and t.assignment_source<>'fallback'
+   order by t.assignment_order, t.created_at limit 1;
+ select coalesce(nullif(trim(a.first_name),''), split_part(trim(coalesce(i.contact_name,i.name,a.full_name,'')),' ',1)),
+        coalesce(nullif(trim(a.last_name),''),
+          nullif(regexp_replace(trim(coalesce(i.contact_name,i.name,a.full_name,'')),'^\S+\s*',''),''))
+   into first_name, last_name
+ from (select 1) one left join public.accounts a on a.id=i.organizer_account_id;
+ organizer_label := nullif(trim(concat_ws(' ', nullif(first_name,''),
+   case when nullif(last_name,'') is not null then upper(left(last_name,1))||'.' end)),'');
+ insert into public.admin_inquiry_notification_jobs(inquiry_id, alert_kind, inquiry)
+ values (i.id, p_kind, jsonb_build_object(
+   'kind', p_kind, 'id', i.id, 'thread_id', source_thread,
+   'event_type', i.event_type, 'event_date', i.event_date,
+   'event_city', i.event_city, 'event_region', i.event_region,
+   'organizer', organizer_label,
+   'invited_count', (select count(*) from public.inquiry_threads f where f.inquiry_id=i.id and f.assignment_source='fallback')
+ )) on conflict (inquiry_id, alert_kind) do nothing;
+ get diagnostics inserted = row_count;
+ return inserted > 0;
+end $$;
 
 create or replace function private.notify_inquiry_still_looking(p_inquiry_id uuid)
 returns boolean language plpgsql security definer set search_path='' as $$
@@ -54,6 +127,7 @@ begin
  update public.inquiries set still_looking_notified_at=now() where id=i.id;
  insert into public.inquiry_attention_items(thread_id,reason) values(source.id,'no_response_after_sharing')
    on conflict do nothing;
+ perform private.notify_owner_sharing_alert(i.id, 'sharing_no_response');
  select coalesce(a.email,i.contact_email,i.email) into organizer_email from public.accounts a where a.id=i.organizer_account_id;
  organizer_email:=coalesce(organizer_email,i.contact_email,i.email);
  if i.organizer_account_id is not null and organizer_email is not null then
@@ -66,7 +140,9 @@ begin
 end $$;
 
 revoke all on function private.inquiry_sharing_unanswered(uuid), private.inquiry_still_looking_due(uuid),
-  private.notify_inquiry_still_looking(uuid) from public, anon, authenticated;
+  private.notify_inquiry_still_looking(uuid), private.inquiry_all_invited_declined(uuid),
+  private.notify_owner_sharing_alert(uuid,text), private.enqueue_admin_inquiry_notification()
+  from public, anon, authenticated;
 
 CREATE OR REPLACE FUNCTION public.enqueue_due_inquiry_response_actions()
  RETURNS integer
@@ -123,7 +199,26 @@ begin
   from public.inquiry_threads t join public.inquiries i on i.id=t.inquiry_id
   where i.automatic_sharing and i.automatic_sharing_started_at is null
     and t.status in ('timed_out','declined') and not private.inquiry_finalizing(i.id);
-  -- Second round: nobody invited has engaged. Tell the organizer once and flag the team.
+  -- Every invited instructor declined, or nobody could be invited: alert the
+  -- owner right away. The organizer is not told until the 48-hour update.
+  perform private.notify_owner_sharing_alert(i.id, 'sharing_all_declined')
+  from public.inquiries i
+  where i.automatic_sharing and i.automatic_sharing_started_at is not null
+    and i.still_looking_notified_at is null
+    and exists(select 1 from public.inquiry_threads f where f.inquiry_id=i.id and f.assignment_source='fallback')
+    and private.inquiry_all_invited_declined(i.id)
+    and not exists(select 1 from public.admin_inquiry_notification_jobs aj
+      where aj.inquiry_id=i.id and aj.alert_kind='sharing_all_declined');
+  perform private.notify_owner_sharing_alert(i.id, 'sharing_no_matches')
+  from public.inquiries i
+  where i.automatic_sharing and i.automatic_sharing_started_at is not null
+    and coalesce(i.status,'') not in ('withdrawn','closed')
+    and private.inquiry_event_open(i.id)
+    and not exists(select 1 from public.inquiry_threads f where f.inquiry_id=i.id and f.assignment_source='fallback')
+    and not exists(select 1 from public.admin_inquiry_notification_jobs aj
+      where aj.inquiry_id=i.id and aj.alert_kind='sharing_no_matches');
+  -- Second round: 48 hours after sharing and nobody invited has responded.
+  -- Tell the organizer once, flag the team, and alert the owner.
   perform private.notify_inquiry_still_looking(i.id)
   from public.inquiries i
   where i.automatic_sharing and i.automatic_sharing_started_at is not null
@@ -163,6 +258,8 @@ begin
    t.status='timed_out' and t.first_instructor_message_at is null and t.assignment_source<>'fallback'
  when j.notification_type='thread_declined' then t.status='declined' and t.assignment_source<>'fallback'
  when j.notification_type='still_looking_organizer' then private.inquiry_sharing_unanswered(t.inquiry_id)
+ -- Automatic sharing keeps the organizer quiet until an instructor responds.
  when j.notification_type='fallback_routed_organizer' then t.status in ('awaiting_response','active','declined','timed_out')
+   and not coalesce(i.automatic_sharing,false)
  else false end;
 end; $function$;

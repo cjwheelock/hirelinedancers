@@ -87,3 +87,32 @@ Deno.test('regular inquiries and invalid requester emails send no confirmation',
   assert(matchingRequestConfirmationEmail(job) === null);
   assert(matchingRequestConfirmationEmail({ ...job, inquiry: { kind: 'matching_request', contact_email: 'nope' } }) === null);
 });
+
+const alert = (kind: string, extra: Record<string, unknown> = {}): AdminInquiryNotificationJob => ({
+  job_id: 77, attempt_number: 1, delivered_to_email: 'cjwheelock1@gmail.com',
+  inquiry_id: '00000000-0000-4000-8000-000000000009',
+  inquiry: { kind, id: '00000000-0000-4000-8000-000000000009', thread_id: '00000000-0000-4000-8000-000000000010',
+    event_type: 'corporate-events', event_date: '2026-12-18', event_city: 'Austin', event_region: 'TX',
+    organizer: 'Jordan R.', invited_count: 2, ...extra },
+});
+Deno.test('owner sharing alerts name the inquiry and link to the admin conversation', () => {
+  for (const kind of ['sharing_all_declined', 'sharing_no_response', 'sharing_no_matches']) {
+    const email = adminInquiryEmail(alert(kind), config.appUrl, config.supportEmail);
+    assert(email.to[0] === 'cjwheelock1@gmail.com', `${kind}: default recipient`);
+    assert(email.subject.includes('Corporate events · 2026-12-18 · Austin, TX'), `${kind}: subject summary`);
+    assert(email.text.includes('Organizer: Jordan R.') && email.text.includes('Event type: Corporate events'), `${kind}: details`);
+    assert(email.text.includes('https://hirelinedancers.com/admin/?tab=messages&thread=00000000-0000-4000-8000-000000000010'), `${kind}: admin link`);
+    assert(!email.text.includes('—') && !email.html.includes('—'), `${kind}: no em dashes`);
+    assert(!('reply_to' in email), `${kind}: no organizer reply-to`);
+  }
+  assert(adminInquiryEmail(alert('sharing_all_declined'), config.appUrl, config.supportEmail).subject.startsWith('Every invited instructor declined'));
+  assert(adminInquiryEmail(alert('sharing_no_response'), config.appUrl, config.supportEmail).subject.startsWith('No replies 48 hours after sharing'));
+});
+Deno.test('owner alert recipient is configurable and falls back when invalid', () => {
+  assert(adminInquiryEmail(alert('sharing_no_response'), config.appUrl, config.supportEmail, 'ops@example.test').to[0] === 'ops@example.test');
+  assert(adminInquiryEmail(alert('sharing_no_response'), config.appUrl, config.supportEmail, 'bad\r\nBcc:x@y.z').to[0] === 'cjwheelock1@gmail.com');
+});
+Deno.test('owner alerts escape event values in HTML', () => {
+  const email = adminInquiryEmail(alert('sharing_all_declined', { event_city: '<b>x</b>' }), config.appUrl, config.supportEmail);
+  assert(email.html.includes('&lt;b&gt;x&lt;/b&gt;') && !email.html.includes('<b>x</b>'));
+});

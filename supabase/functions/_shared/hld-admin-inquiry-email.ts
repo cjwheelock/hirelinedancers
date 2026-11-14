@@ -37,8 +37,59 @@ function matchingRequestEmail(job: AdminInquiryNotificationJob, supportEmail: st
   };
 }
 
-export function adminInquiryEmail(job: AdminInquiryNotificationJob, appUrl: URL, supportEmail: string) {
+export const DEFAULT_OWNER_ALERT_EMAIL = 'cjwheelock1@gmail.com';
+export type SharingAlertKind = 'sharing_all_declined' | 'sharing_no_response' | 'sharing_no_matches';
+const SHARING_ALERT_KINDS: SharingAlertKind[] = ['sharing_all_declined', 'sharing_no_response', 'sharing_no_matches'];
+
+export function isSharingAlert(job: AdminInquiryNotificationJob): boolean {
+  return SHARING_ALERT_KINDS.includes(job.inquiry.kind as SharingAlertKind);
+}
+
+const SHARING_ALERT_COPY: Record<SharingAlertKind, { subject: string; heading: string; body: string }> = {
+  sharing_all_declined: {
+    subject: 'Every invited instructor declined',
+    heading: 'Every invited instructor declined',
+    body: 'Every instructor we invited for this event has declined. The organizer has not been told. They get the still looking update 48 hours after sharing if nobody responds.',
+  },
+  sharing_no_response: {
+    subject: 'No replies 48 hours after sharing',
+    heading: 'No replies 48 hours after sharing',
+    body: 'Nobody we invited for this event has responded in 48 hours. The organizer just received the still looking update.',
+  },
+  sharing_no_matches: {
+    subject: 'No matching instructors to invite',
+    heading: 'No matching instructors to invite',
+    body: 'The selected instructor did not respond or was unavailable, and no other matching instructor could be invited for this event.',
+  },
+};
+
+/** Owner alert asking CJ to start manual outreach for an inquiry. */
+export function sharingAlertEmail(job: AdminInquiryNotificationJob, appUrl: URL, alertEmail = DEFAULT_OWNER_ALERT_EMAIL) {
+  const alert = job.inquiry;
+  const copy = SHARING_ALERT_COPY[alert.kind as SharingAlertKind];
+  if (!copy || !job.inquiry_id) throw new AdminInquiryEmailError('Owner alert is missing its inquiry', false);
+  const url = new URL('admin/', appUrl);
+  url.searchParams.set('tab', 'messages');
+  if (alert.thread_id) url.searchParams.set('thread', String(alert.thread_id));
+  else url.searchParams.set('inquiry', job.inquiry_id);
+  const place = [alert.event_city, alert.event_region].filter(Boolean).join(', ');
+  const eventType = humanize(alert.event_type) || 'Event';
+  const fields: [string, unknown][] = [
+    ['Event type', eventType], ['Event date', alert.event_date], ['City', place],
+    ['Organizer', alert.organizer], ['Instructors invited', alert.invited_count],
+  ];
+  const summary = [eventType, alert.event_date, place].filter(Boolean).join(' · ');
+  return {
+    to: [validEmail(alertEmail) ? alertEmail : DEFAULT_OWNER_ALERT_EMAIL],
+    subject: `${copy.subject}${summary ? ` · ${summary}` : ''}`,
+    text: [copy.body, '', ...fields.map(([label, value]) => `${label}: ${display(value)}`), '', `Open the conversation: ${url}`].join('\n'),
+    html: `<!doctype html><html lang="en"><body style="font-family:Arial,sans-serif;line-height:1.5"><h1>${escapeHtml(copy.heading)}</h1><p>${escapeHtml(copy.body)}</p><table>${fields.map(([label, value]) => `<tr><th align="left" valign="top" style="padding:4px 12px 4px 0">${escapeHtml(label)}</th><td style="padding:4px 0">${escapeHtml(display(value))}</td></tr>`).join('')}</table><p><a href="${escapeHtml(url.toString())}">Open the conversation</a></p></body></html>`,
+  };
+}
+
+export function adminInquiryEmail(job: AdminInquiryNotificationJob, appUrl: URL, supportEmail: string, alertEmail?: string) {
   if (job.inquiry.kind === 'matching_request') return matchingRequestEmail(job, supportEmail);
+  if (isSharingAlert(job)) return sharingAlertEmail(job, appUrl, alertEmail);
   const inquiry = job.inquiry;
   if (!job.inquiry_id) throw new AdminInquiryEmailError('Inquiry notification is missing its inquiry', false);
   const reviewUrl = new URL('admin/', appUrl);
@@ -130,14 +181,14 @@ async function postEmail(body: Record<string, unknown>, idempotencyKey: string, 
 
 export async function sendAdminInquiryEmail(
   job: AdminInquiryNotificationJob,
-  config: { apiKey: string; from: string; appUrl: URL; supportEmail: string },
+  config: { apiKey: string; from: string; appUrl: URL; supportEmail: string; alertEmail?: string },
   fetcher: typeof fetch = fetch,
 ): Promise<string> {
   if (job.delivered_to_email !== 'cjwheelock1@gmail.com') {
     throw new AdminInquiryEmailError('Unexpected administrator notification destination', false);
   }
   const adminId = await postEmail(
-    { from: config.from, ...adminInquiryEmail(job, config.appUrl, config.supportEmail) },
+    { from: config.from, ...adminInquiryEmail(job, config.appUrl, config.supportEmail, config.alertEmail) },
     `hld-admin-inquiry-${job.job_id}`, config.apiKey, fetcher,
   );
   // Retries resend both with the same keys, so the provider never delivers duplicates.
