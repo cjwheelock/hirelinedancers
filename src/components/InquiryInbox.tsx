@@ -16,6 +16,8 @@ import {
   type MarketplaceInquiry
 } from "@/lib/marketplace";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { BookingReviewForm } from "./Reviews";
+import { DECLINE_NOTICE_BODY, DECLINE_NOTICE_SUBJECT } from "@/lib/notificationCopy";
 import { InquiryAttention } from "./InquiryAttention";
 import { InquiryOpportunity } from "./InquiryOpportunity";
 import { InquiryRecommendations } from "./InquiryRecommendations";
@@ -557,6 +559,7 @@ export function InquiryInbox({
   const hasPlatformBooking = Boolean(activeBooking?.paid_at);
   const hasOpenQuote = Boolean(activeBooking && ["quote_sent", "awaiting_payment", "payment_processing"].includes(activeBooking.status));
   const canDecline = perspective === "instructor" && !hasPaidBooking && !["declined", "withdrawn", "closed"].includes(threadStatus) && (threadStatus !== "timed_out" || detail?.inquiry.automatic_sharing === true);
+  const reviewRequested = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("review") === "1";
   const canWithdraw = perspective === "organizer" && !hasPaidBooking && !["withdrawn", "closed"].includes(threadStatus);
   const strip = quoteStrip(perspective === "admin" ? null : bookingState, detail?.thread.finalization_blocked === true);
   function requestBookingPanel(panel: "quote" | "review" | "pay") {
@@ -784,6 +787,10 @@ export function InquiryInbox({
                     />
                   ) : null}
 
+                  {perspective === "organizer" && activeBooking?.paid_at && openThreadId ? (
+                    <BookingReviewForm key={openThreadId} threadId={openThreadId} autoFocus={reviewRequested} />
+                  ) : null}
+
                   {perspective === "organizer" && !detail.inquiry.automatic_sharing && detail.thread.can_recommend === true && openThreadId ? (
                     <InquiryRecommendations threadId={openThreadId} inquiry={detail.inquiry} onSent={(threadId) => {
                       setSelectedThreadId(threadId);
@@ -876,7 +883,15 @@ export function InquiryInbox({
       {confirming === "decline" ? (
         <ConfirmDialog
           title="Mark yourself unavailable?"
-          message="The organizer will be notified that you are unavailable."
+          message={
+            <>
+              The organizer will receive this email:
+              <span className={styles.emailPreview}>
+                <strong>{DECLINE_NOTICE_SUBJECT}</strong>
+                <span>{DECLINE_NOTICE_BODY}</span>
+              </span>
+            </>
+          }
           confirmLabel="Unavailable"
           busyLabel="Updating..."
           cancelLabel="Cancel"

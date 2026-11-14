@@ -31,7 +31,7 @@ Deno.test("legacy static-support jobs use the admin messages inbox", () => {
   );
 });
 
-import { recommendationUrl, threadNotificationContent, threadNotificationHtml, threadNotificationSms, type ThreadNotificationJob } from "./index.ts";
+import { DECLINE_NOTICE_BODY, DECLINE_NOTICE_SUBJECT, recommendationUrl, threadActionLabel, threadActionUrl, threadNotificationContent, threadNotificationHtml, threadNotificationSms, threadNotificationSubject, threadNotificationText, type ThreadNotificationJob } from "./index.ts";
 const notification = (type: ThreadNotificationJob["notification_type"], version = 2): ThreadNotificationJob => ({
   job_id: 1, notification_type: type, channel: "email", response_policy_version: version,
   delivered_to_phone_e164: null, inquiry_recipient_id: null, attempt_number: 1, recipient_account_id: "account",
@@ -122,7 +122,7 @@ Deno.test("greetings prefer an explicit compound first name over public branding
 });
 
 Deno.test("automatic sharing notices confirm invitations without guaranteeing availability", () => {
-  const job = notification("thread_declined");
+  const job = notification("response_timeout_organizer");
   job.opportunity = { automatic: true, invited_count: 4 };
   const content = threadNotificationContent(job);
   assert(content.description.includes("invited other matching instructors"), "invitations explained");
@@ -130,11 +130,43 @@ Deno.test("automatic sharing notices confirm invitations without guaranteeing av
   job.opportunity.invited_count = 0;
   assert(threadNotificationContent(job).description.includes("could not find"), "zero matches do not imply invitations");
 });
-Deno.test("instructor opportunity email includes escaped contact details and event brief", () => {
+Deno.test("unavailable notices use the warm approved wording and never blame the instructor", () => {
+  for (const job of [notification("thread_declined"), notification("thread_declined", 1), { ...notification("thread_declined"), opportunity: { automatic: true, invited_count: 2 } }]) {
+    const content = threadNotificationContent(job);
+    assertEquals(content.description, DECLINE_NOTICE_BODY);
+    assertEquals(content.heading, DECLINE_NOTICE_SUBJECT);
+    assertEquals(threadNotificationSubject(job), DECLINE_NOTICE_SUBJECT);
+    assert(!threadNotificationText(job, "https://hirelinedancers.com/account/").includes("marked that they are unavailable"), "no blame");
+  }
+  assertEquals(DECLINE_NOTICE_BODY, "Unfortunately, the instructor you reached out to isn't available for your event. We're working hard to find you someone else, and we'll let you know.");
+});
+Deno.test("still-looking notice is one calm update without a reply request", () => {
+  const job = notification("still_looking_organizer");
+  assertEquals(threadNotificationContent(job).description, "We're still looking for an instructor for your event. Our team is reaching out personally and will be in touch soon.");
+  const html = threadNotificationHtml(job, "https://hirelinedancers.com/account/");
+  assert(html.includes("Open conversation") && !html.includes("Please reply on Hire Line Dancers"), "no reply request");
+});
+Deno.test("organizer reply emails ask them to sign in; instructor reply emails are unchanged", () => {
+  const organizer = { ...notification("new_message"), recipient_role: "organizer" as const, sender_name: "Jordan Smith" };
+  assertEquals(threadNotificationContent(organizer).description, "Jordan replied to your inquiry. Sign in to your Hire Line Dancers account to read it.");
+  const instructor = { ...notification("new_message"), recipient_role: "instructor" as const, sender_name: "Alex R." };
+  assertEquals(threadNotificationContent(instructor).description, "Alex R. sent a message through Hire Line Dancers.");
+});
+Deno.test("review requests link to the review form and ask for a rating", () => {
+  const job = notification("review_request");
+  assertEquals(threadActionLabel(job, "html"), "Leave a review");
+  const url = new URL(threadActionUrl(job, "https://hirelinedancers.com/account/?tab=inquiries&thread=thread"));
+  assertEquals(url.searchParams.get("review")!, "1");
+  assertEquals(url.searchParams.get("thread")!, "thread");
+  assertEquals(threadActionUrl(notification("new_message"), "https://hirelinedancers.com/x"), "https://hirelinedancers.com/x");
+  assert(threadNotificationContent(job).description.includes("1 to 5 stars"), "rating explained");
+  assert(!threadNotificationHtml(job, "https://hirelinedancers.com/").includes("Please reply on Hire Line Dancers"), "no reply request");
+});
+Deno.test("instructor opportunity email renders the escaped event brief", () => {
   const job = notification("new_thread");
-  job.opportunity = { automatic: true, brief: { Organizer: "Sarah <Parker>", Email: "sarah@example.test", Phone: "+15125550100", Venue: "Congress Hall", "Music requests": "Country & pop" } };
+  job.opportunity = { automatic: true, brief: { Organizer: "Sarah <Parker>", Venue: "Congress Hall", "Music requests": "Country & pop" } };
   const html = threadNotificationHtml(job, "https://hirelinedancers.com/account/?thread=thread");
-  assert(html.includes("sarah@example.test") && html.includes("+15125550100"), "organizer contacts included");
+  assert(html.includes("Congress Hall"), "brief included");
   assert(html.includes("Sarah &lt;Parker&gt;") && html.includes("Country &amp; pop"), "brief is escaped");
   assert(!html.includes("Reach Out"), "no manual re-inquiry step");
 });

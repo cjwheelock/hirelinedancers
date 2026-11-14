@@ -4,7 +4,7 @@ import { getMarketplaceClient } from "@/lib/marketplace";
 import styles from "./Marketplace.module.css";
 
 type AttentionItem = { thread_id: string; reason: string; created_at: string };
-const reasons: Record<string, string> = { no_matches: "No suitable alternatives", urgent_event: "Event within two days", delivery_failed: "Notification delivery failed", static_listing: "Instructor connection needed" };
+const reasons: Record<string, string> = { no_matches: "No suitable alternatives", urgent_event: "Event within two days", delivery_failed: "Notification delivery failed", static_listing: "Instructor connection needed", no_response_after_sharing: "No replies after sharing" };
 export function InquiryAttention({ onOpen }: { onOpen: (threadId: string) => void }) {
   const [items, setItems] = useState<AttentionItem[]>([]);
   const [error, setError] = useState<string | null>(null);

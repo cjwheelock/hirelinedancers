@@ -42,6 +42,8 @@ jobs:
         run: node --test scripts/test-admin-inquiries.mjs
       - name: Test instructor pricing guidance
         run: npm run test:pricing-guidance
+      - name: Test CX improvements
+        run: npm run test:cx
       - name: Test booking agreement PDFs
         run: npm run test:booking-document
       - name: Test IndexNow sitemap comparison
@@ -55,6 +57,7 @@ jobs:
           # remains the authorization boundary for all marketplace data.
           NEXT_PUBLIC_SUPABASE_URL: https://wzmyroeowbsxxibkeejf.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_36gNqu74ysQhY2_VvJlS4A_XTYUFyxe
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
       - name: Audit generated site
         run: npm run audit:static
       - name: Verify searchable instructor profiles

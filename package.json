@@ -21,6 +21,7 @@
     "predev": "node scripts/prepare-video-processor.mjs",
     "test:video": "node --test scripts/test-video-upload.mjs",
     "test:pricing-guidance": "node --test scripts/test-instructor-pricing-guidance.mjs",
+    "test:cx": "node --test scripts/test-cx-improvements.mjs",
     "test:profile-reminder": "node --test scripts/test-profile-reminder.mjs && node scripts/test-profile-reminder-sql.mjs"
   },
   "dependencies": {

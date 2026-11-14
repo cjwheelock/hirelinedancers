@@ -1,24 +1,49 @@
+export type ProfileReminderKind = 'profile_24h' | 'profile_72h' | 'payouts';
 export type ProfileReminderJob = {
   id: number;
   recipient_email: string;
   display_name: string;
   city: string | null;
+  kind?: ProfileReminderKind;
 };
 export const PROFILE_REMINDER_FROM = 'Hire Line Dancers <inquiries@mail.hirelinedancers.com>';
 export const PROFILE_REMINDER_REPLY_TO = 'hello@hirelinedancers.com';
 export const PROFILE_REMINDER_URL = 'https://hirelinedancers.com/account/?tab=profile';
+export const PAYOUTS_REMINDER_URL = 'https://hirelinedancers.com/account/?tab=payouts';
 const escapeHtml = (text: string) => text.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]!);
+export function profileReminderContent(job: ProfileReminderJob) {
+  const place = job.city?.trim() ? `the ${job.city.trim()} area` : 'your area';
+  switch (job.kind ?? 'profile_24h') {
+    case 'profile_72h':
+      return {
+        subject: 'Your Hire Line Dancers profile is almost there',
+        body: `Your profile is still a draft. It only takes a few minutes to finish, and once it is approved, people planning events in ${place} can find you and send you inquiries.`,
+        linkLabel: 'Finish your profile', url: PROFILE_REMINDER_URL,
+      };
+    case 'payouts':
+      return {
+        subject: 'Set up payouts so you can get paid',
+        body: 'Your Hire Line Dancers profile is live. Before you can send a quote and get paid for a booking, connect a Stripe account for payouts. It takes about 5 minutes.',
+        linkLabel: 'Set up payouts', url: PAYOUTS_REMINDER_URL,
+      };
+    default:
+      return {
+        subject: 'Finish your profile and get discovered',
+        body: `Thanks for starting your Hire Line Dancers profile! Finish setting it up so people planning events in ${place} can find you and reach out with inquiries.`,
+        linkLabel: 'Finish your profile', url: PROFILE_REMINDER_URL,
+      };
+  }
+}
 export function profileReminderEmail(job: ProfileReminderJob) {
   const name = job.display_name.trim();
-  const place = job.city?.trim() ? `the ${job.city.trim()} area` : 'your area';
   const greeting = name ? `Hey ${name},` : 'Hey,';
-  const body = `Thanks for starting your Hire Line Dancers profile! Finish setting it up so people planning events in ${place} can find you and reach out with inquiries.`;
+  const content = profileReminderContent(job);
   const help = 'If you have any questions or ran into trouble, just reply here and I’ll help.';
   return {
     from: PROFILE_REMINDER_FROM, reply_to: PROFILE_REMINDER_REPLY_TO, to: [job.recipient_email],
-    subject: 'Finish your profile and get discovered',
-    text: [greeting,'',body,'',`Finish your profile: ${PROFILE_REMINDER_URL}`,'',help,'','CJ'].join('\n'),
-    html: `<div style="font-family:Arial,sans-serif;line-height:1.6"><p>${escapeHtml(greeting)}</p><p>${escapeHtml(body)}</p><p><a href="${escapeHtml(PROFILE_REMINDER_URL)}">Finish your profile</a></p><p>${escapeHtml(help)}</p><p>CJ</p></div>`,
+    subject: content.subject,
+    text: [greeting,'',content.body,'',`${content.linkLabel}: ${content.url}`,'',help,'','CJ'].join('\n'),
+    html: `<div style="font-family:Arial,sans-serif;line-height:1.6"><p>${escapeHtml(greeting)}</p><p>${escapeHtml(content.body)}</p><p><a href="${escapeHtml(content.url)}">${escapeHtml(content.linkLabel)}</a></p><p>${escapeHtml(help)}</p><p>CJ</p></div>`,
   };
 }
 export class ProfileReminderError extends Error {
@@ -36,7 +61,7 @@ export async function sendProfileReminder(job: ProfileReminderJob, apiKey: strin
     response = await fetcher('https://api.resend.com/emails', {
       method:'POST', signal:AbortSignal.timeout(15_000),
       headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json','Idempotency-Key':`hld-profile-completion-${job.id}`},
-      body:JSON.stringify({ ...profileReminderEmail(job), ...(testMode ? { subject: "[TEST] Finish your profile and get discovered" } : {}) }),
+      body:JSON.stringify({ ...profileReminderEmail(job), ...(testMode ? { subject: `[TEST] ${profileReminderContent(job).subject}` } : {}) }),
     });
   } catch { throw new ProfileReminderError('Provider outcome unknown; reconcile before retry', 'uncertain'); }
   const payload = await response.json().catch(()=>({})) as { id?: string };

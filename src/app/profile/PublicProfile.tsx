@@ -18,6 +18,7 @@ import {
   Users
 } from "lucide-react";
 import { SpotifyTrack } from "@/components/SpotifyTrack";
+import { PublicReviews } from "@/components/Reviews";
 import { eventTypes } from "@/data/site";
 import {
   getMarketplaceClient,
@@ -526,6 +527,15 @@ export function PublicProfile({ initialProfile = null, initialMedia = [] }: { in
                 ))}
               </ul>
             </section>
+          ) : null}
+
+          {profile.id && !previewing ? (
+            <PublicReviews
+              profileId={profile.id}
+              sectionClassName={styles.section}
+              kickerClassName={styles.kicker}
+              eventTypeLabel={(slug) => eventTypes.find((item) => item.slug === slug)?.label ?? slug}
+            />
           ) : null}
 
           <section className={styles.section} aria-labelledby="services-heading">

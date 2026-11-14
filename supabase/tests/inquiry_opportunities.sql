@@ -325,7 +325,7 @@ select pg_temp.messaging_assert(not exists(select 1 from public.inquiry_messages
 select id as second_thread from public.inquiry_threads where inquiry_id=:'inquiry_id' and instructor_profile_id='20000000-0000-0000-0000-000000000021' \gset
 select pg_temp.messaging_set_request('10000000-0000-0000-0000-000000000021','two@example.test','authenticated');
 set local role authenticated;
-select pg_temp.messaging_assert(public.get_inquiry_thread(:'second_thread')->'inquiry'->>'contact_email'='messaging-organizer@example.test','invited instructor receives organizer contact');
+select pg_temp.messaging_assert(not (public.get_inquiry_thread(:'second_thread')->'inquiry' ? 'contact_email'),'invited instructor does not receive organizer email before payment');
 select pg_temp.messaging_assert(not(public.get_inquiry_opportunity(:'second_thread') ? 'candidates'),'instructor cannot see applicants');
 select pg_temp.messaging_expect_error(format('select public.get_inquiry_thread(%L)',:'thread_id'),'access denied','private conversation isolation');
 select public.set_inquiry_availability(:'second_thread');

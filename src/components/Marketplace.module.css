@@ -3559,3 +3559,82 @@
     animation: none;
   }
 }
+
+/* Preview of an email the action will send, shown inside ConfirmDialog. */
+.emailPreview {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fbf7f2;
+  color: #3b2f26;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  text-align: left;
+}
+
+/* Star rating input and display for reviews. */
+.stars {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.starButton {
+  display: inline-flex;
+  padding: 2px;
+  border: 0;
+  background: none;
+  color: #c9b8a6;
+  cursor: pointer;
+}
+
+.starButton[aria-checked="true"],
+.starFilled {
+  color: #c8792a;
+}
+
+.starButton:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.reviewList {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.reviewItem {
+  display: grid;
+  gap: 6px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.reviewItem:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.honeypot {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.payoutSteps {
+  display: grid;
+  gap: 8px;
+  margin: 18px 0 0;
+  padding-left: 22px;
+  color: #3b2f26;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}

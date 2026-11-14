@@ -33,7 +33,7 @@ function harness(component = "inbox", props = {}, directoryProfiles = [profile])
   const calls = [], counts = [];
   let active, tree, dirty = true, nextTimer = 0;
   const navigations = [];
-  const location = new URL("/account/?tab=profile", "https://hirelinedancers.test");
+  const location = new URL(component === "contact" ? "/contact/?instructor=instructor-one" : "/account/?tab=profile", "https://hirelinedancers.test");
   location.assign = url => navigations.push(url);
   const window = { location, history: { replaceState: (_s, _t, url) => { location.href = new URL(url, location).href; } }, setTimeout: fn => { const id = ++nextTimer; timers.set(id, fn); return id; }, clearTimeout: id => timers.delete(id) };
   function query(table) {
@@ -45,7 +45,13 @@ function harness(component = "inbox", props = {}, directoryProfiles = [profile])
     return result;
   }
   const channel = { on: () => channel, subscribe: () => channel };
-  const client = { from: query, channel: () => channel, removeChannel: async () => {}, rpc: async (name, args) => {
+  const functions = { invoke: async (name, options) => {
+    calls.push({ name, args: options?.body });
+    const plan = plans.get(name)?.shift();
+    if (plan) return plan(options?.body);
+    return { data: { ok: true }, error: null };
+  } };
+  const client = { from: query, functions, channel: () => channel, removeChannel: async () => {}, rpc: async (name, args) => {
     calls.push({ name, args });
     const plan = plans.get(name)?.shift();
     if (plan) return plan(args);
@@ -92,6 +98,7 @@ function harness(component = "inbox", props = {}, directoryProfiles = [profile])
       if (specifier === "@/lib/commercialTerms") return load("src/lib/commercialTerms.ts");
       if (specifier === "@/data/site") return load("src/data/site.ts");
       if (specifier === "@/lib/videoLinks") return load("src/lib/videoLinks.ts");
+      if (specifier === "@/hooks/useMarketplaceSession") return { useMarketplaceSession: () => props.marketplaceSession ?? { session: null, account: null, isAdmin: false, loading: false } };
       if (specifier === "./ProfileEditor" || specifier === "./ProfileMediaManager" || specifier === "./InquiryRecommendations" || specifier === "./DirectoryCityField") return load(`src/components/${specifier.slice(2)}.tsx`);
       if (specifier.includes("commercial-terms.json")) return JSON.parse(readFileSync(new URL("config/commercial-terms.json", root), "utf8"));
       if (specifier.endsWith(".css")) return { __esModule: true, default: new Proxy({}, { get: (_target, key) => String(key) }) };
@@ -99,7 +106,7 @@ function harness(component = "inbox", props = {}, directoryProfiles = [profile])
     }, window, { env: { NEXT_PUBLIC_SUPABASE_URL: "https://supabase.test", NEXT_PUBLIC_SUPABASE_ANON_KEY: "publishable-test" } }, fn => fn());
     return commonJsModule.exports;
   }
-  const Component = component === "editor" ? load("src/components/ProfileEditor.tsx").ProfileEditor : component === "inbox" ? load("src/components/InquiryInbox.tsx").InquiryInbox : component === "dashboard" ? load("src/components/AccountWorkspace.tsx").InstructorDashboard : component === "onboarding" ? load("src/components/AccountWorkspace.tsx").OnboardingForm : component === "browser" ? load("src/components/SearchPanel.tsx").InstructorDirectoryBrowser : load("src/components/SearchPanel.tsx").PublicInstructorResults;
+  const Component = component === "contact" ? load("src/components/ContactInstructor.tsx").ContactInstructor : component === "editor" ? load("src/components/ProfileEditor.tsx").ProfileEditor : component === "inbox" ? load("src/components/InquiryInbox.tsx").InquiryInbox : component === "dashboard" ? load("src/components/AccountWorkspace.tsx").InstructorDashboard : component === "onboarding" ? load("src/components/AccountWorkspace.tsx").OnboardingForm : component === "browser" ? load("src/components/SearchPanel.tsx").InstructorDirectoryBrowser : load("src/components/SearchPanel.tsx").PublicInstructorResults;
   const rootProps = component === "inbox" ? { perspective: "organizer", accountId: "account", ...props } : component === "dashboard" ? { account: { id: "account" }, ...props } : { onCountChange: count => counts.push(count), ...props };
   async function render() {
     for (let iteration = 0; iteration < 40; iteration++) {
@@ -406,4 +413,63 @@ test("Southern California launch markets match their own city and surrounding se
     await app.render();
     assert.equal(app.counts.at(-1), 2, citySlug);
   }
+});
+
+test("an organizer without an account can send an inquiry with name and email", async () => {
+  const app = harness("contact");
+  await app.render();
+  assert.ok(app.text().includes("We'll email you when an instructor replies. Sign in with this email to read and respond."));
+  app.field("First name").props.onChange(event("Pat")); await app.render();
+  app.field("Last name").props.onChange(event("Guest")); await app.render();
+  app.field("Email").props.onChange(event("pat@example.test")); await app.render();
+  app.field("Event date").props.onChange(event("2027-02-01")); await app.render();
+  app.field("City").props.onChange(event("Austin")); await app.render();
+  app.field("State").props.onChange(event("tx"));
+  await app.render();
+  await app.nodes().find(node => node.type === "form").props.onSubmit(event()); await app.render();
+  const sent = app.calls.find(call => call.name === "guest-inquiry");
+  assert.ok(sent, "guest inquiries go through the guest-inquiry function");
+  assert.equal(sent.args.email, "pat@example.test");
+  assert.equal(sent.args.firstName, "Pat");
+  assert.equal(sent.args.instructorSlug, "instructor-one");
+  assert.equal(sent.args.region, "TX");
+  assert.equal(sent.args.website, "");
+  assert.ok(!app.calls.some(call => call.name === "submit_inquiry"), "the signed-in path is not used");
+  assert.ok(app.text().includes("has your event details"));
+});
+
+test("a guest inquiry error is shown and the form stays filled", async () => {
+  const app = harness("contact");
+  await app.render();
+  app.queue("guest-inquiry", async () => ({ data: null, error: { message: "Edge Function returned a non-2xx status code", context: { json: async () => ({ error: "Too many requests. Please try again later" }) } } }));
+  app.field("First name").props.onChange(event("Pat")); await app.render();
+  app.field("Email").props.onChange(event("pat@example.test"));
+  await app.render();
+  await app.nodes().find(node => node.type === "form").props.onSubmit(event()); await app.render();
+  assert.ok(app.text().includes("Too many requests. Please try again later"));
+  assert.equal(app.field("First name").props.value, "Pat");
+});
+
+test("signed-in organizers keep the existing inquiry flow", async () => {
+  const app = harness("contact", { marketplaceSession: { session: { user: { id: "account" } }, account: { id: "account", role: "organizer" }, isAdmin: false, loading: false } });
+  await app.render();
+  assert.equal(app.field("Email"), undefined, "no guest email field when signed in");
+  app.field("Event date").props.onChange(event("2027-02-01")); await app.render();
+  await app.nodes().find(node => node.type === "form").props.onSubmit(event()); await app.render();
+  assert.ok(app.calls.some(call => call.name === "submit_inquiry"));
+  assert.ok(!app.calls.some(call => call.name === "guest-inquiry"));
+});
+
+test("submitting a free profile moves to the Payouts step, and saving a draft never does", async () => {
+  const app = harness("editor", { profile: { ...profile, bio: "Hi" }, settings: { inquiry_email: "account@example.test" }, hasLifetimeAccess: true, onSaved: () => {}, describeEdgeError: async () => "Request failed" });
+  await app.render();
+  const stepButton = label => app.nodes().find(node => node.type === "button" && text(node) === label);
+  stepButton("5Preview & submit").props.onClick(); await app.render();
+  app.button("Save draft").props.onClick(); await app.render();
+  assert.equal(stepButton("5Preview & submit").props["aria-current"], "step");
+  app.button("Submit for review").props.onClick(); await app.render();
+  assert.equal(stepButton("6Payouts").props["aria-current"], "step");
+  assert.ok(app.text().includes("Your profile was submitted."));
+  const recorded = app.calls.filter(call => call.name === "record_instructor_onboarding_step").map(call => call.args.p_step);
+  assert.deepEqual([...new Set(recorded)], ["basics", "review", "payouts"]);
 });

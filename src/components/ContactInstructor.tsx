@@ -1,12 +1,74 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { eventTypes, instructors } from "@/data/site";
 import { useMarketplaceSession } from "@/hooks/useMarketplaceSession";
 import { getMarketplaceClient, signInUrl, readableError, type InstructorProfile } from "@/lib/marketplace";
 import styles from "./Marketplace.module.css";
 import contactStyles from "./ContactInstructor.module.css";
+
+export const GUEST_INQUIRY_NOTE = "We'll email you when an instructor replies. Sign in with this email to read and respond.";
+const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() || "";
+
+type TurnstileApi = {
+  render: (element: HTMLElement, options: { sitekey: string; callback: (token: string) => void; "expired-callback": () => void; "error-callback": () => void }) => string;
+  reset: (widgetId?: string) => void;
+  remove: (widgetId: string) => void;
+};
+
+/** Cloudflare Turnstile, rendered only when a site key is configured. */
+function TurnstileWidget({ onToken, resetKey }: { onToken: (token: string | null) => void; resetKey: number }) {
+  const container = useRef<HTMLDivElement>(null);
+  const widget = useRef<string | null>(null);
+  useEffect(() => {
+    if (!turnstileSiteKey) return;
+    let cancelled = false;
+    const win = window as typeof window & { turnstile?: TurnstileApi };
+    function mount() {
+      if (cancelled || !container.current || !win.turnstile || widget.current) return;
+      widget.current = win.turnstile.render(container.current, {
+        sitekey: turnstileSiteKey,
+        callback: (token) => onToken(token),
+        "expired-callback": () => onToken(null),
+        "error-callback": () => onToken(null)
+      });
+    }
+    if (win.turnstile) {
+      mount();
+    } else {
+      let script = document.querySelector<HTMLScriptElement>("script[data-turnstile]");
+      if (!script) {
+        script = document.createElement("script");
+        script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+        script.async = true;
+        script.dataset.turnstile = "true";
+        document.head.appendChild(script);
+      }
+      script.addEventListener("load", mount);
+    }
+    return () => {
+      cancelled = true;
+      if (widget.current && win.turnstile) win.turnstile.remove(widget.current);
+      widget.current = null;
+    };
+  }, [onToken]);
+  useEffect(() => {
+    const win = window as typeof window & { turnstile?: TurnstileApi };
+    if (resetKey > 0 && widget.current && win.turnstile) win.turnstile.reset(widget.current);
+  }, [resetKey]);
+  if (!turnstileSiteKey) return null;
+  return <div ref={container} />;
+}
+
+async function functionErrorMessage(error: unknown): Promise<string> {
+  const context = (error as { context?: Response } | null)?.context;
+  if (context && typeof context.json === "function") {
+    const parsed = await context.json().catch(() => null) as { error?: string } | null;
+    if (parsed?.error) return parsed.error;
+  }
+  return readableError(error);
+}
 
 type ContactProfile = Pick<InstructorProfile, "id" | "slug" | "display_name" | "business_name" | "city" | "region"> & {
   isStaticListing: boolean;
@@ -20,6 +82,10 @@ export function ContactInstructor() {
   const [successId, setSuccessId] = useState<string | null>(null);
   const [successThreadId, setSuccessThreadId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [guestSent, setGuestSent] = useState(false);
+  const [guest, setGuest] = useState({ firstName: "", lastName: "", email: "", website: "" });
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [turnstileReset, setTurnstileReset] = useState(0);
   const [form, setForm] = useState({
     eventType: "corporate-events",
     eventDate: "",
@@ -89,8 +155,63 @@ export function ContactInstructor() {
     return null;
   }
 
+  function budgetText() {
+    return form.budget === "" ? null : Number(form.budget).toLocaleString("en-US", { style: "currency", currency: "USD" });
+  }
+
+  async function submitGuest() {
+    const client = getMarketplaceClient();
+    if (!client || !profile) return;
+    if (turnstileSiteKey && !turnstileToken) {
+      setError("Please complete the verification and try again.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const { data, error: invokeError } = await client.functions.invoke("guest-inquiry", {
+        body: {
+          email: guest.email,
+          firstName: guest.firstName,
+          lastName: guest.lastName || null,
+          website: guest.website,
+          turnstileToken,
+          instructorProfileId: profile.id || null,
+          instructorSlug: profile.slug,
+          eventType: form.eventType,
+          eventDate: form.eventDate,
+          startTime: form.startTime || null,
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          venueName: form.venueName || null,
+          city: form.city || null,
+          region: form.region || null,
+          postalCode: form.postalCode || null,
+          guestCount: form.guestCount ? Number(form.guestCount) : null,
+          budgetRange: budgetText(),
+          musicRequests: form.musicRequests || null,
+          venueHasSpeakers: booleanOrNull(form.venueHasSpeakers),
+          venueHasMicrophone: booleanOrNull(form.venueHasMicrophone),
+          message: form.message || null
+        }
+      });
+      if (invokeError) throw invokeError;
+      if (!data?.ok) throw new Error("We could not send your inquiry. Please try again.");
+      setGuestSent(true);
+    } catch (submitError) {
+      setError(await functionErrorMessage(submitError));
+      setTurnstileToken(null);
+      setTurnstileReset((value) => value + 1);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!session) {
+      await submitGuest();
+      return;
+    }
     const client = getMarketplaceClient();
     if (!client || !profile) return;
     setBusy(true);
@@ -111,7 +232,7 @@ export function ContactInstructor() {
         p_event_region: form.region || null,
         p_event_postal_code: form.postalCode || null,
         p_guest_count: form.guestCount ? Number(form.guestCount) : null,
-        p_budget_range: form.budget === "" ? null : Number(form.budget).toLocaleString("en-US", { style: "currency", currency: "USD" }),
+        p_budget_range: budgetText(),
         p_music_requests: form.musicRequests || null,
         p_venue_has_speakers: booleanOrNull(form.venueHasSpeakers),
         p_venue_has_microphone: booleanOrNull(form.venueHasMicrophone),
@@ -134,21 +255,21 @@ export function ContactInstructor() {
 
   if (authLoading || profileLoading) return <div className={styles.loading}>Preparing your inquiry...</div>;
 
-  if (!session) {
-    const next = `${window.location.pathname}${window.location.search}`;
+  if (!session && guestSent) {
     return (
       <section className={`${styles.shell} ${styles.narrow}`}>
-        <p className={styles.eyebrow}>Contact an instructor</p>
-        <h1 className={styles.title}>Sign in to send your inquiry</h1>
-        <p className={styles.subtitle}>Profiles are open to everyone. An account is required only when you are ready to contact an instructor.</p>
-        <div className={styles.buttonRow} style={{ marginTop: 28 }}>
-          <a className={styles.button} href={signInUrl(next, "organizer")}>Sign in and continue</a>
+        <p className={styles.eyebrow}>Inquiry sent</p>
+        <h1 className={styles.title}>{profile?.display_name} has your event details</h1>
+        <p className={styles.success}>{GUEST_INQUIRY_NOTE}</p>
+        <p className={styles.subtitle}>We ask instructors to respond within 48 hours. If you haven’t heard back by then, we’ll invite other matching instructors to respond to your event. You can compare their profiles and choose who to book.</p>
+        <div className={styles.buttonRow} style={{ marginTop: 26 }}>
+          <Link className={styles.secondaryButton} href="/instructors/">Browse more instructors</Link>
         </div>
       </section>
     );
   }
 
-  if (!account?.role) {
+  if (session && !account?.role) {
     return (
       <section className={`${styles.shell} ${styles.narrow}`}>
         <h1 className={styles.title}>Finish your account first</h1>
@@ -158,7 +279,7 @@ export function ContactInstructor() {
     );
   }
 
-  if (account.role !== "organizer" && !isAdmin) {
+  if (session && account?.role !== "organizer" && !isAdmin) {
     return (
       <section className={`${styles.shell} ${styles.narrow}`}>
         <h1 className={styles.title}>Planner account required</h1>
@@ -204,6 +325,29 @@ export function ContactInstructor() {
       <h1 className={styles.title}>Tell the instructor about your event</h1>
       <p className={styles.subtitle}>Send your event details and message through Hire Line Dancers. The instructor will confirm availability, rates, and terms. We ask instructors to respond within 48 hours. If there is no reply, or they are unavailable, we will invite other matching instructors to respond.</p>
       <form className={`${styles.card} ${styles.stack} ${contactStyles.form}`} onSubmit={submit}>
+        {!session ? (
+          <>
+            <div className={styles.grid}>
+              <label className={styles.field}>
+                <span>First name</span>
+                <input required autoComplete="given-name" maxLength={80} value={guest.firstName} onChange={(e) => setGuest({ ...guest, firstName: e.target.value })} />
+              </label>
+              <label className={styles.field}>
+                <span>Last name</span>
+                <input autoComplete="family-name" maxLength={80} value={guest.lastName} onChange={(e) => setGuest({ ...guest, lastName: e.target.value })} />
+              </label>
+            </div>
+            <label className={styles.field}>
+              <span>Email</span>
+              <input required type="email" autoComplete="email" maxLength={254} value={guest.email} onChange={(e) => setGuest({ ...guest, email: e.target.value })} />
+            </label>
+            <p className={styles.help}>{GUEST_INQUIRY_NOTE} <a href={signInUrl(`${window.location.pathname}${window.location.search}`, "organizer")}>Sign in and continue</a></p>
+            <label className={styles.honeypot} aria-hidden="true">
+              <span>Website</span>
+              <input tabIndex={-1} autoComplete="off" value={guest.website} onChange={(e) => setGuest({ ...guest, website: e.target.value })} />
+            </label>
+          </>
+        ) : null}
         <label className={styles.field}>
           <span>Event type</span>
           <select required value={form.eventType} onChange={(e) => setForm({ ...form, eventType: e.target.value })}>
@@ -275,8 +419,9 @@ export function ContactInstructor() {
           <span>Anything else the instructor should know?</span>
           <textarea maxLength={3000} value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} />
         </label>
-        <p className={styles.help}>Your inquiry goes to this instructor first. If they do not respond within 48 hours or mark themselves unavailable, we will share your full event details and organizer contact information with other matching instructors. Your private conversations are not shared. You choose who to book.</p>
+        <p className={styles.help}>Your inquiry goes to this instructor first. If they do not respond within 48 hours or mark themselves unavailable, we will share your full event details with other matching instructors. Your email and phone number stay private until you book. Your private conversations are not shared. You choose who to book.</p>
         <p className={styles.help}>Messages are handled through Hire Line Dancers. Authorized administrators can view them to support the inquiry.</p>
+        {!session ? <TurnstileWidget onToken={setTurnstileToken} resetKey={turnstileReset} /> : null}
         {error ? <p className={styles.error}>{error}</p> : null}
         <button className={styles.button} disabled={busy} type="submit">{busy ? "Sending inquiry..." : "Send inquiry"}</button>
       </form>

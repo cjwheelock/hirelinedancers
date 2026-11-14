@@ -33,11 +33,14 @@ const standardWindows = bookingTerms.standardCancellationWindows as Cancellation
 export function PayoutsCard({
   profileId,
   settings,
-  onSaved
+  onSaved,
+  onSkip
 }: {
   profileId: string;
   settings: BookingSettings | null;
   onSaved: () => void;
+  /** Set during onboarding: shows Skip for now and hides booking defaults. */
+  onSkip?: () => void;
 }) {
   const [status, setStatus] = useState<PayoutStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -120,13 +123,21 @@ export function PayoutsCard({
                   {busy === "onboard" ? "Opening Stripe..." : status.hasAccount ? "Continue payout setup" : "Set up payouts"}
                 </button>
                 {status.hasAccount ? <button className={styles.secondaryButton} type="button" disabled={busy !== null || loading} onClick={() => void refresh()}>Check again</button> : null}
+                {onSkip ? <button className={styles.secondaryButton} type="button" disabled={busy !== null} onClick={onSkip}>Skip for now</button> : null}
               </div>
               <p className={styles.muted}>Stripe securely stores your tax ID and bank details. Hire Line Dancers never sees them. Stripe sends a 1099 tax form when federal or state rules require one.</p>
             </>
           ) : null}
         </div>
+        {onSkip ? (
+          <ol className={styles.payoutSteps}>
+            <li>You send a quote from a conversation</li>
+            <li>The organizer signs and pays in full</li>
+            <li>Your payout goes to Stripe {bookingTerms.payoutDelayHours} hours after the event</li>
+          </ol>
+        ) : null}
       </div>
-      <BookingPreferencesCard profileId={profileId} settings={settings} onSaved={onSaved} />
+      {onSkip ? null : <BookingPreferencesCard profileId={profileId} settings={settings} onSaved={onSaved} />}
     </>
   );
 }

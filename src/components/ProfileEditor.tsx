@@ -27,6 +27,7 @@ import {
   type ProfilePackage
 } from "@/lib/marketplace";
 import { ProfileMediaManager, type EditorMedia } from "./ProfileMediaManager";
+import { PayoutsCard } from "./PayoutsCard";
 import { InstructorPricingGuide } from "./InstructorPricingGuide";
 import pricing from "./InstructorPricingGuide.module.css";
 import styles from "./Marketplace.module.css";
@@ -56,7 +57,8 @@ const steps = [
   { id: "media", label: "Photos & videos" },
   { id: "services", label: "Services" },
   { id: "links", label: "Links & pricing" },
-  { id: "review", label: "Preview & submit" }
+  { id: "review", label: "Preview & submit" },
+  { id: "payouts", label: "Payouts" }
 ] as const;
 
 type StepId = (typeof steps)[number]["id"];
@@ -209,6 +211,14 @@ export function ProfileEditor({
   const score = Math.round((checklist.filter((item) => item.done).length / checklist.length) * 100);
   const nextTip = checklist.find((item) => !item.done);
 
+  useEffect(() => {
+    if (profile.status !== "draft" && profile.status !== "pending_review") return;
+    const client = getMarketplaceClient();
+    if (!client) return;
+    // Best effort: records the furthest onboarding step for admins. No profile content is sent.
+    void client.rpc("record_instructor_onboarding_step", { p_step: step }).then(() => undefined, () => undefined);
+  }, [profile.status, step]);
+
   function goTo(id: StepId) {
     setStep(id);
     setError(null);
@@ -338,8 +348,10 @@ export function ProfileEditor({
         onSaved();
         if (!quiet) {
           if (profile.status === "draft") {
+            // Saving never moves past Preview & submit; Payouts follows submission.
             const index = steps.findIndex((item) => item.id === step);
-            goTo(steps[Math.min(index + 1, steps.length - 1)].id);
+            const reviewIndex = steps.findIndex((item) => item.id === "review");
+            goTo(steps[index >= reviewIndex ? index : index + 1].id);
           } else {
             window.location.assign(publicUrl ?? previewUrl);
           }
@@ -360,7 +372,7 @@ export function ProfileEditor({
           setError(submissionError.message);
           return false;
         }
-        goTo("review");
+        goTo("payouts");
         setMessage("Your profile was submitted. We’ll review it ASAP.");
         onSaved();
         return true;
@@ -819,6 +831,10 @@ export function ProfileEditor({
         </section>
       ) : null}
 
+      {step === "payouts" ? (
+        <PayoutsCard profileId={profile.id} settings={settings} onSaved={onSaved} onSkip={() => goTo("review")} />
+      ) : null}
+
       <footer className={editor.footer}>
         <div className={editor.footerLeft}>
           {stepIndex > 0 ? (
@@ -830,7 +846,7 @@ export function ProfileEditor({
             </button>
           ) : null}
         </div>
-        {step !== "review" ? (
+        {step === "payouts" ? null : step !== "review" ? (
           <button type="button" className={styles.button} disabled={busy !== null || mediaBusy} onClick={() => void next(1)}>
             Next: {steps[stepIndex + 1]?.label} <ArrowRight size={16} aria-hidden="true" />
           </button>

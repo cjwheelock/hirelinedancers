@@ -33,6 +33,7 @@ import { InstructorOnboardingPricing } from "./InstructorOnboardingPricing";
 import { InquiryInbox } from "./InquiryInbox";
 import { MembershipCreditAdmin } from "./MembershipCreditAdmin";
 import { PayoutsCard } from "./PayoutsCard";
+import { AdminReviewsCard, OnboardingStepCell, useOnboardingProgress } from "./AdminReviews";
 import { AdminAttentionRows, AdminBookings, AdminRecentBookings, collectedCents, useAdminBookings } from "./AdminBookings";
 import { AdminOutreach } from "./AdminOutreach";
 import { AdminInquiries } from "./AdminInquiries";
@@ -2048,6 +2049,7 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
   const [focusedInquiryId, setFocusedInquiryId] = useState<string | null>(null);
   const [focusedThreadId, setFocusedThreadId] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<InstructorProfile[]>([]);
+  const onboardingProgress = useOnboardingProgress(profiles);
   const [inquiries, setInquiries] = useState<MarketplaceInquiry[]>([]);
   const [jobs, setJobs] = useState<AdminNotificationJob[]>([]);
   const [threadJobs, setThreadJobs] = useState<AdminThreadNotificationJob[]>([]);
@@ -2912,7 +2914,7 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
             <div className={styles.compactSectionHeader}><h2>All instructor profiles</h2><span className={styles.recordCount}>{profiles.length} total</span></div>
             <div className={adminStyles.tableWrap}>
               <table className={adminStyles.table}>
-                <thead><tr><th>Instructor</th><th>Location</th><th>Status</th><th>Approval email</th><th>Action</th></tr></thead>
+                <thead><tr><th>Instructor</th><th>Location</th><th>Status</th><th>Onboarding step</th><th>Approval email</th><th>Action</th></tr></thead>
                 <tbody>{profiles.map((profile) => {
                   const paymentSetup = paymentSetups.find((setup) => setup.instructor_profile_id === profile.id);
                   const approvalJob = latestApprovalEmailJob(profile.id);
@@ -2932,6 +2934,7 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
                   return (
                     <tr key={profile.id}>
                       <td>{profile.display_name}</td><td>{[profile.city, profile.region].filter(Boolean).join(", ")}</td><td><span className={styles.status}>{profile.status.replaceAll("_", " ")}</span></td>
+                      <td><OnboardingStepCell progress={onboardingProgress[profile.id]} /></td>
                       <td>{approvalJob
                         ? <><span className={styles.status}>{approvalJob.status.replaceAll("_", " ")}</span>{approvalJob.sent_at ? <small>{new Date(approvalJob.sent_at).toLocaleString()}</small> : null}</>
                         : <span className={styles.muted}>Not queued</span>}</td>
@@ -2946,6 +2949,7 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
               </table>
             </div>
           </section>
+          <AdminReviewsCard />
         </div>
       ) : null}
 
