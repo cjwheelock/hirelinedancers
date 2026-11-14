@@ -631,3 +631,40 @@ button.welcomeTile {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+.filmTips {
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: #fffaf3;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+
+.filmTips summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.filmTips ul {
+  margin: 10px 0 0;
+  padding-left: 1.2em;
+}
+
+.filmTips li + li {
+  margin-top: 4px;
+}
+
+.filmTipsLabel {
+  margin: 12px 0 4px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.filmTipsScript {
+  margin: 0;
+  padding-left: 12px;
+  border-left: 3px solid #b8482a;
+}

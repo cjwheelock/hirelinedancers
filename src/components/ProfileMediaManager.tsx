@@ -417,7 +417,21 @@ export function ProfileMediaManager({
               <span><Video size={28} aria-hidden="true" /> Upload a welcome video</span>
             </button>
           )}
-          <small className={styles.muted}>30–60 seconds saying hi and what a class with you feels like. Or paste a link below and choose &ldquo;Use as welcome video.&rdquo;</small>
+          <small className={styles.muted}>Planners and couples want to know who will be leading their guests. A quick hello from you helps them picture you at their event and reach out. Or paste a link below and choose &ldquo;Use as welcome video.&rdquo;</small>
+          <details className={editor.filmTips}>
+            <summary>How to film it</summary>
+            <ul>
+              <li>Hold your phone vertically. We recommend keeping it 15 to 30 seconds.</li>
+              <li>Find good light and a quiet spot.</li>
+              <li>Say who you are, the events you teach, and why line dancing works.</li>
+              <li>If you have clips of yourself teaching, use them as B-roll over your voice while you talk.</li>
+              <li>End by inviting people to get in touch.</li>
+            </ul>
+            <p className={editor.filmTipsLabel}>Example script</p>
+            <p className={editor.filmTipsScript}>
+              &ldquo;Hi, I&rsquo;m [your name], a line dance instructor in [your city]. I&rsquo;d love to teach line dancing at your wedding, corporate party, or next event. It&rsquo;s the perfect way to get everyone up on the floor, dancing, having fun, and making memories together. <em>(Show a clip of you teaching as B-roll while you&rsquo;re talking.)</em> If you have any questions, just hit Contact on my profile. I&rsquo;d love to hear from you!&rdquo;
+            </p>
+          </details>
           <input ref={welcomeInput} hidden type="file" accept={VIDEO_ACCEPT} onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; void chooseWelcomeFile(file); }} />
         </div>
       </div>
