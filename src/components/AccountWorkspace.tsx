@@ -464,6 +464,17 @@ export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean })
     );
   }
 
+  // A workspace switch is navigation to its landing view, not a request to
+  // reopen a detail/anchor left behind by the previous workspace.
+  function selectWorkspace(next: "admin" | "account" | "organizer") {
+    if (next === workspaceMode) return;
+    const url = new URL(window.location.href);
+    for (const key of ["tab", "thread", "inquiry", "profile", "followup"]) url.searchParams.delete(key);
+    url.hash = "";
+    window.history.replaceState({}, "", `${url.pathname}${url.search}`);
+    setWorkspaceMode(next);
+  }
+
   const adminWorkspaceActive = isAdmin && workspaceMode === "admin";
 
   return (
@@ -483,10 +494,10 @@ export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean })
 
       {!adminOnly && isAdmin ? (
         <div className={styles.tabs} role="tablist" aria-label="Workspace selection">
-          <button className={`${styles.tab} ${workspaceMode === "admin" ? styles.activeTab : ""}`} type="button" onClick={() => setWorkspaceMode("admin")}>Admin</button>
-          {account?.role === "instructor" ? <button className={`${styles.tab} ${workspaceMode === "account" ? styles.activeTab : ""}`} type="button" onClick={() => setWorkspaceMode("account")}>Instructor</button> : null}
-          {account?.role === "organizer" ? <button className={`${styles.tab} ${workspaceMode === "account" ? styles.activeTab : ""}`} type="button" onClick={() => setWorkspaceMode("account")}>Organizer</button> : null}
-          {account?.role !== "organizer" ? <button className={`${styles.tab} ${workspaceMode === "organizer" ? styles.activeTab : ""}`} type="button" onClick={() => setWorkspaceMode("organizer")}>Organizer</button> : null}
+          <button className={`${styles.tab} ${workspaceMode === "admin" ? styles.activeTab : ""}`} type="button" onClick={() => selectWorkspace("admin")}>Admin</button>
+          {account?.role === "instructor" ? <button className={`${styles.tab} ${workspaceMode === "account" ? styles.activeTab : ""}`} type="button" onClick={() => selectWorkspace("account")}>Instructor</button> : null}
+          {account?.role === "organizer" ? <button className={`${styles.tab} ${workspaceMode === "account" ? styles.activeTab : ""}`} type="button" onClick={() => selectWorkspace("account")}>Organizer</button> : null}
+          {account?.role !== "organizer" ? <button className={`${styles.tab} ${workspaceMode === "organizer" ? styles.activeTab : ""}`} type="button" onClick={() => selectWorkspace("organizer")}>Organizer</button> : null}
         </div>
       ) : null}
 
@@ -2477,7 +2488,7 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
           : (["overview", "inquiries", "messages", "bookings", "profiles", "memberships", "invitations", "delivery"] as const)
         ).map((name) => (
           <button key={name} className={`${styles.tab} ${tab === name ? styles.activeTab : ""}`} type="button" onClick={() => selectAdminTab(name)}>
-            {name[0].toUpperCase() + name.slice(1)}
+            {name === "profiles" ? `Instructor reviews${pending.length ? ` (${pending.length})` : ""}` : name[0].toUpperCase() + name.slice(1)}
           </button>
         ))}
       </div>
@@ -2507,6 +2518,15 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
 
       {!loading && tab === "overview" ? (
         <div className={styles.compactAdminStack}>
+          <section className={`${styles.card} ${styles.compactAdminCard} ${styles.pendingReviewBanner}`} aria-label="Instructor reviews">
+            <div>
+              <h2>{pending.length} {pending.length === 1 ? "instructor awaiting review" : "instructors awaiting review"}</h2>
+              {!pending.length ? <p className={styles.muted}>No profiles are waiting for review.</p> : null}
+            </div>
+            <button className={styles.button} type="button" onClick={() => selectAdminTab("profiles")}>
+              Review instructors
+            </button>
+          </section>
           <div className={`${styles.card} ${styles.compactAdminCard} ${styles.filterBar} ${styles.adminOverviewHeader}`}>
             <div>
               <h2>Marketplace performance</h2>
@@ -2652,7 +2672,6 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
             {!pending.length ? <p className={styles.notice}>No profiles are waiting for review.</p> : null}
           </section>
 
-          <SpotlightReview profiles={profiles} />
           <div className={styles.profileReviewList}>
               {reviewProfiles.map((profile) => {
                 const profileMedia = media.filter((item) => item.instructor_profile_id === profile.id);

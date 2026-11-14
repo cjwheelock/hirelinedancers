@@ -36,6 +36,8 @@ jobs:
         run: npm run test:auth
       - name: Test instructor and organizer journeys
         run: npm run test:journeys
+      - name: Test admin navigation and review queue
+        run: node --test scripts/test-admin-navigation.mjs
       - name: Test admin inquiry visibility
         run: node --test scripts/test-admin-inquiries.mjs
       - name: Test instructor pricing guidance

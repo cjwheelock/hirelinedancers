@@ -2590,3 +2590,33 @@
 @media (max-width: 600px) { .opportunity { padding: 15px; } .opportunityCandidate { flex-wrap: wrap; padding: 12px; } .opportunityActions { width: 100%; justify-items: start; margin-left: 54px; } }
 
 .organizerEmail { grid-column: span 2; }
+
+/* Keep workspace swaps from re-anchoring the document to replaced content. */
+.shell:has([aria-label="Workspace selection"]) {
+  overflow-anchor: none;
+}
+
+.pendingReviewBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  border-color: #b8482a;
+  background: #fff8ed;
+}
+
+.pendingReviewBanner h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.pendingReviewBanner p {
+  margin: 6px 0 0;
+}
+
+@media (max-width: 600px) {
+  .pendingReviewBanner > button {
+    width: 100%;
+  }
+}

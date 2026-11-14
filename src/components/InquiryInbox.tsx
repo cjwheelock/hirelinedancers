@@ -114,7 +114,7 @@ export function InquiryInbox({
   const [loadingBooking, setLoadingBooking] = useState(false);
   const bookingRequestRef = useRef(0);
   const requestedSectionRef = useRef<{ threadId: string; quote: boolean } | null>(null);
-  const messageEndRef = useRef<HTMLDivElement | null>(null);
+  const messageTimelineRef = useRef<HTMLDivElement | null>(null);
   const detailRequestRef = useRef(0);
   const listRequestRef = useRef(0);
   const moreRequestRef = useRef(0);
@@ -304,7 +304,9 @@ export function InquiryInbox({
   }, [accountId, loadBooking, loadDetail, loadThreads, perspective, selectedThreadId]);
 
   useEffect(() => {
-    messageEndRef.current?.scrollIntoView({ block: "end" });
+    // Keep new messages visible inside the timeline without scrolling the page.
+    const timeline = messageTimelineRef.current;
+    if (timeline) timeline.scrollTop = timeline.scrollHeight;
   }, [detail?.messages.length]);
 
   function chooseThread(threadId: string | null) {
@@ -669,7 +671,7 @@ export function InquiryInbox({
                       onDataChange?.();
                     }} />
                   ) : null}
-                  <div className={styles.messageTimeline} aria-live="polite">
+                  <div ref={messageTimelineRef} className={styles.messageTimeline} aria-live="polite">
                     {detail.messages.map((message) => {
                       const ownMessage = Boolean(accountId && message.sender_account_id === accountId);
                       const systemMessage = message.message_type === "system" || message.sender_role === "system";
@@ -680,7 +682,6 @@ export function InquiryInbox({
                         </article>
                       );
                     })}
-                    <div ref={messageEndRef} />
                   </div>
                   {canReply ? (
                     <form className={styles.messageComposer} onSubmit={sendMessage}>
