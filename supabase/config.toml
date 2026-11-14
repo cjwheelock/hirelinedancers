@@ -64,3 +64,6 @@ verify_jwt = true
 
 [functions.inquiry-notification-webhook]
 verify_jwt = false
+
+[functions.outreach]
+verify_jwt = false
