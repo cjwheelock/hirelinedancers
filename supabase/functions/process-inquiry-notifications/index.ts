@@ -8,7 +8,7 @@ import { maskContactDetails } from "../_shared/hld-booking.ts";
 
 import { AdminInquiryEmailError, type AdminInquiryNotificationJob, sendAdminInquiryEmail } from "../_shared/hld-admin-inquiry-email.ts";
 
-import { ProfileReminderError, type ProfileReminderJob, sendProfileReminder, profileReminderSuppressed, PROFILE_REMINDER_FROM, PROFILE_REMINDER_REPLY_TO, profileReminderEmail } from "../_shared/hld-profile-reminder.ts";
+import { ProfileReminderError, type ProfileReminderJob, sendProfileReminder, PROFILE_REMINDER_FROM, PROFILE_REMINDER_REPLY_TO, profileReminderEmail } from "../_shared/hld-profile-reminder.ts";
 
 type ReadOnlyTable<Row extends Record<string, unknown>> = {
   Row: Row;
@@ -1784,22 +1784,20 @@ export default {
     if (body.action === "profile-reminder-readiness" || body.action === "profile-reminder-test") {
       const sample: ProfileReminderJob = { id: 0, recipient_email: "cjwheelock1@gmail.com", display_name: "CJ", city: null };
       try {
-        const suppressed = body.action === "profile-reminder-readiness" ? await profileReminderSuppressed(sample.recipient_email, requiredEnv("RESEND_API_KEY")) : false;
         if (body.action === "profile-reminder-readiness") return Response.json({
           from: PROFILE_REMINDER_FROM, replyTo: PROFILE_REMINDER_REPLY_TO,
           existingSenderMatches: requiredEnv("RESEND_FROM_EMAIL").trim() === PROFILE_REMINDER_FROM,
-          suppressionLookupSucceeded: true, testRecipientSuppressed: suppressed,
+          suppressionMode: "provider-enforced-on-send", acceptanceIsDelivery: false,
           preview: profileReminderEmail(sample),
         });
-        if (suppressed) return Response.json({ error: "Test recipient is suppressed; no email sent" }, { status: 409 });
         const { data: reserved, error: reserveError } = await ctx.supabaseAdmin.rpc("reserve_profile_reminder_test", {});
         if (reserveError || !reserved) return Response.json({ error: "Test already reserved or reminders enabled; reconcile before retry" }, { status: 409 });
         let result = "uncertain", providerId: string | null = null;
         try { providerId = await sendProfileReminder(sample, requiredEnv("RESEND_API_KEY"), fetch, true); result = "sent"; }
         catch (error) { result = error instanceof ProfileReminderError ? error.outcome : "uncertain"; }
         const { error: completeError } = await ctx.supabaseAdmin.rpc("complete_profile_reminder_test", { p_status: result, p_provider_message_id: providerId });
-        return Response.json({ status: result, providerMessageId: providerId, acknowledgementSucceeded: !completeError });
-      } catch { return Response.json({ error: "Provider suppression check unavailable; no test email sent" }, { status: 503 }); }
+        return Response.json({ status: result, providerMessageId: providerId, acceptanceIsDelivery: false, acknowledgementSucceeded: !completeError });
+      } catch (error) { return Response.json({ error: error instanceof ProfileReminderError ? error.message : "Reminder test unavailable; reconcile test ledger before retry" }, { status: 503 }); }
     }
     const requestedLimit = Number.isInteger(body.limit) ? Number(body.limit) : 10;
     const limit = Math.max(1, Math.min(requestedLimit, 25));

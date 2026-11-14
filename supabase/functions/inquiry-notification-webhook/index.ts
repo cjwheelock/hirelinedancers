@@ -47,6 +47,13 @@ export default { fetch: async (req: Request) => {
       });
       if (error) throw error;
     }
+    const reminderStatus = event.type === "email.suppressed" ? "suppressed" : status;
+    if (reminderStatus && event.data?.email_id && event.created_at && Number.isFinite(Date.parse(event.created_at))) {
+      const { error } = await notificationAdmin().rpc("record_profile_reminder_delivery", {
+        p_provider_message_id: event.data.email_id, p_status: reminderStatus, p_occurred_at: event.created_at
+      });
+      if (error) throw error;
+    }
     return new Response("OK");
   } catch {
     return new Response("Unable to record notification event", { status: 500 });

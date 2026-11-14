@@ -24,29 +24,12 @@ export function profileReminderEmail(job: ProfileReminderJob) {
 export class ProfileReminderError extends Error {
   constructor(message: string, readonly outcome: 'failed' | 'uncertain' | 'cancelled') { super(message); }
 }
-export async function profileReminderSuppressed(email: string, apiKey: string, fetcher: typeof fetch = fetch): Promise<boolean> {
-  let response: Response;
-  try {
-    response = await fetcher(`https://api.resend.com/suppressions/${encodeURIComponent(email)}`, {
-      headers: { Authorization: `Bearer ${apiKey}` }, signal: AbortSignal.timeout(10_000),
-    });
-  } catch { throw new ProfileReminderError('Suppression lookup unavailable; no email sent', 'failed'); }
-  if (response.status === 404) return false;
-  if (!response.ok) throw new ProfileReminderError(`Suppression lookup returned ${response.status}; no email sent`, 'failed');
-  const data = await response.json().catch(() => null) as { email?: string } | null;
-  if (typeof data?.email !== 'string' || data.email.toLowerCase() !== email.toLowerCase()) {
-    throw new ProfileReminderError('Invalid suppression lookup response; no email sent', 'failed');
-  }
-  return true;
-}
 export async function sendProfileReminder(job: ProfileReminderJob, apiKey: string, fetcher: typeof fetch = fetch, testMode = false, beforeSend?: () => Promise<boolean>) {
   if (testMode && (job.id !== 0 || job.recipient_email !== "cjwheelock1@gmail.com")) throw new ProfileReminderError("Invalid test recipient", "failed");
   // Low-volume queue: leave room for the worker's other transactional messages.
   await new Promise(resolve => setTimeout(resolve, 600));
-  if (await profileReminderSuppressed(job.recipient_email, apiKey, fetcher)) {
-    throw new ProfileReminderError('Recipient is suppressed by email provider', 'cancelled');
-  }
-  await new Promise(resolve => setTimeout(resolve, 600));
+  // Resend enforces its suppression list on every send, including sending-only keys.
+  // An accepted id is not proof of delivery; signed webhook events record delivery separately.
   if (beforeSend && !await beforeSend()) throw new ProfileReminderError('Profile is no longer eligible', 'cancelled');
   let response: Response;
   try {
