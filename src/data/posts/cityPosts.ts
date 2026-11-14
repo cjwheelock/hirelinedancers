@@ -2,6 +2,52 @@ import type { BlogPost } from "../blog";
 
 export const cityPosts: BlogPost[] = [
   {
+    slug: "where-to-line-dance-nashville",
+    title: "Where to Go Line Dancing in Nashville",
+    description: "Four Nashville places to try line dancing, from social dance floors to bookable beginner lessons, with official calendars and practical arrival tips.",
+    publishDate: "2026-11-14",
+    updatedDate: "2026-11-14",
+    status: "ready",
+    category: "City guide",
+    citySlug: "nashville-tn",
+    author: "Hire Line Dancers",
+    body: `
+<p>Nashville offers more than one kind of line-dancing experience. You can join instruction at a busy entertainment venue, spend an evening on a country dance floor, or book a beginner class with a clear start and finish. The right choice depends on whether you want a lesson, a night out, or both.</p>
+<p>These four options are an editorial shortlist, not a ranking. Each has line-dance programming on its official venue or organizer website.</p>
+<p><strong>Last checked: November 14, 2026.</strong> Times are local to Nashville. Check the linked calendar for your date, especially around holidays. Country swing and two-step are partner dances, so look specifically for line-dance instruction when choosing a class.</p>
+<h2>1. Category 10, Hurricane Hall</h2>
+<p><strong>Address:</strong> 120 2nd Avenue North, Nashville, TN 37201.</p>
+<p>Category 10 offers free line-dance lessons in Hurricane Hall, plus separate Line Dance All-Call sessions for joining popular dances. Choose a lesson if you want the steps explained rather than trying to follow a sequence already in motion.</p>
+<p>The venue publishes a date-specific schedule, and times can vary. It is 21 and over after 8 p.m. Category 10 continues the former Wildhorse Saloon's dance-floor legacy; do not plan them as two separate stops.</p>
+<p><a href="https://www.category10.com/nashville/line-dancing/">Official line-dancing schedule</a> · <a href="https://www.category10.com/nashville/">Category 10 visitor information</a></p>
+<h2>2. The Nashville Palace</h2>
+<p><strong>Address:</strong> 2611 McGavock Pike, Nashville, TN 37214.</p>
+<p>The Palace is an option for a longer country-dancing evening. Its official calendar includes Standard Western line-dance lessons and weekend dancing, while other sessions feature two-step. Check the specific event rather than assuming every country dance night teaches line dances.</p>
+<p>The venue lists country dance nights Tuesday through Saturday and free onsite parking. Its FAQ describes line-dance nights as 21 and over except Thursday Ladies Night; confirm Thursday's entry requirements directly instead of assuming it is all ages. Lesson times, cover charges and the dance format should be checked for your chosen night.</p>
+<p><a href="https://www.thefamousnashvillepalace.com/dancing">Dance-night information</a> · <a href="https://www.thefamousnashvillepalace.com/calendar">Official calendar</a> · <a href="https://www.thefamousnashvillepalace.com/contact">Location</a></p>
+<h2>3. Bootleggers Inn, with Stompin’ Grounds</h2>
+<p><strong>Primary location:</strong> 207 Broadway, second floor, Nashville, TN 37201.</p>
+<p>Stompin’ Grounds runs bookable, one-hour public line-dancing classes with daily slots. This is a structured beginner-friendly lesson, not a guarantee of an open dance floor all evening. The class welcomes all ages. Minors must be accompanied by an adult with valid ID.</p>
+<p>Check the location text before leaving: Bootleggers is the primary venue, but classes can be assigned to another Broadway venue. Bootleggers has no elevator, so contact the organizer before booking if you need step-free access. Its alternate venues should not be counted as separate guaranteed daily classes.</p>
+<p><a href="https://www.stompingrounds.us/events/public-line-dancing-broadway">Public class details and booking</a> · <a href="https://www.stompingrounds.us/faq">Location, age and accessibility FAQ</a></p>
+<h2>4. Turn Their Heads Country Dance</h2>
+<p><strong>Address:</strong> 830 Fesslers Parkway, Suite 114, Nashville, TN 37210.</p>
+<p>For a studio-based option, Turn Their Heads advertises a one-hour public beginner line-dance experience that teaches two dances. It is family-friendly and open to all ages. The studio also offers other country dance styles, so choose the line-dancing class when booking.</p>
+<p><strong>Important schedule distinction:</strong> Its locals beginner drop-in line-dance class is paused for the rest of 2026. That is a different offering from the bookable public experience. Use the public lesson calendar for availability rather than arriving for an older recurring drop-in listing.</p>
+<p><a href="https://turntheirheads.com/nashville-line-dancing-lessons/">Public line-dance lessons</a> · <a href="https://locals.turntheirheads.com/line-dancing">Local class updates</a> · <a href="https://turntheirheads.com/contact">Studio location</a></p>
+<h2>Pick the experience that fits your group</h2>
+<ul>
+<li><strong>Want a night out?</strong> Start with a venue's lesson and social-dancing calendar, then check the age policy for the evening.</li>
+<li><strong>Want a defined activity?</strong> A bookable beginner class gives your group a specific arrival time and lesson window.</li>
+<li><strong>Need accessible entry?</strong> Ask about the actual assigned room, not just the venue name.</li>
+<li><strong>New to dancing?</strong> Look for beginner instruction and arrive before it starts. You do not need a partner for line dancing.</li>
+</ul>
+<h2>Bring line dancing to your event</h2>
+<p>For a wedding, company gathering or private party, <a href="/cities/nashville-tn/">explore Nashville-area instructors</a> and include your event location, group size and experience level in your inquiry.</p>
+`,
+  },
+
+  {
     slug: "where-to-line-dance-austin",
     title: "Where to Go Line Dancing in Austin and Nearby",
     description: "Four Austin-area venues with line-dance lessons or announced events, including Pflugerville, Cedar Park and Austin's queer country dance nights.",
