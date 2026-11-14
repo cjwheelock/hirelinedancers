@@ -1,3 +1,7 @@
+alter table public.outreach_market_instructors add column wait_until timestamptz;
+update public.outreach_market_instructors set wait_until = '2026-11-17 16:39:00-05'
+where service_market_slug = 'san-francisco-ca' and years is null;
+
 -- Co-featured outreach instructors pick up years teaching from their profile once they add it.
 create or replace function public.outreach_activate_markets()
 returns table (service_market_slug text, missing text[]) language plpgsql security definer set search_path = '' as $$
@@ -6,9 +10,12 @@ begin
   from public.instructor_profiles p
   where p.id = m.featured_instructor_profile_id and m.featured_instructor_years is null and p.years_teaching is not null;
 
-  update public.outreach_market_instructors i set years = p.years_teaching
+  update public.outreach_market_instructors i set years = p.years_teaching, wait_until = null
   from public.instructor_profiles p
   where p.id = i.instructor_profile_id and i.years is null and p.years_teaching is not null;
+
+  -- An instructor who hasn't added years by the deadline drops out of the rotation.
+  delete from public.outreach_market_instructors i where i.years is null and i.wait_until < now();
 
   update public.outreach_leads l set status = 'approved', approved_at = now()
   from public.outreach_markets m
