@@ -209,18 +209,18 @@ export type Place = {
   cid?: string;
 };
 
-export async function serperMaps(query: string, location: string, page: number): Promise<Place[]> {
+export async function serperMaps(query: string, location: string, page: number, ll?: string | null): Promise<{ places: Place[]; ll: string | null }> {
   const key = Deno.env.get("SERPER_API_KEY")?.trim();
   if (!key) throw new Error("SERPER_API_KEY is not set");
   const response = await fetch("https://google.serper.dev/maps", {
     method: "POST",
     headers: { "X-API-KEY": key, "Content-Type": "application/json" },
-    body: JSON.stringify({ q: `${query} in ${location}`, gl: "us", page }),
+    body: JSON.stringify(page > 1 && ll ? { q: `${query} in ${location}`, gl: "us", page, ll } : { q: `${query} in ${location}`, gl: "us", page }),
     signal: AbortSignal.timeout(30_000),
   });
   if (!response.ok) throw new Error(`Serper ${response.status}`);
-  const data = await response.json() as { places?: Place[] };
-  return data.places ?? [];
+  const data = await response.json() as { places?: Place[]; ll?: string };
+  return { places: data.places ?? [], ll: data.ll ?? null };
 }
 
 export function milesBetween(lat1: number, lng1: number, lat2: number, lng2: number): number {
