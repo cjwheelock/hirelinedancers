@@ -7,7 +7,7 @@ const inbox = readFileSync('src/components/InquiryInbox.tsx', 'utf8');
 const css = readFileSync('src/components/Marketplace.module.css', 'utf8');
 
 test('manual workspace selection clears detail links before mounting the next workspace', () => {
-  const body = workspace.match(/function selectWorkspace\(next:[\s\S]*?\n  }/)[0];
+  const body = workspace.match(/function selectWorkspace\(next:[\s\S]*?\n {2}}/)[0];
   const run = new Function('next', 'workspaceMode', 'window', 'setWorkspaceMode', body.slice(body.indexOf('{') + 1, body.lastIndexOf('}')));
   for (const next of ['admin', 'account', 'organizer']) {
     let destination, mode;
@@ -19,7 +19,7 @@ test('manual workspace selection clears detail links before mounting the next wo
 });
 
 test('incoming messages scroll their timeline only, never the workspace document', () => {
-  const effect = inbox.match(/useEffect\(\(\) => \{\n    \/\/ Keep new messages[\s\S]*?\}, \[detail\?\.messages.length\]\);/)[0];
+  const effect = inbox.match(/useEffect\(\(\) => \{\n {4}\/\/ Keep new messages[\s\S]*?\}, \[detail\?\.messages.length\]\);/)[0];
   const timeline = { scrollTop: 0, scrollHeight: 900 };
   new Function('messageTimelineRef', effect.slice(effect.indexOf('{') + 1, effect.lastIndexOf('},')))({ current: timeline });
   assert.equal(timeline.scrollTop, 900);
