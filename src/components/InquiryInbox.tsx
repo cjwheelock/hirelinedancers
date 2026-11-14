@@ -883,7 +883,7 @@ export function InquiryInbox({
       {confirming === "decline" ? (
         <ConfirmDialog
           title="Mark yourself unavailable?"
-          message={
+          message={detail?.thread.assignment_source === "fallback" ? undefined : (
             <>
               The organizer will receive this email:
               <span className={styles.emailPreview}>
@@ -891,7 +891,7 @@ export function InquiryInbox({
                 <span>{DECLINE_NOTICE_BODY}</span>
               </span>
             </>
-          }
+          )}
           confirmLabel="Unavailable"
           busyLabel="Updating..."
           cancelLabel="Cancel"
