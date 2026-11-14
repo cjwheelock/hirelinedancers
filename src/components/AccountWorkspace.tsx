@@ -33,7 +33,7 @@ import { InstructorOnboardingPricing } from "./InstructorOnboardingPricing";
 import { InquiryInbox } from "./InquiryInbox";
 import { MembershipCreditAdmin } from "./MembershipCreditAdmin";
 import { PayoutsCard } from "./PayoutsCard";
-import { AdminBookings } from "./AdminBookings";
+import { AdminAttentionRows, AdminBookings, AdminRecentBookings, collectedCents, useAdminBookings } from "./AdminBookings";
 import { AdminOutreach } from "./AdminOutreach";
 import { AdminInquiries } from "./AdminInquiries";
 import {
@@ -55,6 +55,7 @@ import {
   type MarketplaceInquiry
 } from "@/lib/marketplace";
 import styles from "./Marketplace.module.css";
+import adminStyles from "./AdminShell.module.css";
 
 type ProfileMedia = {
   id: string;
@@ -179,20 +180,6 @@ export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean })
     const accountTabRequested = ["profile", "inquiries", "membership", "media"].includes(requestedTab ?? "");
     setWorkspaceMode(params.has("followup") || accountTabRequested ? "account" : "admin");
   }, [account?.role, adminOnly, isAdmin]);
-
-  async function signOut() {
-    const client = getMarketplaceClient();
-    if (!client) return;
-    setSigningOut(true);
-    setSignOutError(null);
-    const { error: localSignOutError } = await client.auth.signOut({ scope: "local" });
-    if (localSignOutError) {
-      setSignOutError(localSignOutError.message);
-      setSigningOut(false);
-      return;
-    }
-    window.location.replace("/");
-  }
 
   async function restartAccountSignIn() {
     const client = getMarketplaceClient();
@@ -479,18 +466,7 @@ export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean })
   const adminWorkspaceActive = isAdmin && workspaceMode === "admin";
 
   return (
-    <section className={`${styles.shell} ${adminWorkspaceActive ? styles.adminShell : ""}`}>
-      <div className={`${styles.topbar} ${adminWorkspaceActive ? styles.adminTopbar : ""}`}>
-        <div>
-          {!adminWorkspaceActive ? <p className={styles.eyebrow}>{workspaceMode === "organizer" || account?.role === "organizer" ? "Planner workspace" : "Instructor workspace"}</p> : null}
-          <h1>{adminWorkspaceActive ? "Admin" : `Welcome, ${account?.first_name || account?.full_name?.trim().split(/\s+/)[0] || "there"}`}</h1>
-          <p className={styles.muted}>{account?.email}</p>
-        </div>
-        <button className={styles.secondaryButton} type="button" disabled={signingOut} onClick={() => void signOut()}>
-          {signingOut ? "Signing out..." : "Sign out"}
-        </button>
-      </div>
-
+    <section className={`${styles.shell} ${styles.appShell} ${adminWorkspaceActive ? styles.adminShell : ""}`}>
       {signOutError ? <p className={styles.error} role="alert">{signOutError}</p> : null}
 
       {!adminOnly && isAdmin ? (
@@ -2106,6 +2082,7 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const adminBookings = useAdminBookings();
 
   function suggestedSlug(profile: InstructorProfile) {
     return [profile.display_name, profile.city, profile.region]
@@ -2467,6 +2444,14 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
   }
 
   const summary = analytics.summary;
+  const overviewRange = adminRange(rangePreset, customStart, customEnd);
+  const collected = collectedCents(adminBookings.rows, overviewRange.start, overviewRange.end);
+  const adminMenu: Array<{ label: string; items: Array<typeof tab> }> = [
+    { label: "Operations", items: ["overview", "inquiries", "messages", "bookings"] },
+    { label: "Instructors", items: ["profiles", "memberships", "invitations"] },
+    { label: "Growth", items: ["outreach"] },
+    { label: "System", items: isOwner ? ["delivery", "access"] : ["delivery"] }
+  ];
 
   function selectAdminTab(nextTab: typeof tab) {
     setTab(nextTab);
@@ -2481,18 +2466,32 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
     window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
   }
 
+  function openAdminThread(threadId: string) {
+    setFocusedInquiryId(null);
+    setFocusedThreadId(threadId);
+    selectAdminTab("messages");
+    const url = new URL(window.location.href);
+    url.searchParams.delete("inquiry");
+    url.searchParams.set("thread", threadId);
+    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+  }
+
   return (
-    <>
-      <div className={styles.tabs} role="tablist" aria-label="Admin dashboard sections">
-        {(isOwner
-          ? (["overview", "inquiries", "messages", "bookings", "outreach", "profiles", "memberships", "invitations", "delivery", "access"] as const)
-          : (["overview", "inquiries", "messages", "bookings", "outreach", "profiles", "memberships", "invitations", "delivery"] as const)
-        ).map((name) => (
-          <button key={name} className={`${styles.tab} ${tab === name ? styles.activeTab : ""}`} type="button" onClick={() => selectAdminTab(name)}>
-            {name === "profiles" ? `Instructor reviews${pending.length ? ` (${pending.length})` : ""}` : name[0].toUpperCase() + name.slice(1)}
-          </button>
+    <div className={adminStyles.layout}>
+      <nav className={adminStyles.menu} aria-label="Admin dashboard sections">
+        {adminMenu.map((group) => (
+          <div className={adminStyles.menuGroup} key={group.label}>
+            <p className={adminStyles.menuLabel}>{group.label}</p>
+            {group.items.map((name) => (
+              <button key={name} className={`${adminStyles.menuItem} ${tab === name ? adminStyles.menuItemActive : ""}`} type="button" aria-current={tab === name ? "page" : undefined} onClick={() => selectAdminTab(name)}>
+                <span>{name === "profiles" ? "Reviews" : name[0].toUpperCase() + name.slice(1)}</span>
+                {name === "profiles" && pending.length ? <span className={adminStyles.menuBadge}>{pending.length}</span> : null}
+              </button>
+            ))}
+          </div>
         ))}
-      </div>
+      </nav>
+      <div className={adminStyles.content}>
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
       {message ? <p className={styles.success} role="status">{message}</p> : null}
       {loading ? <div className={styles.loading}>Loading marketplace operations...</div> : null}
@@ -2500,15 +2499,7 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
       {!loading && tab === "bookings" ? <AdminBookings /> : null}
       {!loading && tab === "outreach" ? <AdminOutreach /> : null}
 
-      {!loading && tab === "inquiries" ? <AdminInquiries focusInquiryId={focusedInquiryId} onOpenThread={(threadId) => {
-        setFocusedInquiryId(null);
-        setFocusedThreadId(threadId);
-        selectAdminTab("messages");
-        const url = new URL(window.location.href);
-        url.searchParams.delete("inquiry");
-        url.searchParams.set("thread", threadId);
-        window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
-      }} /> : null}
+      {!loading && tab === "inquiries" ? <AdminInquiries focusInquiryId={focusedInquiryId} onOpenThread={openAdminThread} /> : null}
 
       {!loading && tab === "messages" ? (
         <InquiryInbox
@@ -2519,21 +2510,10 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
       ) : null}
 
       {!loading && tab === "overview" ? (
-        <div className={styles.compactAdminStack}>
-          <section className={`${styles.card} ${styles.compactAdminCard} ${styles.pendingReviewBanner}`} aria-label="Instructor reviews">
-            <div>
-              <h2>{pending.length} {pending.length === 1 ? "instructor awaiting review" : "instructors awaiting review"}</h2>
-              {!pending.length ? <p className={styles.muted}>No profiles are waiting for review.</p> : null}
-            </div>
-            <button className={styles.button} type="button" onClick={() => selectAdminTab("profiles")}>
-              Review instructors
-            </button>
-          </section>
-          <div className={`${styles.card} ${styles.compactAdminCard} ${styles.filterBar} ${styles.adminOverviewHeader}`}>
-            <div>
-              <h2>Marketplace performance</h2>
-              <p className={styles.muted}>Every submitted contact form counts as one inquiry. Booking activity uses the date it was reported, and completed gigs use the confirmed event date.</p>
-            </div>
+        <div className={adminStyles.stack}>
+          <div className={adminStyles.pageHeader}>
+            <h2>Overview</h2>
+            <div className={adminStyles.pageHeaderControls}>
             <label className={styles.field}>
               <span>Time frame</span>
               <select value={rangePreset} onChange={(event) => setRangePreset(event.target.value as AdminRangePreset)}>
@@ -2551,24 +2531,46 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
                 <label className={styles.field}><span>End</span><input type="date" value={customEnd} onChange={(event) => setCustomEnd(event.target.value)} /></label>
               </>
             ) : null}
+            </div>
+          </div>
+
+          <section className={`${adminStyles.card} ${adminStyles.attention}`} aria-label="Needs attention">
+            <h2>Needs attention</h2>
+            {pending.length ? (
+              <div className={adminStyles.attentionRow}>
+                <span><strong>{pending.length}</strong> {pending.length === 1 ? "instructor awaiting review" : "instructors awaiting review"}</span>
+                <button className={adminStyles.linkButton} type="button" onClick={() => selectAdminTab("profiles")}>
+                  Review instructors
+                </button>
+              </div>
+            ) : null}
+            <AdminAttentionRows hasPending={pending.length > 0} bookings={adminBookings.rows} bookingsLoading={adminBookings.loading} onOpenThread={openAdminThread} onOpenBookings={() => selectAdminTab("bookings")} />
+          </section>
+
+          <div className={adminStyles.card}>
+            <h2>Marketplace performance</h2>
+            <p className={adminStyles.cardNote}>Every submitted contact form counts as one inquiry. Booking activity uses the date it was reported, and completed gigs use the confirmed event date.</p>
           </div>
 
           {analyticsLoading ? <div className={styles.loading}>Calculating marketplace results...</div> : (
             <>
-              <div className={`${styles.metricGrid} ${styles.adminMetricGrid}`}>
-                <article className={`${styles.metricCard} ${styles.adminMetricCard}`}><span>Inquiries</span><strong>{summary.inquiries}</strong></article>
-                <article className={`${styles.metricCard} ${styles.adminMetricCard}`}><span>Instructors contacted</span><strong>{summary.instructors}</strong></article>
-                <article className={`${styles.metricCard} ${styles.adminMetricCard}`}><span>Companies</span><strong>{summary.companies}</strong></article>
-                <article className={`${styles.metricCard} ${styles.adminMetricCard}`}><span>Bookings reported</span><strong>{summary.booked}</strong><small>{percent(summary.cohort_booked, summary.inquiries)} conversion</small></article>
-                <article className={`${styles.metricCard} ${styles.adminMetricCard}`}><span>Completed gigs</span><strong>{summary.completed}</strong><small>{percent(summary.cohort_completed, summary.cohort_booked)} completion</small></article>
-                <article className={`${styles.metricCard} ${styles.adminMetricCard}`}><span>In progress</span><strong>{summary.in_progress}</strong></article>
+              <div className={adminStyles.metricGrid}>
+                <article className={adminStyles.metric}><span>Inquiries</span><strong>{summary.inquiries}</strong></article>
+                <article className={adminStyles.metric}><span>Instructors contacted</span><strong>{summary.instructors}</strong></article>
+                <article className={adminStyles.metric}><span>Companies</span><strong>{summary.companies}</strong></article>
+                <article className={adminStyles.metric}><span>Bookings reported</span><strong>{summary.booked}</strong><small>{percent(summary.cohort_booked, summary.inquiries)} conversion</small></article>
+                <article className={adminStyles.metric}><span>Completed gigs</span><strong>{summary.completed}</strong><small>{percent(summary.cohort_completed, summary.cohort_booked)} completion</small></article>
+                <article className={adminStyles.metric}><span>In progress</span><strong>{summary.in_progress}</strong></article>
+                <article className={adminStyles.metric}><span>Collected</span><strong>{money(collected)}</strong></article>
               </div>
 
-              <div className={`${styles.card} ${styles.compactAdminCard}`}>
+              <AdminRecentBookings rows={adminBookings.rows} loading={adminBookings.loading} error={adminBookings.error} onViewAll={() => selectAdminTab("bookings")} />
+
+              <div className={adminStyles.card}>
                 <h2>Activity over time</h2>
-                {!analytics.series.length ? <p className={styles.notice}>No inquiry activity in this time frame.</p> : (
-                  <div className={`${styles.tableWrap} ${styles.compactTableWrap}`}>
-                    <table className={`${styles.dataTable} ${styles.compactDataTable}`}>
+                {!analytics.series.length ? <p className={adminStyles.empty}>No inquiry activity in this time frame.</p> : (
+                  <div className={adminStyles.tableWrap}>
+                    <table className={adminStyles.table}>
                       <thead><tr><th>Period</th><th>Inquiries</th><th>Booked</th><th>Completed</th></tr></thead>
                       <tbody>{analytics.series.map((row) => (
                         <tr key={row.period_start}><td>{new Date(`${row.period_start}T12:00:00`).toLocaleDateString()}</td><td>{row.inquiries}</td><td>{row.booked}</td><td>{row.completed}</td></tr>
@@ -2578,24 +2580,27 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
                 )}
               </div>
 
-              <div className={`${styles.card} ${styles.compactAdminCard}`}>
+              <div className={adminStyles.card}>
                 <h2>Performance by instructor</h2>
                 <p className={styles.muted}>Booking and completion columns show the current results for inquiries submitted during this time frame.</p>
-                <div className={`${styles.tableWrap} ${styles.compactTableWrap}`}>
-                  <table className={`${styles.dataTable} ${styles.compactDataTable}`}>
+                {!analytics.instructors.length ? <p className={adminStyles.empty}>No inquiry activity in this time frame.</p> : (
+                <div className={adminStyles.tableWrap}>
+                  <table className={adminStyles.table}>
                     <thead><tr><th>Instructor</th><th>Inquiries</th><th>Companies</th><th>Booked</th><th>Completed</th><th>Booking rate</th></tr></thead>
                     <tbody>{analytics.instructors.map((row) => (
                       <tr key={row.instructor_key}><td>{row.instructor_name}</td><td>{row.inquiries}</td><td>{row.companies}</td><td>{row.booked}</td><td>{row.completed}</td><td>{percent(row.booked, row.inquiries)}</td></tr>
                     ))}</tbody>
                   </table>
                 </div>
+                )}
               </div>
 
-              <div className={`${styles.card} ${styles.compactAdminCard}`}>
+              <div className={adminStyles.card}>
                 <h2>Inquiries by instructor and company</h2>
                 <p className={styles.muted}>Use this view to see how many times each company or organizer contacted a specific instructor.</p>
-                <div className={`${styles.tableWrap} ${styles.compactTableWrap}`}>
-                  <table className={`${styles.dataTable} ${styles.compactDataTable}`}>
+                {!analytics.instructor_companies.length ? <p className={adminStyles.empty}>No inquiry activity in this time frame.</p> : (
+                <div className={adminStyles.tableWrap}>
+                  <table className={adminStyles.table}>
                     <thead><tr><th>Instructor</th><th>Company</th><th>Inquiries</th><th>Booked</th><th>Completed</th><th>Latest inquiry</th></tr></thead>
                     <tbody>{analytics.instructor_companies.map((row) => (
                       <tr key={`${row.instructor_key}:${row.company_key}`}>
@@ -2607,45 +2612,52 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
                     ))}</tbody>
                   </table>
                 </div>
+                )}
               </div>
 
-              <div className={`${styles.card} ${styles.compactAdminCard}`}>
+              <div className={adminStyles.card}>
                 <h2>Performance by company or organizer</h2>
-                <div className={`${styles.tableWrap} ${styles.compactTableWrap}`}>
-                  <table className={`${styles.dataTable} ${styles.compactDataTable}`}>
+                {!analytics.companies.length ? <p className={adminStyles.empty}>No inquiry activity in this time frame.</p> : (
+                <div className={adminStyles.tableWrap}>
+                  <table className={adminStyles.table}>
                     <thead><tr><th>Company</th><th>Inquiries</th><th>Instructors</th><th>Booked</th><th>Completed</th><th>Latest inquiry</th></tr></thead>
                     <tbody>{analytics.companies.map((row) => (
                       <tr key={row.company_key}><td>{row.company_name}{row.contact_email ? <small>{row.contact_email}</small> : null}</td><td>{row.inquiries}</td><td>{row.instructors}</td><td>{row.booked}</td><td>{row.completed}</td><td>{new Date(row.latest_inquiry_at).toLocaleDateString()}</td></tr>
                     ))}</tbody>
                   </table>
                 </div>
+                )}
               </div>
             </>
           )}
 
-          <div className={`${styles.card} ${styles.compactAdminCard}`}>
-            <h2>Recent inquiries</h2>
-            <button type="button" className={styles.secondaryButton} onClick={() => selectAdminTab("inquiries")}>View all inquiries</button>
-            <div className={`${styles.tableWrap} ${styles.compactTableWrap}`}>
-              <table className={`${styles.dataTable} ${styles.compactDataTable}`}>
+          <div className={adminStyles.card}>
+            <div className={adminStyles.cardHeader}>
+              <h2>Recent inquiries</h2>
+              <button type="button" className={adminStyles.linkButton} onClick={() => selectAdminTab("inquiries")}>View all inquiries</button>
+            </div>
+            {inquiries.length ? (
+            <div className={adminStyles.tableWrap}>
+              <table className={adminStyles.table}>
                 <thead><tr><th>Submitted</th><th>Company</th><th>Instructor</th><th>Event</th><th>Booking</th><th>Completion</th></tr></thead>
                 <tbody>{inquiries.slice(0, 30).map((inquiry) => (
                   <tr key={inquiry.id}>
                     <td>{new Date(inquiry.created_at).toLocaleDateString()}</td>
                     <td>{inquiry.company_name || inquiry.contact_name || "Individual organizer"}</td>
                     <td>{inquiry.instructor_name || "Instructor"}</td>
-                    <td>{[inquiry.event_type, inquiry.event_date].filter(Boolean).join(" · ")}</td>
-                    <td><span className={styles.status}>{inquiry.booking_outcome.replaceAll("_", " ")}</span></td>
-                    <td><span className={styles.status}>{inquiry.completion_status.replaceAll("_", " ")}</span></td>
+                    <td>{[inquiry.event_type ? eventTypes.find((item) => item.slug === inquiry.event_type)?.label ?? statusLabel(inquiry.event_type) : null, inquiry.event_date ? new Date(`${inquiry.event_date}T12:00:00`).toLocaleDateString() : null].filter(Boolean).join(" · ")}</td>
+                    <td><span className={adminStyles.chip}>{inquiry.booking_outcome.replaceAll("_", " ")}</span></td>
+                    <td><span className={adminStyles.chip}>{inquiry.completion_status.replaceAll("_", " ")}</span></td>
                   </tr>
                 ))}</tbody>
               </table>
             </div>
+            ) : null}
           </div>
 
-          <div className={`${styles.card} ${styles.compactAdminCard}`}>
+          <div className={adminStyles.card}>
             <h2>Recent instructor feedback</h2>
-            {!followupResponses.length ? <p className={styles.notice}>No instructor follow-up responses yet.</p> : (
+            {!followupResponses.length ? <p className={adminStyles.empty}>No instructor follow-up responses yet.</p> : (
               <div className={styles.list}>{followupResponses.slice(0, 20).map((response) => {
                 const inquiry = inquiries.find((item) => item.id === response.inquiry_id);
                 return (
@@ -2662,8 +2674,8 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
       ) : null}
 
       {!loading && tab === "profiles" ? (
-        <div className={styles.compactAdminStack}>
-          <section className={`${styles.card} ${styles.compactAdminCard} ${styles.profileReviewIntro}`}>
+        <div className={adminStyles.stack}>
+          <section className={`${adminStyles.card} ${styles.profileReviewIntro}`}>
             <div className={styles.compactSectionHeader}>
               <div>
                 <h2>Profiles awaiting review</h2>
@@ -2695,7 +2707,7 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
                 const eventLabels = profile.event_types.map((value) => eventTypes.find((item) => item.slug === value)?.label ?? statusLabel(value));
                 return (
                   <article
-                    className={`${styles.card} ${styles.compactAdminCard} ${styles.profileReviewCard} ${focusedProfileId === profile.id ? styles.focusedItem : ""}`}
+                    className={`${adminStyles.card} ${styles.profileReviewCard} ${focusedProfileId === profile.id ? styles.focusedItem : ""}`}
                     id={`profile-review-${profile.id}`}
                     key={profile.id}
                   >
@@ -2896,10 +2908,10 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
               })}
           </div>
 
-          <section className={`${styles.card} ${styles.compactAdminCard}`}>
+          <section className={adminStyles.card}>
             <div className={styles.compactSectionHeader}><h2>All instructor profiles</h2><span className={styles.recordCount}>{profiles.length} total</span></div>
-            <div className={`${styles.tableWrap} ${styles.compactTableWrap}`}>
-              <table className={`${styles.dataTable} ${styles.compactDataTable}`}>
+            <div className={adminStyles.tableWrap}>
+              <table className={adminStyles.table}>
                 <thead><tr><th>Instructor</th><th>Location</th><th>Status</th><th>Approval email</th><th>Action</th></tr></thead>
                 <tbody>{profiles.map((profile) => {
                   const paymentSetup = paymentSetups.find((setup) => setup.instructor_profile_id === profile.id);
@@ -2940,8 +2952,8 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
       {!loading && tab === "memberships" ? <MembershipGuaranteeAdmin isOwner={isOwner} /> : null}
 
       {!loading && tab === "invitations" ? (
-        <div className={styles.compactAdminStack}>
-          <section className={`${styles.card} ${styles.compactAdminCard}`}>
+        <div className={adminStyles.stack}>
+          <section className={adminStyles.card}>
             <div className={styles.compactSectionHeader}>
               <div><h2>Invite instructor</h2><p className={styles.muted}>Standard invitations give eligible new instructors their first {billingCycles} free. Choose lifetime access instead only when that separate benefit is intended.</p></div>
             </div>
@@ -2968,10 +2980,10 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
             </form>
           </section>
 
-          <section className={`${styles.card} ${styles.compactAdminCard}`}>
+          <section className={adminStyles.card}>
             <h2>Lifetime instructor access</h2>
-            {!lifetimeAccess.length ? <p className={styles.notice}>No instructor profiles yet.</p> : <div className={`${styles.tableWrap} ${styles.compactTableWrap}`} role="region" aria-label="Lifetime instructor access" tabIndex={0}>
-              <table className={`${styles.dataTable} ${styles.compactDataTable}`}>
+            {!lifetimeAccess.length ? <p className={styles.notice}>No instructor profiles yet.</p> : <div className={adminStyles.tableWrap} role="region" aria-label="Lifetime instructor access" tabIndex={0}>
+              <table className={adminStyles.table}>
                 <caption className={styles.srOnly}>Lifetime access status for instructors</caption>
                 <thead><tr><th scope="col">Instructor</th><th scope="col">Profile</th><th scope="col">Access</th><th scope="col">Action</th></tr></thead>
                 <tbody>{lifetimeAccess.map((row) => (
@@ -2996,11 +3008,11 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
             </div>}
           </section>
 
-          <section className={`${styles.card} ${styles.compactAdminCard}`}>
+          <section className={adminStyles.card}>
             <h2>Recent invitations</h2>
             {!invitations.length ? <p className={styles.notice}>No instructor invitations have been sent yet.</p> : (
-              <div className={`${styles.tableWrap} ${styles.compactTableWrap}`} role="region" aria-label="Recent instructor invitations" tabIndex={0}>
-                <table className={`${styles.dataTable} ${styles.compactDataTable}`}>
+              <div className={adminStyles.tableWrap} role="region" aria-label="Recent instructor invitations" tabIndex={0}>
+                <table className={adminStyles.table}>
                   <caption className={styles.srOnly}>Recently sent instructor invitations</caption>
                   <thead><tr><th scope="col">Email</th><th scope="col">Access</th><th scope="col">Status</th><th scope="col">Claim</th><th scope="col">Profile</th><th scope="col">Offer</th></tr></thead>
                   <tbody>{invitations.map((invitation) => (
@@ -3085,7 +3097,8 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
           ))}</div>
         </div>
       ) : null}
-    </>
+      </div>
+    </div>
   );
 }
 
@@ -3103,10 +3116,8 @@ function OrganizerDashboard({ accountId }: { accountId: string }) {
 
   return (
     <>
-      <div className={styles.card}>
-        <h2>Messages</h2>
-        <p>Contact instructors and keep each event conversation organized in your account.</p>
-        <Link className={styles.button} href="/instructors/">Find an instructor</Link>
+      <div className={styles.workspaceBar}>
+        <h1 className={styles.pageTitle}>Messages</h1>
       </div>
       <InquiryInbox
         perspective="organizer"

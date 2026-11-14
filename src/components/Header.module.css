@@ -8,3 +8,233 @@
     display: none;
   }
 }
+
+/* ---------- Logged-in app header ---------- */
+.appHeader {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  padding: 0 clamp(12px, 3vw, 24px);
+  border-bottom: 1px solid var(--line);
+  background: #fff;
+}
+
+.appHeaderInner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 64px;
+}
+
+.appBrand {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+.appBrand :global(.brand-text) {
+  font-size: 21px;
+}
+
+.appNav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.appLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 12px;
+  color: var(--ink);
+  font-size: 0.95rem;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.appLink:hover {
+  background: var(--paper);
+}
+
+.findLink {
+  font-weight: 500;
+}
+
+.badge {
+  display: inline-flex;
+  min-width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--sunset);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.menuWrap {
+  position: relative;
+}
+
+.avatarButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 10px 0 6px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.avatarButton:hover {
+  border-color: var(--line-strong);
+  background: var(--paper);
+}
+
+.avatar {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 50;
+  display: grid;
+  gap: 2px;
+  min-width: 230px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: var(--shadow-md);
+}
+
+.menuEmail {
+  margin: 0;
+  padding: 8px 12px 10px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.86rem;
+  overflow-wrap: anywhere;
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  font: 500 0.95rem/1.2 var(--font-sans);
+  text-align: left;
+  transition: background 0.15s ease;
+}
+
+.menuItem:hover:not(:disabled) {
+  background: var(--paper);
+}
+
+.menuItem:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.menuFind {
+  display: none;
+}
+
+.menuError {
+  margin: 4px 0 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: #fff0eb;
+  color: #7a2e1a;
+  font-size: 0.86rem;
+}
+
+.appLink:focus-visible,
+.avatarButton:focus-visible,
+.menuItem:focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+  .appHeaderInner {
+    min-height: 56px;
+  }
+
+  .appBrand :global(.brand-text) {
+    display: none;
+  }
+
+  .findLink {
+    display: none;
+  }
+
+  .menuFind {
+    display: flex;
+  }
+
+  .appLink {
+    padding: 0 10px;
+  }
+}
+
+/* ---------- Slim footer on app pages ---------- */
+.appFooter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 24px;
+  padding: 10px clamp(12px, 3vw, 24px);
+  border-top: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.appFooter nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 18px;
+}
+
+.appFooter a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.appFooter a:hover {
+  color: var(--sunset);
+}

@@ -188,7 +188,7 @@ test("older pagination cannot append into a new filter", async () => {
   const app = harness(); const page = Array.from({ length: 50 }, (_, i) => ({ ...rows[0], thread_id: `page-${i}`, next_cursor_at: "2026-10-01T00:00:00Z", next_cursor_id: `page-${i}` }));
   app.queue("list_inquiry_threads", async () => ({ data: page, error: null })); await app.render();
   const old = deferred(); app.queue("list_inquiry_threads", () => old.promise); const pending = app.button("Load more conversations").props.onClick(); await app.render();
-  app.queue("list_inquiry_threads", async () => ({ data: [rows[1]], error: null })); app.field("Show").props.onChange(event("unread")); await app.render();
+  app.queue("list_inquiry_threads", async () => ({ data: [rows[1]], error: null })); app.button("Unread").props.onClick(); await app.render();
   old.resolve({ data: [{ ...rows[0], thread_id: "stale-page", counterparty_name: "Stale result" }], error: null }); await pending; await app.render();
   assert.ok(!app.text().includes("Stale result"));
 });

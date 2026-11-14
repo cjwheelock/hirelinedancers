@@ -1,9 +1,29 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { isAppPath, isAuthPath } from "@/components/Header";
 import { Logo } from "@/components/Logo";
+import styles from "./Header.module.css";
 import { cities, eventTypes, site } from "@/data/site";
 import { marketplaceConfigured } from "@/lib/marketplace";
 
 export function Footer() {
+  const pathname = usePathname();
+  if (isAuthPath(pathname)) return null;
+  if (isAppPath(pathname)) {
+    return (
+      <footer className={styles.appFooter}>
+        <span>© {new Date().getFullYear()} {site.legalName} Operating as {site.name}.</span>
+        <nav aria-label="Help and legal">
+          <Link href="/support/">Support</Link>
+          <Link href="/legal/terms/">Terms</Link>
+          <Link href="/legal/privacy/">Privacy</Link>
+        </nav>
+      </footer>
+    );
+  }
+
   return (
     <footer className="footer">
       <div className="footer-inner">

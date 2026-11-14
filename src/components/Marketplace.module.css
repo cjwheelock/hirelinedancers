@@ -2244,74 +2244,6 @@
     gap: 10px;
   }
 
-  .inboxToolbar,
-  .adminThreadTools,
-  .messageComposer {
-    grid-template-columns: 1fr;
-  }
-
-  .inboxToolbar {
-    display: grid;
-  }
-
-  .inboxSearch,
-  .inboxSelect {
-    width: 100%;
-    min-width: 0;
-  }
-
-  .iconButton {
-    width: 100%;
-  }
-
-  .inboxLayout {
-    min-height: 560px;
-    grid-template-columns: 1fr;
-  }
-
-  .threadList {
-    max-height: none;
-    border-right: 0;
-  }
-
-  .hasSelectedThread .threadList {
-    display: none;
-  }
-
-  .inboxLayout:not(.hasSelectedThread) .threadPanel {
-    display: none;
-  }
-
-  .mobileBackButton {
-    display: inline-flex;
-  }
-
-  .threadHeader {
-    padding: 18px;
-  }
-
-  .eventSummary dl {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .adminThreadTools {
-    grid-template-columns: 1fr;
-  }
-
-  .messageTimeline {
-    min-height: 360px;
-    max-height: 60dvh;
-    padding: 16px;
-  }
-
-  .messageBubble {
-    max-width: 90%;
-  }
-
-  .messageComposer .button {
-    width: 100%;
-  }
-
   .creditHistory dl {
     grid-template-columns: 1fr;
   }
@@ -2618,5 +2550,1012 @@
 @media (max-width: 600px) {
   .pendingReviewBanner > button {
     width: 100%;
+  }
+}
+
+
+/* ==========================================================================
+   App redesign (November 2026): shared polish, then the messages workspace.
+   These rules intentionally come last so they refine the base styles above.
+   ========================================================================== */
+.shell {
+  padding: 28px 0 64px;
+}
+
+.card,
+.listItem,
+.feedbackPanel,
+.roleOption {
+  border-radius: var(--radius);
+}
+
+.card {
+  border-color: var(--line);
+  background: #fff;
+}
+
+.button,
+.secondaryButton,
+.dangerButton {
+  border-width: 1px;
+  font: 700 0.92rem/1 var(--font-sans);
+  letter-spacing: 0;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.button {
+  border-color: #e9a94b;
+}
+
+.button:hover:not(:disabled) {
+  border-color: #f1b554;
+  background: #f1b554;
+}
+
+.secondaryButton:hover:not(:disabled) {
+  border-color: #4a3a2f;
+  background: #4a3a2f;
+}
+
+.dangerButton:hover:not(:disabled) {
+  background: #fff0eb;
+}
+
+.button:focus-visible,
+.secondaryButton:focus-visible,
+.dangerButton:focus-visible,
+.tab:focus-visible,
+.linkButton:focus-visible,
+.quietLink:focus-visible,
+.filterPill:focus-visible,
+.stripButton:focus-visible,
+.detailsToggle:focus-visible {
+  outline: 3px solid #e9a94b;
+  outline-offset: 2px;
+}
+
+.field > span,
+.legend {
+  font: 700 0.84rem/1.3 var(--font-sans);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.field input,
+.field select,
+.field textarea {
+  border-width: 1px;
+}
+
+.notice,
+.error,
+.success {
+  border-radius: 12px;
+  border-color: transparent;
+}
+
+.error { border-color: #f0c4b6; }
+
+.tabs {
+  gap: 6px;
+  margin-top: 0;
+}
+
+.tab {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  padding: 0 16px;
+  border: 1px solid #8a7a6c;
+  border-radius: 999px;
+  background: transparent;
+  font: 500 0.92rem/1 var(--font-sans);
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.tab:hover {
+  border-color: #2a1e17;
+  background: #fff;
+}
+
+.activeTab,
+.activeTab:hover {
+  border-color: #2a1e17;
+  background: #2a1e17;
+  color: #f6eee2;
+  font-weight: 700;
+}
+
+.status {
+  display: inline-block;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: #e6ddd0;
+  color: #4a3a2f;
+  font: 700 0.75rem/1.2 var(--font-sans);
+  letter-spacing: 0;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.status::first-letter {
+  text-transform: uppercase;
+}
+
+.booking_confirmed,
+.booking_completed,
+.booking_paid_out {
+  background: #e4f0ee;
+  color: #17524f;
+}
+
+.booking_quote_sent,
+.booking_awaiting_payment,
+.booking_payment_processing {
+  background: #fbecd0;
+  color: #5c3d06;
+}
+
+.booking_cancelled,
+.booking_declined,
+.booking_expired,
+.booking_withdrawn,
+.booking_payment_failed {
+  background: #f6d9cf;
+  color: #7a2e1a;
+}
+
+.loading {
+  align-content: center;
+  gap: 14px;
+  justify-items: center;
+}
+
+.loading::before {
+  width: 28px;
+  height: 28px;
+  border: 3px solid #dccdb8;
+  border-top-color: #b8482a;
+  border-radius: 50%;
+  animation: appSpin 0.8s linear infinite;
+  content: "";
+}
+
+@keyframes appSpin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes appPulse {
+  50% { opacity: 0.45; }
+}
+
+/* ---------- Workspace chrome ---------- */
+.appShell {
+  width: min(1480px, calc(100% - 32px));
+  --inbox-offset: 184px;
+  --inbox-offset-mobile: 150px;
+}
+
+.appShell > .tabs,
+.appShell .tabs[role="tablist"] {
+  margin-bottom: 16px;
+}
+
+.workspaceBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin-bottom: 16px;
+}
+
+.pageTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.7rem, 3vw, 2.1rem);
+  font-weight: 400;
+  line-height: 1.1;
+}
+
+/* ---------- Messages workspace ---------- */
+.inboxSection {
+  gap: 12px;
+  margin-top: 0;
+}
+
+.inboxLayout {
+  height: calc(100dvh - var(--inbox-offset, 210px));
+  min-height: 520px;
+  grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+  border-radius: var(--radius);
+}
+
+.threadList {
+  display: flex;
+  max-height: none;
+  flex-direction: column;
+  background: #efe3d0;
+}
+
+.inboxToolbar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 0;
+  border-bottom: 1px solid #dccdb8;
+  border-radius: 0;
+  background: #efe3d0;
+}
+
+.inboxSearch {
+  min-height: 44px;
+  flex: none;
+  border-width: 1px;
+  border-radius: 12px;
+}
+
+.filterPills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.filterPill {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid #8a7a6c;
+  border-radius: 999px;
+  background: transparent;
+  color: #2a1e17;
+  cursor: pointer;
+  font: 500 0.82rem/1 var(--font-sans);
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.filterPill:hover {
+  border-color: #2a1e17;
+  background: #fff;
+}
+
+.activeFilterPill,
+.activeFilterPill:hover {
+  border-color: #2a1e17;
+  background: #2a1e17;
+  color: #f6eee2;
+  font-weight: 700;
+}
+
+.inboxSortRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.inboxSelect {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+}
+
+.inboxSelect > span {
+  color: #5a4a3e;
+  font: 500 0.82rem/1.2 var(--font-sans);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.inboxSelect select {
+  min-width: 0;
+  min-height: 36px;
+  flex: 1;
+  padding: 0 8px;
+  border-width: 1px;
+  border-radius: 10px;
+  font-size: 0.86rem;
+}
+
+.iconButton {
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  border: 1px solid #8a7a6c;
+  border-radius: 10px;
+  background: #fff;
+  color: #2a1e17;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.iconButton:hover {
+  border-color: #2a1e17;
+  background: #f6eee2;
+}
+
+.threadSkeletons {
+  display: grid;
+  gap: 1px;
+}
+
+.threadSkeletons span {
+  height: 96px;
+  border-bottom: 1px solid #dccdb8;
+  background: linear-gradient(#e6d8c3, #e6d8c3) 16px 18px / 45% 12px no-repeat,
+    linear-gradient(#e6d8c3, #e6d8c3) 16px 42px / 70% 10px no-repeat,
+    linear-gradient(#e6d8c3, #e6d8c3) 16px 64px / 30% 18px no-repeat;
+  animation: appPulse 1.4s ease-in-out infinite;
+}
+
+.threadListItem {
+  gap: 4px;
+  padding: 14px 16px;
+  transition: background 0.15s ease;
+}
+
+.threadListItem:hover {
+  background: rgb(255 255 255 / 60%);
+}
+
+.selectedThread,
+.selectedThread:hover {
+  box-shadow: inset 4px 0 0 #b8482a;
+  background: #fff;
+}
+
+.threadListHeading time {
+  flex: none;
+  color: #5a4a3e;
+  font-size: 0.75rem;
+}
+
+.threadListEvent {
+  color: #5a4a3e;
+  font-size: 0.82rem;
+}
+
+.threadPreview {
+  display: block;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.threadListMeta {
+  justify-content: flex-start;
+  margin-top: 3px;
+}
+
+.threadListMeta .unreadBadge {
+  margin-left: auto;
+}
+
+.chip {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font: 700 0.75rem/1.3 var(--font-sans);
+  white-space: nowrap;
+}
+
+.chipAmber { background: #fbecd0; color: #5c3d06; }
+.chipPine { background: #e4f0ee; color: #17524f; }
+.chipNeutral { background: #e6ddd0; color: #4a3a2f; }
+.chipDanger { background: #f6d9cf; color: #7a2e1a; }
+
+.threadPanel {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.threadHeader {
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  background: #fff;
+}
+
+.threadHeaderText {
+  min-width: 0;
+  flex: 1;
+}
+
+.threadHeader h2 {
+  margin: 0;
+  overflow: hidden;
+  font-family: var(--font-display);
+  font-size: 1.45rem;
+  font-weight: 400;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.threadHeader p {
+  overflow: hidden;
+  color: #5a4a3e;
+  font-size: 0.86rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobileBackButton {
+  display: none;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+}
+
+.mobileBackButton:hover {
+  background: #f6eee2;
+}
+
+.detailsToggle {
+  display: none;
+  min-height: 44px;
+  flex: none;
+  align-items: center;
+  padding: 0 14px;
+  border: 1px solid #8a7a6c;
+  border-radius: 12px;
+  background: #fff;
+  color: #2a1e17;
+  cursor: pointer;
+  font: 700 0.88rem/1 var(--font-sans);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.detailsToggle:hover {
+  background: #f6eee2;
+}
+
+.detailsToggle[aria-pressed="true"] {
+  border-color: #2a1e17;
+  background: #2a1e17;
+  color: #f6eee2;
+}
+
+.threadBody {
+  min-height: 0;
+  flex: 1;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 330px);
+}
+
+.conversationColumn {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.quoteStrip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  padding: 12px 20px;
+  border-bottom: 1px solid #eadfd0;
+  background: #fbecd0;
+}
+
+.quoteStrip > div {
+  display: grid;
+  min-width: 0;
+  flex: 1 1 220px;
+}
+
+.quoteStrip span {
+  color: #4a3a2f;
+  font-size: 0.88rem;
+}
+
+.stripButton {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 12px;
+  background: #2a1e17;
+  color: #f6eee2;
+  cursor: pointer;
+  font: 700 0.92rem/1 var(--font-sans);
+  transition: background 0.15s ease;
+}
+
+.stripButton:hover {
+  background: #4a3a2f;
+  color: #f6eee2;
+}
+
+.threadNotice {
+  margin: 12px 20px 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #e4f0ee;
+  color: #2a1e17;
+  font-size: 0.88rem;
+}
+
+.messageTimeline {
+  min-height: 0;
+  max-height: none;
+  flex: 1;
+  gap: 14px;
+  padding: 20px;
+}
+
+.messageBubble {
+  max-width: min(78%, 560px);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.messageBubble p {
+  padding: 11px 14px;
+  border-radius: 16px 16px 16px 4px;
+  background: #f6eee2;
+}
+
+.messageBubble > div {
+  justify-content: flex-start;
+  gap: 6px;
+  margin: 4px 2px 0;
+  color: #5a4a3e;
+  font-size: 0.75rem;
+}
+
+.messageBubble > div strong {
+  font-weight: 500;
+}
+
+.messageBubble > div strong::after {
+  content: " ·";
+}
+
+.messageBubble time {
+  color: #5a4a3e;
+  font-size: 0.75rem;
+}
+
+.ownMessage {
+  border: 0;
+  background: transparent;
+  color: inherit;
+}
+
+.ownMessage p {
+  border-radius: 16px 16px 4px 16px;
+  background: #2a1e17;
+  color: #f6eee2;
+}
+
+.ownMessage > div {
+  justify-content: flex-end;
+}
+
+.ownMessage time {
+  color: #5a4a3e;
+}
+
+.systemMessage {
+  max-width: 90%;
+  align-self: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #5a4a3e;
+  font-size: 0.82rem;
+  text-align: center;
+}
+
+.messageComposer {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  padding: 12px 20px;
+  border-top: 1px solid #eadfd0;
+  background: #fff;
+}
+
+.messageComposer label {
+  min-width: 0;
+  flex: 1;
+}
+
+.messageComposer textarea {
+  display: block;
+  min-height: 46px;
+  max-height: 160px;
+  padding: 11px 14px;
+  border-width: 1px;
+  border-radius: 12px;
+  resize: none;
+  field-sizing: content;
+}
+
+.messageComposer .button {
+  width: auto;
+  min-height: 46px;
+}
+
+.inboxLoading,
+.inboxEmpty {
+  flex: 1;
+}
+
+/* Details column */
+.eventSummary {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+  padding: 16px;
+  border-bottom: 0;
+  border-left: 1px solid #eadfd0;
+  background: #f6eee2;
+}
+
+.railCard,
+.eventSummary .bookingPanel,
+.eventSummary .outcomeActions,
+.eventSummary .adminThreadTools > section {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid #eadfd0;
+  border-radius: var(--radius);
+  background: #fff;
+}
+
+.railCard h3,
+.eventSummary .adminThreadTools h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.railCard dl {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin: 0;
+}
+
+.railCard dl > div {
+  display: grid;
+  grid-template-columns: minmax(84px, auto) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.railCard dt {
+  color: #5a4a3e;
+  font: 400 0.88rem/1.4 var(--font-sans);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.railCard dd {
+  font-size: 0.88rem;
+}
+
+.railLink {
+  width: fit-content;
+  font-size: 0.88rem;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.railLink:hover {
+  color: #b8482a;
+}
+
+.eventSummary .organizerQuote {
+  margin: 0;
+}
+
+.eventSummary .bookingHeader {
+  flex-direction: column;
+  gap: 8px;
+}
+
+.eventSummary .bookingHeader h3,
+.eventSummary .organizerQuote .bookingHeader h3 {
+  font: 700 1rem/1.3 var(--font-sans);
+}
+
+.eventSummary .bookingHeader .eyebrow,
+.eventSummary .bookingNext {
+  display: none;
+}
+
+.eventSummary .bookingHeaderAside {
+  justify-items: start;
+}
+
+.eventSummary .quoteTotal {
+  font-size: 1.5rem;
+}
+
+.eventSummary .bookingNext,
+.eventSummary .bookingCallout,
+.eventSummary .quoteDescription,
+.eventSummary .help {
+  font-size: 0.88rem;
+}
+
+.eventSummary .bookingCallout {
+  display: grid;
+  gap: 8px;
+  border: 0;
+  border-radius: 12px;
+  background: #f6eee2;
+}
+
+.eventSummary .bookingFacts > div {
+  grid-template-columns: 1fr;
+  gap: 2px;
+}
+
+.eventSummary .bookingFacts dt {
+  font: 400 0.82rem/1.4 var(--font-sans);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.eventSummary .bookingContacts {
+  border: 0;
+  border-radius: 12px;
+  font-size: 0.88rem;
+}
+
+.eventSummary .bookingForm {
+  padding: 0;
+  border: 0;
+}
+
+.bookingActions {
+  gap: 4px 18px;
+}
+
+.bookingActions:empty {
+  display: none;
+}
+
+.bookingActions .button,
+.bookingActions .secondaryButton,
+.bookingActions .dangerButton {
+  width: 100%;
+}
+
+.quietActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 20px;
+  padding: 0 4px;
+}
+
+.quietLink {
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #5a4a3e;
+  cursor: pointer;
+  font: 500 0.88rem/1.2 var(--font-sans);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color 0.15s ease;
+}
+
+.quietLink:hover:not(:disabled) {
+  color: #2a1e17;
+}
+
+.quietDanger,
+.quietDanger:hover:not(:disabled) {
+  color: #9a3a20;
+}
+
+.quietLink:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.eventSummary .outcomeActions {
+  border-top: 1px solid #eadfd0;
+}
+
+.eventSummary .adminThreadTools {
+  grid-template-columns: 1fr;
+  gap: 14px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+@media (min-width: 1180px) {
+  .eventSummary { display: flex; }
+}
+
+@media (max-width: 1179px) {
+  .threadBody {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .eventSummary {
+    display: none;
+    border-left: 0;
+  }
+
+  .showDetails .eventSummary {
+    display: flex;
+  }
+
+  .showDetails .conversationColumn {
+    display: none;
+  }
+
+  .detailsToggle {
+    display: inline-flex;
+  }
+}
+
+@media (max-width: 720px) {
+  .shell {
+    padding-top: 18px;
+  }
+
+  .inboxLayout {
+    height: calc(100dvh - var(--inbox-offset-mobile, 190px));
+    min-height: 420px;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .hasSelectedThread {
+    position: fixed;
+    inset: 57px 0 0;
+    z-index: 35;
+    height: auto;
+    min-height: 0;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .threadList {
+    border-right: 0;
+    background: #f6eee2;
+  }
+
+  .hasSelectedThread .threadList,
+  .inboxLayout:not(.hasSelectedThread) .threadPanel {
+    display: none;
+  }
+
+  .inboxLayout:not(.hasSelectedThread) {
+    height: auto;
+    min-height: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    overflow: visible;
+  }
+
+  .inboxLayout:not(.hasSelectedThread) .threadList {
+    overflow: visible;
+    background: transparent;
+  }
+
+  .inboxLayout:not(.hasSelectedThread) .inboxToolbar {
+    position: static;
+    padding: 0 0 12px;
+    border-bottom: 0;
+    background: transparent;
+  }
+
+  .inboxLayout:not(.hasSelectedThread) .threadListItem {
+    margin-bottom: 10px;
+    border: 1px solid #eadfd0;
+    border-radius: var(--radius);
+    background: #fff;
+    box-shadow: none;
+  }
+
+  .inboxToolbar {
+    background: #f6eee2;
+  }
+
+  .filterPill {
+    min-height: 44px;
+    padding: 0 16px;
+    font-size: 0.88rem;
+  }
+
+  .inboxSelect select,
+  .iconButton {
+    min-height: 44px;
+    height: 44px;
+  }
+
+  .iconButton {
+    width: 44px;
+    min-width: 44px;
+  }
+
+  .mobileBackButton {
+    display: inline-flex;
+  }
+
+  .threadHeader {
+    gap: 4px;
+    padding: 6px 10px 6px 4px;
+  }
+
+  .threadHeader h2 {
+    font-size: 1.25rem;
+  }
+
+  .threadHeaderChip {
+    display: none;
+  }
+
+  .quoteStrip {
+    padding: 10px 14px;
+  }
+
+  .stripButton {
+    width: 100%;
+  }
+
+  .messageTimeline {
+    padding: 14px;
+  }
+
+  .messageBubble {
+    max-width: 86%;
+  }
+
+  .messageComposer {
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+  }
+
+  .messageComposer textarea {
+    font-size: 16px;
+  }
+
+  .messageComposer .button {
+    width: 46px;
+    padding: 0;
+  }
+
+  .messageComposer .button span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading::before,
+  .threadSkeletons span {
+    animation: none;
   }
 }

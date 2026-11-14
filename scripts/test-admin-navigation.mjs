@@ -29,10 +29,11 @@ test('incoming messages scroll their timeline only, never the workspace document
 });
 
 test('review summary precedes performance and opens the existing review queue', () => {
-  assert.ok(workspace.indexOf('styles.pendingReviewBanner') < workspace.indexOf('<h2>Marketplace performance</h2>'));
+  assert.ok(workspace.indexOf('adminStyles.attention}') > 0 && workspace.indexOf('adminStyles.attention}') < workspace.indexOf('<h2>Marketplace performance</h2>'));
   assert.match(workspace, /pending.length === 1 \? "instructor awaiting review" : "instructors awaiting review"/);
   assert.match(workspace, /onClick=\{\(\) => selectAdminTab\("profiles"\)\}>\s+Review instructors/);
-  assert.match(workspace, /name === "profiles" \? `Instructor reviews/);
+  assert.match(workspace, /name === "profiles" \? "Reviews"/);
+  assert.match(workspace, /name === "profiles" && pending.length \? <span className=\{adminStyles.menuBadge\}>\{pending.length\}<\/span>/);
 });
 
 test('admin review queue omits spotlights while instructor review remains available', () => {

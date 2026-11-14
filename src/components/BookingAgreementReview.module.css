@@ -1,88 +1,108 @@
-.dialog { position: fixed; inset: 0; z-index: 1000; overflow: auto; color: #2a1e17; background: #efe3d0; font: 14px/1.5 var(--font-sans); overscroll-behavior: contain; }
+.dialog { position: fixed; inset: 0; z-index: 1000; overflow: auto; color: #2a1e17; background: #efe3d0; font: 15px/1.5 var(--font-sans); overscroll-behavior: contain; }
 .dialog * { box-sizing: border-box; }
 .dialog h1, .dialog h2, .dialog h3, .dialog p { margin: 0; }
 .dialog button, .dialog input, .dialog select { font: inherit; }
 .dialog button { cursor: pointer; }
 .dialog button:disabled { cursor: default; opacity: .5; }
 .dialog button:focus-visible, .dialog input:focus-visible, .dialog select:focus-visible, .dialog a:focus-visible { outline: 3px solid #e9a94b; outline-offset: 3px; }
-.brand { padding: 20px 32px; background: #2a1e17; border-bottom: 3px solid #e9a94b; color: #fff; font: 700 20px/1.3 Georgia, serif; letter-spacing: .035em; }
-.header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 18px; padding: 18px 32px; border-bottom: 1px solid #eadfd0; background: #fff; }
-.header h1 { color: #2a1e17; font: 700 18px/1.4 var(--font-sans); letter-spacing: -.02em; text-transform: none; }
-.back { display: inline-flex; align-items: center; gap: 7px; border: 0; padding: 5px 0 8px; background: none; color: #5a4a3e; font-size: 12px !important; }
-.steps { display: flex; align-items: center; gap: 22px; padding: 0; margin: 0; list-style: none; color: #6b5b4e; font-size: 12px; }
-.steps li { display: flex; align-items: center; gap: 7px; }
-.steps span { display: grid; width: 24px; height: 24px; place-items: center; border: 1px solid #eadfd0; border-radius: 50%; font-size: 11px; }
+
+.header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px 24px; padding: 10px 24px; border-bottom: 1px solid #eadfd0; background: #fff; }
+.headerMain { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.logo { display: inline-flex; flex: 0 0 auto; }
+.header h1 { color: #2a1e17; font: 400 24px/1.2 var(--font-display); letter-spacing: 0; text-transform: none; }
+.back { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; border: 0; padding: 2px 0; background: none; color: #5a4a3e; font-size: 13px !important; transition: color .15s ease; }
+.back:hover:not(:disabled) { color: #b8482a; }
+
+.steps { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 20px; padding: 0; margin: 0; list-style: none; color: #5a4a3e; font-size: 14px; }
+.steps li { display: flex; align-items: center; gap: 8px; }
+.steps span { display: grid; width: 26px; height: 26px; place-items: center; border: 1px solid #8a7a6c; border-radius: 50%; font-size: 13px; }
 .steps [aria-current] { color: #2a1e17; font-weight: 700; }
-.steps [aria-current] span { border-color: #2a1e17; background: #2a1e17; color: #fff; }
-.layout { display: grid; grid-template-columns: minmax(0, 790px) 290px; align-items: start; justify-content: center; gap: 28px; max-width: 1240px; margin: auto; padding: 24px 32px 48px; }
+.steps [aria-current] span { border-color: #2a1e17; background: #2a1e17; color: #f6eee2; }
+.steps [data-done] { color: #17524f; font-weight: 700; }
+.steps [data-done] span { border-color: #1f6f6b; background: #1f6f6b; color: #fff; }
+
+.mobileJump { display: none; }
+
+.layout { display: grid; grid-template-columns: minmax(0, 790px) 330px; align-items: start; justify-content: center; gap: 24px; max-width: 1240px; margin: auto; padding: 24px 24px 48px; }
 .document { min-width: 0; }
 .toolbar, .tools, .pagination, .pageControls { display: flex; align-items: center; gap: 10px; }
-.toolbar { justify-content: space-between; flex-wrap: wrap; margin-bottom: 12px; color: #5a4a3e; font-size: 12px; }
+.toolbar { justify-content: space-between; flex-wrap: wrap; margin-bottom: 12px; color: #5a4a3e; font-size: 14px; }
 .tools { flex-wrap: wrap; }
-.toolbar button, .pagination button, .error button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 1px solid #dccdb8; border-radius: 12px; padding: 7px 10px; background: #fff; color: #2a1e17; font-size: 12px; }
-.pagination { justify-content: space-between; margin-bottom: 14px; color: #5a4a3e; font-size: 12px; }
-.pagination label { display: flex; align-items: center; gap: 7px; }
-.pagination select { min-width: 90px; border: 1px solid #dccdb8; background: #fff; padding: 6px; color: #2a1e17; }
+.toolbar button, .pagination button, .error button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; border: 1px solid #8a7a6c; border-radius: 12px; padding: 8px 14px; background: #fff; color: #2a1e17; font-size: 14px; transition: background-color .15s ease, border-color .15s ease; }
+.toolbar button:hover:not(:disabled), .pagination button:hover:not(:disabled), .error button:hover:not(:disabled) { border-color: #2a1e17; background: #f6eee2; }
+.pagination { justify-content: space-between; margin-bottom: 14px; color: #5a4a3e; font-size: 14px; }
+.pagination button { min-width: 44px; padding: 8px; }
+.pagination label { display: flex; align-items: center; gap: 8px; }
+.pagination select { min-width: 110px; min-height: 44px; border: 1px solid #8a7a6c; border-radius: 12px; background: #fff; padding: 8px 10px; color: #2a1e17; }
 .pageControls { flex: 0 0 auto; }
-.pageControls span { min-width: 52px; text-align: center; }
+.pageControls span { min-width: 56px; text-align: center; color: #2a1e17; }
 .viewport { overflow-x: auto; padding: 1px; }
 .viewport[hidden] { display: none; }
-.paper { position: relative; min-width: 100%; aspect-ratio: 612 / 792; border: 1px solid #eadfd0; background: #fff; box-shadow: 0 4px 18px #2a1e1710; }
+.paper { position: relative; min-width: 100%; aspect-ratio: 612 / 792; border: 1px solid #eadfd0; border-radius: 4px; background: #fff; box-shadow: 0 10px 30px rgb(42 30 23 / 8%); }
 .canvas { display: block; width: 100%; height: auto; }
 .pendingCanvas { display: none; }
 .placeholder { padding: clamp(22px, 5vw, 46px); overflow-wrap: anywhere; }
-.paperBrand { margin-bottom: 24px !important; padding-bottom: 16px; border-bottom: 1px solid var(--line); font-size: 10px; font-weight: 700; letter-spacing: .1em; }
-.placeholder h2, .textPaper h2 { margin-bottom: 20px; font: 400 30px/1.2 Georgia, serif; text-transform: none; }
+.paperBrand { margin-bottom: 24px !important; padding-bottom: 16px; border-bottom: 2px solid #2a1e17; font: 400 18px/1.2 var(--font-display); letter-spacing: 0; text-transform: none; }
+.placeholder h2, .textPaper h2 { margin-bottom: 20px; font: 400 34px/1.1 var(--font-display); text-transform: none; }
 .placeholder p { margin: 20px 0; }
-.placeholderTotal { font-size: 28px; }
+.placeholderTotal { font-size: 28px; font-variant-numeric: tabular-nums; }
 .placeholder > p:not(.paperBrand):not(.preparing) { max-height: 120px; overflow: hidden; }
-.preparing { display: flex; align-items: center; gap: 8px; color: #5a4a3e; font-size: 12px; }
-.textPaper { padding: 32px; border: 1px solid #eadfd0; background: #fff; }
-.agreementContent { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; line-height: 1.8; }
+.preparing { display: flex; align-items: center; gap: 8px; color: #5a4a3e; font-size: 14px; }
+.textPaper { padding: 32px; border: 1px solid #eadfd0; border-radius: 4px; background: #fff; box-shadow: 0 10px 30px rgb(42 30 23 / 8%); }
+.agreementContent { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 15px; line-height: 1.8; }
 .textPaper h3 { margin: 25px 0 12px; }
 .textPaper > p { margin: 15px 0; overflow-wrap: anywhere; }
-.signCard { position: sticky; top: 24px; min-width: 0; margin-top: 88px; padding: 23px; border: 1px solid #eadfd0; background: #fff; }
-.eyebrow { color: #5a4a3e; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; }
-.signCard h2 { margin: 5px 0 12px; font: 700 21px/1.3 var(--font-sans); letter-spacing: -.03em; text-transform: none; }
-.help { color: #5a4a3e; font-size: 12px; line-height: 1.65; }
-.signaturePage { display: inline-flex; align-items: center; gap: 7px; margin: 10px 0 6px; border: 0; padding: 4px 0; background: none; color: #5a4a3e; font-size: 12px !important; }
-.nameLabel { display: block; margin: 18px 0 7px; font-size: 12px; font-weight: 700; }
-.signCard input[type="text"], .signCard input:not([type]) { width: 100%; border: 1px solid #c3c7cf; border-radius: 12px; padding: 11px; color: #2a1e17; background: #fff; }
-.signaturePreview { display: flex; align-items: center; min-height: 82px; margin: 0 0 18px; padding: 8px 0; border-bottom: 1px solid #eadfd0; font: italic 29px/1.5 "Brush Script MT", "Segoe Script", cursive; overflow-wrap: anywhere; }
-.signaturePreview span { color: #6b5b4e; font: 12px/1.5 var(--font-sans); }
-.check { display: flex; align-items: flex-start; gap: 8px; margin: 14px 0; font-size: 12px; line-height: 1.65; }
-.check input { flex: 0 0 auto; width: 16px; height: 16px; margin: 3px 0 0; accent-color: #2a1e17; }
-.check a { text-decoration: underline; }
-.total { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-top: 22px; padding-top: 17px; border-top: 1px solid #eadfd0; }
-.total span { color: #5a4a3e; font-size: 12px; }
-.total strong { font-size: 25px; font-weight: 700; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
-.submit { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; margin: 12px 0; padding: 13px 12px; border: 1px solid #e9a94b; border-radius: 12px; background: #e9a94b; color: #2a1e17; font-size: 13px !important; font-weight: 700 !important; text-align: center; }
+
+.signCard { position: sticky; top: 24px; min-width: 0; padding: 22px; border: 1px solid #eadfd0; border-radius: 18px; background: #fff; scroll-margin-top: 12px; }
+.signCard h2 { margin: 0 0 10px; font: 700 19px/1.3 var(--font-sans); letter-spacing: -.01em; text-transform: none; }
+.help { color: #5a4a3e; font-size: 14px; line-height: 1.55; }
+.priorSignature { display: flex; flex-direction: column; gap: 2px; margin-top: 14px; padding: 12px 14px; border-radius: 12px; background: #f6eee2; color: #5a4a3e; font-size: 14px; overflow-wrap: anywhere; }
+.priorSignature strong { color: #2a1e17; font: 600 28px/1.1 "Caveat", "Segoe Script", cursive; }
+.signaturePage { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; margin: 6px 0 0; border: 0; padding: 4px 0; background: none; color: #2a1e17; font-size: 14px !important; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+.signaturePage:hover:not(:disabled) { color: #b8482a; }
+.nameLabel { display: block; margin: 10px 0 6px; font-size: 14px; font-weight: 700; }
+.signCard input[type="text"], .signCard input:not([type]) { width: 100%; min-height: 46px; border: 1px solid #8a7a6c; border-radius: 12px; padding: 10px 12px; color: #2a1e17; background: #fff; font-size: 16px; }
+.signCard input:not([type]):focus { border-color: #b8482a; }
+.signaturePreview { display: flex; align-items: flex-end; min-height: 60px; margin: 6px 0 16px; padding: 0 4px 4px; border-bottom: 1px solid #8a7a6c; font: 600 36px/1 "Caveat", "Segoe Script", cursive; overflow-wrap: anywhere; }
+.signaturePreview span { color: #5a4a3e; font: 14px/1.5 var(--font-sans); }
+.check { display: flex; align-items: flex-start; gap: 10px; min-height: 28px; margin: 12px 0; font-size: 14px; line-height: 1.5; cursor: pointer; }
+.check input { flex: 0 0 auto; width: 18px; height: 18px; margin: 2px 0 0; accent-color: #2a1e17; }
+.check a { text-decoration: underline; text-underline-offset: 3px; }
+.check a:hover { color: #b8482a; }
+.total { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-top: 18px; padding-top: 14px; border-top: 1px solid #eadfd0; }
+.total span { color: #5a4a3e; font-size: 15px; }
+.total strong { font-size: 26px; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.submit { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; min-height: 50px; margin: 12px 0; padding: 12px; border: 1px solid #e9a94b; border-radius: 12px; background: #e9a94b; color: #2a1e17; font-size: 15px !important; font-weight: 700 !important; text-align: center; transition: background-color .15s ease; }
+.submit:hover:not(:disabled) { border-color: #f1b554; background: #f1b554; }
 .submit svg { flex: 0 0 auto; }
-.savedSignature { margin: 22px 0; overflow-wrap: anywhere; }
-.savedSignature p { color: #5a4a3e; font-size: 12px; }
-.savedSignature strong { display: block; margin: 7px 0; font-size: 19px; }
-.error { margin: 12px 0; padding: 12px; background: #fff3ed; color: #7a2e1a; font-size: 13px; }
+.savedSignature { margin: 16px 0; padding: 12px 14px; border-radius: 12px; background: #f6eee2; overflow-wrap: anywhere; }
+.savedSignature p { color: #5a4a3e; font-size: 14px; }
+.savedSignature strong { display: block; margin: 2px 0; font: 600 28px/1.1 "Caveat", "Segoe Script", cursive; }
+.error { margin: 12px 0; padding: 12px 14px; border: 1px solid #e3b9ab; border-radius: 12px; background: #fff0eb; color: #7a2e1a; font-size: 14px; }
 .error p { margin-bottom: 10px; }
+
 @media (max-width: 900px) {
-  .layout { grid-template-columns: minmax(0, 1fr) 260px; gap: 18px; padding: 20px 18px 40px; }
-  .header { padding: 16px 18px; }
-  .brand { padding: 18px; }
-  .signCard { padding: 19px; margin-top: 130px; }
+  .layout { grid-template-columns: minmax(0, 1fr) 290px; gap: 18px; padding: 20px 18px 40px; }
+  .header { padding: 10px 18px; }
 }
 @media (max-width: 680px) {
   .layout { grid-template-columns: minmax(0, 1fr); padding: 16px 12px 32px; }
-  .signCard { position: static; margin-top: 0; padding: 22px; }
-  .header { align-items: flex-start; gap: 12px; }
-  .header h1 { font-size: 17px; }
-  .steps { gap: 18px; }
+  .signCard { position: static; }
+  .header { align-items: flex-start; gap: 10px; padding: 10px 12px; }
+  .headerMain { gap: 12px; }
+  .header h1 { font-size: 21px; }
+  .steps { gap: 6px 16px; }
+  .mobileJump { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border-bottom: 1px solid #eadfd0; background: #fbecd0; }
+  .mobileTotal { display: flex; align-items: baseline; gap: 10px; }
+  .mobileTotal span { color: #4a3a2f; font-size: 14px; }
+  .mobileTotal strong { font-size: 20px; font-variant-numeric: tabular-nums; }
+  .mobileJump button { min-height: 44px; padding: 8px 16px; border: 0; border-radius: 12px; background: #2a1e17; color: #f6eee2; font-weight: 700; }
   .toolbar { gap: 8px; }
   .toolbar > span { width: 100%; }
-  .toolbar button, .pagination button { min-height: 44px; }
-  .pagination button { min-width: 44px; padding: 5px; }
-  .pagination select { min-height: 44px; }
   .pageControls { gap: 5px; }
-  .pageControls span { min-width: 45px; }
-  .pagination label { gap: 5px; font-size: 11px; }
+  .pagination label { gap: 5px; }
   .textPaper { padding: 22px 18px; }
-  .signCard input:not([type]) { font-size: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .back, .submit, .toolbar button, .pagination button, .error button { transition: none; }
 }

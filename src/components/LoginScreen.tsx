@@ -21,7 +21,8 @@ import {
   invitationClaimWindow,
   profileSubmissionWindow
 } from "@/lib/commercialTerms";
-import styles from "./Marketplace.module.css";
+import { LogoMark } from "@/components/Logo";
+import styles from "./LoginScreen.module.css";
 
 function accountEntryPath(intent: AccountIntent | null, returnPath: string, invitationToken: string | null): string {
   if (!intent) return returnPath;
@@ -51,6 +52,7 @@ export function LoginScreen() {
   const [invitation, setInvitation] = useState<InstructorInvitationLifecycle | null>(null);
   const [invitationLoading, setInvitationLoading] = useState(false);
   const [hasSession, setHasSession] = useState(false);
+  const [sentTo, setSentTo] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -154,7 +156,7 @@ export function LoginScreen() {
         }
       });
       if (authError) throw authError;
-      setMessage("Check your email for a secure sign-in link. You can open it on any device and in any browser.");
+      setSentTo(email.trim());
     } catch (authError) {
       setError(readableError(authError));
     } finally {
@@ -178,7 +180,7 @@ export function LoginScreen() {
     ? invited ? "Your private instructor invitation" : "Sign in to build your instructor profile"
     : intent === "organizer"
       ? "Sign in to contact instructors"
-      : "Sign in to Hire Line Dancers";
+      : "Sign in";
   const subtitle = intent === "instructor"
     ? invited
       ? "Review the invitation first. Nothing is claimed until you choose the button below."
@@ -188,9 +190,22 @@ export function LoginScreen() {
       : "Browse instructors without an account. Sign in when you are ready to send an inquiry, or to manage your instructor profile.";
 
   return (
-    <section className={`${styles.shell} ${styles.narrow}`}>
-      <h1 className={styles.title}>{title}</h1>
-      <p className={styles.subtitle}>{subtitle}</p>
+    <section className={styles.page}>
+      <div className={styles.brandPanel}>
+        <Link className={styles.brandLink} href="/" aria-label="Hire Line Dancers home">
+          <span className={styles.brandMark} aria-hidden="true"><LogoMark size={44} /></span>
+          <span className={styles.brandName}>Hire Line Dancers</span>
+        </Link>
+        <p className={styles.headline}>Help more guests get moving together.</p>
+        <p className={styles.tagline}>A simple way to find a line dance instructor for your event. No experience needed.</p>
+      </div>
+
+      <div className={styles.formPanel}>
+      <div className={styles.column}>
+      <div className={styles.intro}>
+        <h1 className={styles.title}>{title}</h1>
+        <p className={styles.subtitle}>{subtitle}</p>
+      </div>
 
       <div className={styles.card}>
         {!marketplaceConfigured ? (
@@ -242,6 +257,14 @@ export function LoginScreen() {
                 Continue with signed-in account
               </button>
             </div>
+          ) : sentTo ? (
+            <div className={styles.sent} role="status">
+              <p className={styles.sentMessage}>Check your email for a secure sign-in link. You can open it on any device and in any browser.</p>
+              <p className={styles.sentEmail}>{sentTo}</p>
+              <button className={styles.secondaryButton} type="button" onClick={() => { setSentTo(null); setError(null); }}>
+                Use a different email
+              </button>
+            </div>
           ) : (
             <>
               {invited ? (
@@ -254,7 +277,7 @@ export function LoginScreen() {
                 </p>
               ) : null}
               <button
-                className={`${styles.button} ${styles.googleButton}`}
+                className={styles.googleButton}
                 type="button"
                 disabled={busy !== null}
                 onClick={() => void signInWithGoogle()}
@@ -276,7 +299,7 @@ export function LoginScreen() {
                     placeholder="you@company.com"
                   />
                 </label>
-                <button className={styles.secondaryButton} disabled={busy !== null} type="submit">
+                <button className={styles.button} disabled={busy !== null} type="submit">
                   {busy === "email" ? "Sending link..." : "Email me a sign-in link"}
                 </button>
               </form>
@@ -289,7 +312,13 @@ export function LoginScreen() {
         {message ? <p className={styles.success} role="status">{message}</p> : null}
         {error ? <p className={styles.error} role="alert">{error}</p> : null}
       </div>
-      <p className={styles.help}>By continuing, you agree to the site terms and privacy policy.</p>
+      <p className={styles.help}>By continuing, you agree to the <Link href="/legal/terms/">site terms</Link> and <Link href="/legal/privacy/">privacy policy</Link>.</p>
+      </div>
+      <nav className={styles.helpLinks} aria-label="Help">
+        <Link href="/instructors/join/">Join as an instructor</Link>
+        <Link href="/support/">Support</Link>
+      </nav>
+      </div>
     </section>
   );
 }

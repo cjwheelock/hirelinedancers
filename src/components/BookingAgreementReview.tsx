@@ -2,8 +2,9 @@
 
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
-import { ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, Download, FileText } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, ChevronLeft, ChevronRight, Download, FileText } from "lucide-react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
+import { LogoMark } from "@/components/Logo";
 import { displayDate, displayDateTime, displayTime, money, type Booking } from "@/lib/booking";
 import styles from "./BookingAgreementReview.module.css";
 
@@ -19,6 +20,7 @@ export function BookingAgreementReview({ booking, busy = false, error, onClose, 
   const dialog = useRef<HTMLElement>(null);
   const backButton = useRef<HTMLButtonElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
+  const signCard = useRef<HTMLElement>(null);
   const headingId = useId();
   const signatureKey = JSON.stringify(booking.signatures);
   // The agreement hash binds the immutable quote fields. Refresh the document
@@ -36,6 +38,7 @@ export function BookingAgreementReview({ booking, busy = false, error, onClose, 
   const [agreed, setAgreed] = useState(false);
   const [retry, setRetry] = useState(0);
   const canSign = Boolean(onSubmit);
+  const instructorSignature = snapshot.signatures.find(signature => signature.party_role === "instructor");
   const currentDocument = displayed?.hash === snapshot.agreement_sha256 && pdfState?.hash === snapshot.agreement_sha256;
   const ready = textView || currentDocument;
 
@@ -142,14 +145,20 @@ export function BookingAgreementReview({ booking, busy = false, error, onClose, 
   if (typeof document === "undefined") return null;
   return createPortal(
     <section ref={dialog} className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby={headingId} onKeyDown={handleKeys}>
-      <div className={styles.brand}>HIRE LINE DANCERS</div>
       <header className={styles.header}>
-        <div>
-          <button ref={backButton} className={styles.back} type="button" disabled={busy} onClick={onClose}><ArrowLeft size={16} aria-hidden="true" /> Back to conversation</button>
-          <h1 id={headingId}>{canSign ? "Review, sign, and pay" : "Booking agreement"}</h1>
+        <div className={styles.headerMain}>
+          <span className={styles.logo}><LogoMark size={40} /></span>
+          <div>
+            <button ref={backButton} className={styles.back} type="button" disabled={busy} onClick={onClose}><ArrowLeft size={16} aria-hidden="true" /> Back to conversation</button>
+            <h1 id={headingId}>{canSign ? "Review, sign, and pay" : "Booking agreement"}</h1>
+          </div>
         </div>
-        {canSign ? <ol className={styles.steps} aria-label="Booking steps"><li aria-current={typedName ? undefined : "step"}><span>1</span> Review</li><li aria-current={typedName ? "step" : undefined}><span>2</span> Sign</li><li><span>3</span> Pay</li></ol> : null}
+        {canSign ? <ol className={styles.steps} aria-label="Booking steps"><li data-done={reviewed ? "true" : undefined} aria-current={reviewed ? undefined : "step"}><span>{reviewed ? <Check size={14} strokeWidth={3} role="img" aria-label="Done" /> : 1}</span> Review</li><li aria-current={reviewed ? "step" : undefined}><span>2</span> Sign</li><li><span>3</span> Pay</li></ol> : null}
       </header>
+      {canSign ? <div className={styles.mobileJump}>
+        <div className={styles.mobileTotal}><span>Total</span><strong>{money(snapshot.total_cents)}</strong></div>
+        <button type="button" onClick={() => signCard.current?.scrollIntoView({ block: "start" })}>Sign the agreement</button>
+      </div> : null}
       <div className={styles.layout}>
         <div className={styles.document}>
           <div className={styles.toolbar}>
@@ -171,15 +180,16 @@ export function BookingAgreementReview({ booking, busy = false, error, onClose, 
           <div className={styles.viewport} hidden={textView}>
             <div className={styles.paper} style={{ width: `${zoom * 100}%` }} aria-busy={!currentDocument || requestedPage !== displayed?.page}>
               <canvas ref={canvas} className={displayed ? styles.canvas : styles.pendingCanvas} role="img" aria-label={`Booking agreement, page ${displayed?.page ?? 1}`} />
-              {!displayed ? <div className={styles.placeholder}><p className={styles.paperBrand}>HIRE LINE DANCERS</p><h2>Booking agreement</h2><strong className={styles.placeholderTotal}>{money(snapshot.total_cents)}</strong><p>{displayDate(snapshot.event_date)}<br />{displayTime(snapshot.start_time)} to {displayTime(snapshot.end_time)} ({snapshot.time_zone})</p><p>{[snapshot.venue_name, snapshot.venue_address].filter(Boolean).join(", ")}</p><p>{snapshot.service_description}</p><p className={styles.preparing}><FileText size={18} aria-hidden="true" /> Preparing PDF...</p></div> : null}
+              {!displayed ? <div className={styles.placeholder}><p className={styles.paperBrand}>Hire Line Dancers</p><h2>Booking agreement</h2><strong className={styles.placeholderTotal}>{money(snapshot.total_cents)}</strong><p>{displayDate(snapshot.event_date)}<br />{displayTime(snapshot.start_time)} to {displayTime(snapshot.end_time)} ({snapshot.time_zone})</p><p>{[snapshot.venue_name, snapshot.venue_address].filter(Boolean).join(", ")}</p><p>{snapshot.service_description}</p><p className={styles.preparing}><FileText size={18} aria-hidden="true" /> Preparing PDF...</p></div> : null}
             </div>
           </div>
           {textView ? <article className={styles.textPaper} aria-label="Full booking agreement"><h2>Booking agreement</h2><div className={styles.agreementContent}>{snapshot.agreement_text}</div><h3>Signatures</h3>{snapshot.signatures.map(signature => <p key={signature.party_role}>{signature.party_role === "instructor" ? "Instructor" : "Client"}: {signature.typed_name}<br />{displayDateTime(signature.signed_at)}</p>)}</article> : null}
         </div>
-        <aside className={styles.signCard} aria-label={canSign ? "Electronic signature" : "Signatures"}>
+        <aside ref={signCard} className={styles.signCard} aria-label={canSign ? "Electronic signature" : "Signatures"}>
           {canSign ? <form onSubmit={event => { event.preventDefault(); if (ready && reviewed && agreed && typedName.trim().length >= 2 && !busy) onSubmit?.(typedName.trim()); }}>
-            <p className={styles.eyebrow}>Signature</p><h2>Sign the agreement</h2>
+            <h2>Sign the agreement</h2>
             <p className={styles.help}>Read the agreement. When you sign, you go straight to secure payment of <strong>{money(snapshot.total_cents)}</strong>.</p>
+            {instructorSignature ? <div className={styles.priorSignature}><span>Signed by the instructor</span><strong>{instructorSignature.typed_name}</strong><span>{displayDateTime(instructorSignature.signed_at)}</span></div> : null}
             <button className={styles.signaturePage} type="button" disabled={!pdfState || textView} onClick={() => setRequestedPage(pdfState?.pdf.numPages ?? 1)}>View signature page <ArrowRight size={15} aria-hidden="true" /></button>
             <label className={styles.nameLabel} htmlFor={`${headingId}-name`}>Type your full name to sign</label>
             <input id={`${headingId}-name`} required minLength={2} maxLength={120} autoComplete="name" value={typedName} disabled={busy} onChange={event => setTypedName(event.target.value)} />
@@ -190,7 +200,7 @@ export function BookingAgreementReview({ booking, busy = false, error, onClose, 
             <div className={styles.total}><span>Total</span><strong>{money(snapshot.total_cents)}</strong></div>
             <button className={styles.submit} type="submit" disabled={busy || !ready || !agreed || !reviewed || typedName.trim().length < 2}>{busy ? "Opening payment..." : "Agree and continue to payment"}<ArrowRight size={17} aria-hidden="true" /></button>
             <p className={styles.help}>The agreement takes effect only when the payment succeeds.</p>
-          </form> : <><p className={styles.eyebrow}>Signatures</p><h2>Booking agreement</h2>{snapshot.signatures.map(signature => <div className={styles.savedSignature} key={signature.party_role}><p>{signature.party_role === "instructor" ? "Instructor" : "Client"}</p><strong>{signature.typed_name}</strong><p>{displayDateTime(signature.signed_at)}</p></div>)}<div className={styles.total}><span>Total</span><strong>{money(snapshot.total_cents)}</strong></div></>}
+          </form> : <><h2>Signatures</h2>{snapshot.signatures.map(signature => <div className={styles.savedSignature} key={signature.party_role}><p>{signature.party_role === "instructor" ? "Instructor" : "Client"}</p><strong>{signature.typed_name}</strong><p>{displayDateTime(signature.signed_at)}</p></div>)}<div className={styles.total}><span>Total</span><strong>{money(snapshot.total_cents)}</strong></div></>}
         </aside>
       </div>
     </section>, document.body

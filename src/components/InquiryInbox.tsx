@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ChevronLeft, Clock3, Inbox, RefreshCw, Search, Send } from "lucide-react";
 import { eventTypes } from "@/data/site";
 import { BookingPanel } from "./BookingPanel";
-import { displayTime, bookingStatusLabels, paidBookingStatuses, type ThreadBookingState } from "@/lib/booking";
+import { displayTime, bookingStatusLabels, money, nextStepText, openBookingStatuses, paidBookingStatuses, type BookingStatus, type ThreadBookingState } from "@/lib/booking";
 import {
   getMarketplaceClient,
   readableError,
@@ -15,6 +15,7 @@ import {
   type InquiryThreadMessage,
   type MarketplaceInquiry
 } from "@/lib/marketplace";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { InquiryAttention } from "./InquiryAttention";
 import { InquiryOpportunity } from "./InquiryOpportunity";
 import { InquiryRecommendations } from "./InquiryRecommendations";
@@ -24,6 +25,37 @@ type InboxPerspective = "organizer" | "instructor" | "admin";
 type InboxFilter = "all" | "unread" | "needs_reply" | "active" | "closed";
 type InboxSort = "recent" | "oldest_waiting" | "event_date";
 const inboxPageSize = 50;
+const inboxFilters: Array<[InboxFilter, string]> = [
+  ["all", "All"],
+  ["unread", "Unread"],
+  ["needs_reply", "Needs reply"],
+  ["active", "Active"],
+  ["closed", "Closed"]
+];
+
+function sentenceCase(value: string) {
+  return value ? value.charAt(0).toUpperCase() + value.slice(1) : value;
+}
+
+function statusTone(status: string | null | undefined) {
+  if (status === "awaiting_response") return "chipAmber";
+  if (!status || status === "active") return "chipPine";
+  return "chipNeutral";
+}
+
+function bookingTone(status: BookingStatus) {
+  if (["quote_sent", "awaiting_payment", "payment_processing"].includes(status)) return "chipAmber";
+  if (["confirmed", "completed", "paid_out"].includes(status)) return "chipPine";
+  if (["cancelled", "payment_failed"].includes(status)) return "chipDanger";
+  return "chipNeutral";
+}
+
+function shortWhen(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const sameDay = date.toDateString() === new Date().toDateString();
+  return new Intl.DateTimeFormat(undefined, sameDay ? { timeStyle: "short" } : { month: "short", day: "numeric" }).format(date);
+}
 
 function eventTypeLabel(value: string | null | undefined) {
   if (!value) return "Event";
@@ -71,9 +103,36 @@ function normalizeDetail(data: unknown): InquiryThreadDetail | null {
 function senderLabel(message: InquiryThreadMessage, perspective: InboxPerspective) {
   if (message.message_type === "system" || message.sender_role === "system") return "Hire Line Dancers";
   if (message.sender_role === "admin") return perspective === "admin" ? "Administrator" : "Hire Line Dancers";
-  if (perspective === "admin") return statusLabel(message.sender_role);
+  if (perspective === "admin") return sentenceCase(statusLabel(message.sender_role));
   if (message.sender_role === perspective) return "You";
   return message.sender_role === "instructor" ? "Instructor" : "Organizer";
+}
+
+type QuoteStrip = { title: string; text: string; action: "review" | "pay" | "quote" | "payouts" | null };
+
+/** One-line booking status with the single next action for this person. */
+function quoteStrip(state: ThreadBookingState | null, finalizationBlocked: boolean): QuoteStrip | null {
+  if (!state) return null;
+  const text = nextStepText(state);
+  if (!text) return null;
+  const booking = state.booking;
+  const canQuote = !finalizationBlocked && state.role === "instructor" && state.is_current_assignment
+    && ["awaiting_response", "active"].includes(state.thread_status);
+  if (!booking || !openBookingStatuses.includes(booking.status)) {
+    if (!booking && state.role !== "instructor") return null;
+    if (state.role !== "instructor" && booking) return { title: bookingStatusLabels[booking.status], text, action: null };
+    return {
+      title: booking ? bookingStatusLabels[booking.status] : "No quote yet",
+      text,
+      action: !canQuote ? null : state.payouts_ready === false ? "payouts" : "quote"
+    };
+  }
+  const waiting = booking.status === "quote_sent" || booking.status === "awaiting_payment";
+  const title = waiting ? `Quote for ${money(booking.total_cents)}` : `${bookingStatusLabels[booking.status]} · ${money(booking.total_cents)}`;
+  const action = state.role !== "organizer" ? null
+    : booking.status === "quote_sent" && !finalizationBlocked ? "review"
+    : booking.status === "awaiting_payment" ? "pay" : null;
+  return { title, text, action };
 }
 
 export function InquiryInbox({
@@ -112,6 +171,9 @@ export function InquiryInbox({
   const [candidateSearchComplete, setCandidateSearchComplete] = useState(false);
   const [bookingState, setBookingState] = useState<ThreadBookingState | null>(null);
   const [loadingBooking, setLoadingBooking] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
+  const [confirming, setConfirming] = useState<"decline" | "withdraw" | null>(null);
+  const [bookingRequest, setBookingRequest] = useState<{ panel: "quote" | "review" | "pay"; nonce: number } | null>(null);
   const bookingRequestRef = useRef(0);
   const requestedSectionRef = useRef<{ threadId: string; quote: boolean } | null>(null);
   const messageTimelineRef = useRef<HTMLDivElement | null>(null);
@@ -184,7 +246,9 @@ export function InquiryInbox({
     setSelectedThreadId((current) => {
       if (requestedThreadId) return requestedThreadId;
       if (current) return current;
-      return selectionWasInitialized ? null : rows[0]?.thread_id ?? null;
+      // On a phone the inbox list is its own screen, so nothing opens until it is chosen.
+      const listOnly = typeof window.matchMedia === "function" && window.matchMedia("(max-width: 720px)").matches;
+      return selectionWasInitialized || listOnly ? null : rows[0]?.thread_id ?? null;
     });
     setLoadingThreads(false);
   }, [filter, focusInquiryId, focusThreadId, perspective, search, sort]);
@@ -226,6 +290,7 @@ export function InquiryInbox({
       if (perspective !== "admin") {
         await client.rpc("mark_inquiry_thread_read", { p_thread_id: threadId });
         setThreads((current) => current.map((row) => row.thread_id === threadId ? { ...row, unread_count: 0 } : row));
+        if (typeof window.dispatchEvent === "function") window.dispatchEvent(new Event("hld:inbox-changed"));
       }
     }
   }, [perspective]);
@@ -262,7 +327,7 @@ export function InquiryInbox({
     const request = requestedSectionRef.current;
     if (!request || request.threadId !== openThreadId) return;
     requestedSectionRef.current = null;
-    document.querySelector(request.quote ? '[aria-label="Booking"]' : '[aria-label="Messages"] textarea')?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setShowDetails(request.quote);
   }, [openThreadId]);
 
   useEffect(() => {
@@ -490,6 +555,13 @@ export function InquiryInbox({
   const activeBooking = bookingState?.booking ?? null;
   const hasPaidBooking = Boolean(activeBooking && paidBookingStatuses.includes(activeBooking.status) && activeBooking.status !== "paid_out");
   const hasPlatformBooking = Boolean(activeBooking?.paid_at);
+  const hasOpenQuote = Boolean(activeBooking && ["quote_sent", "awaiting_payment", "payment_processing"].includes(activeBooking.status));
+  const canDecline = perspective === "instructor" && !hasPaidBooking && !["declined", "withdrawn", "closed"].includes(threadStatus) && (threadStatus !== "timed_out" || detail?.inquiry.automatic_sharing === true);
+  const canWithdraw = perspective === "organizer" && !hasPaidBooking && !["withdrawn", "closed"].includes(threadStatus);
+  const strip = quoteStrip(perspective === "admin" ? null : bookingState, detail?.thread.finalization_blocked === true);
+  function requestBookingPanel(panel: "quote" | "review" | "pay") {
+    setBookingRequest((current) => ({ panel, nonce: (current?.nonce ?? 0) + 1 }));
+  }
   const canRouteFallback = perspective === "admin"
     && Boolean(detail?.inquiry.fallback_consent)
     && ["declined", "timed_out"].includes(threadStatus);
@@ -497,41 +569,50 @@ export function InquiryInbox({
   return (
     <section className={styles.inboxSection} aria-label="Messages">
       {perspective === "admin" ? <InquiryAttention onOpen={setSelectedThreadId} /> : null}
-      <div className={styles.inboxToolbar}>
-        <label className={styles.inboxSearch}>
-          <Search aria-hidden="true" size={18} />
-          <span className={styles.srOnly}>Search conversations</span>
-          <input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="Search conversations" />
-        </label>
-        <label className={styles.inboxSelect}>
-          <span>Show</span>
-          <select value={filter} onChange={(event) => setFilter(event.target.value as InboxFilter)}>
-            <option value="all">All</option>
-            <option value="unread">Unread</option>
-            {perspective !== "organizer" ? <option value="needs_reply">Needs reply</option> : null}
-            <option value="active">Active</option>
-            <option value="closed">Closed</option>
-          </select>
-        </label>
-        <label className={styles.inboxSelect}>
-          <span>Sort</span>
-          <select value={sort} onChange={(event) => setSort(event.target.value as InboxSort)}>
-            <option value="recent">Recent activity</option>
-            <option value="oldest_waiting">Oldest waiting</option>
-            <option value="event_date">Event date</option>
-          </select>
-        </label>
-        <button className={styles.iconButton} type="button" aria-label="Refresh conversations" onClick={() => void loadThreads()}>
-          <RefreshCw aria-hidden="true" size={18} />
-        </button>
-      </div>
 
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
       {actionMessage ? <p className={styles.success} role="status">{actionMessage}</p> : null}
 
-      <div className={`${styles.inboxLayout} ${selectedThreadId ? styles.hasSelectedThread : ""}`}>
+      <div className={`${styles.inboxLayout} ${selectedThreadId ? styles.hasSelectedThread : ""} ${showDetails ? styles.showDetails : ""}`}>
         <aside className={styles.threadList} aria-label="Conversations">
-          {loadingThreads && !threads.length ? <div className={styles.inboxLoading}>Loading conversations...</div> : null}
+          <div className={styles.inboxToolbar}>
+            <label className={styles.inboxSearch}>
+              <Search aria-hidden="true" size={18} />
+              <span className={styles.srOnly}>Search conversations</span>
+              <input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="Search conversations" />
+            </label>
+            <div className={styles.filterPills} role="group" aria-label="Show">
+              {inboxFilters.filter(([value]) => value !== "needs_reply" || perspective !== "organizer").map(([value, label]) => (
+                <button
+                  className={`${styles.filterPill} ${filter === value ? styles.activeFilterPill : ""}`}
+                  key={value}
+                  type="button"
+                  aria-pressed={filter === value}
+                  onClick={() => setFilter(value)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div className={styles.inboxSortRow}>
+              <label className={styles.inboxSelect}>
+                <span>Sort</span>
+                <select value={sort} onChange={(event) => setSort(event.target.value as InboxSort)}>
+                  <option value="recent">Recent activity</option>
+                  <option value="oldest_waiting">Oldest waiting</option>
+                  <option value="event_date">Event date</option>
+                </select>
+              </label>
+              <button className={styles.iconButton} type="button" aria-label="Refresh conversations" onClick={() => void loadThreads()}>
+                <RefreshCw aria-hidden="true" size={17} />
+              </button>
+            </div>
+          </div>
+          {loadingThreads && !threads.length ? (
+            <div className={styles.threadSkeletons} role="status" aria-label="Loading conversations...">
+              <span /><span /><span />
+            </div>
+          ) : null}
           {!loadingThreads && !threads.length ? (
             <div className={styles.inboxEmpty}>
               <Inbox aria-hidden="true" size={28} />
@@ -545,17 +626,18 @@ export function InquiryInbox({
                 className={`${styles.threadListItem} ${thread.thread_id === openThreadId ? styles.selectedThread : ""}`}
                 key={thread.thread_id}
                 type="button"
-                onClick={() => chooseThread(thread.thread_id)}
+                onClick={() => { setShowDetails(false); chooseThread(thread.thread_id); }}
               >
                 <span className={styles.threadListHeading}>
                   <strong>{thread.counterparty_name || "Conversation"}</strong>
-                  {thread.unread_count > 0 ? <span className={styles.unreadBadge}>{thread.unread_count}</span> : null}
+                  {thread.last_message_at ? <time dateTime={thread.last_message_at}>{shortWhen(thread.last_message_at)}</time> : null}
                 </span>
-                <span>{eventTypeLabel(thread.event_type)}{thread.event_date ? ` · ${formatDate(thread.event_date)}` : ""}</span>
+                <span className={styles.threadListEvent}>{eventTypeLabel(thread.event_type)}{thread.event_date ? ` · ${formatDate(thread.event_date)}` : ""}{thread.event_city ? ` · ${thread.event_city}` : ""}</span>
                 <span className={styles.threadPreview}>{thread.last_message_body || "Inquiry submitted"}</span>
                 <span className={styles.threadListMeta}>
-                  <span className={styles.status}>{statusLabel(thread.thread_status)}</span>
+                  <span className={`${styles.chip} ${styles[statusTone(thread.thread_status)]}`}>{sentenceCase(statusLabel(thread.thread_status))}</span>
                   {deadline && thread.thread_status === "awaiting_response" ? <small><Clock3 aria-hidden="true" size={13} />{deadline}</small> : null}
+                  {thread.unread_count > 0 ? <span className={styles.unreadBadge}>{thread.unread_count}</span> : null}
                 </span>
               </button>
             );
@@ -568,12 +650,7 @@ export function InquiryInbox({
         </aside>
 
         <div className={styles.threadPanel}>
-          {selectedThreadId ? (
-            <button className={styles.mobileBackButton} type="button" onClick={() => chooseThread(null)}>
-              <ChevronLeft aria-hidden="true" size={18} /> Conversations
-            </button>
-          ) : null}
-          {loadingDetail && !detail ? <div className={styles.inboxLoading}>Opening conversation...</div> : null}
+          {loadingDetail && !detail ? <div className={styles.inboxLoading} role="status">Opening conversation...</div> : null}
           {!loadingDetail && !detail ? (
             <div className={styles.inboxEmpty}>
               <Inbox aria-hidden="true" size={32} />
@@ -583,42 +660,139 @@ export function InquiryInbox({
           {detail ? (
             <>
               <header className={styles.threadHeader}>
-                <div>
-                  <p className={styles.eyebrow}>{eventTypeLabel(detail.inquiry.event_type)}</p>
+                <button className={styles.mobileBackButton} type="button" aria-label="Conversations" onClick={() => { setShowDetails(false); chooseThread(null); }}>
+                  <ChevronLeft aria-hidden="true" size={22} />
+                </button>
+                <div className={styles.threadHeaderText}>
                   <h2>{selectedRow?.counterparty_name || detail.inquiry.instructor_name || detail.inquiry.contact_name || "Conversation"}</h2>
-                  <p>{[detail.inquiry.event_date ? formatDate(detail.inquiry.event_date) : null, detail.inquiry.event_city, detail.inquiry.event_region].filter(Boolean).join(" · ")}</p>
+                  <p>{[eventTypeLabel(detail.inquiry.event_type), detail.inquiry.event_date ? formatDate(detail.inquiry.event_date) : null, [detail.inquiry.event_city, detail.inquiry.event_region].filter(Boolean).join(", ")].filter(Boolean).join(" · ")}</p>
                 </div>
-                <span className={styles.status}>{activeBooking ? bookingStatusLabels[activeBooking.status] : statusLabel(threadStatus)}</span>
+                <span className={`${styles.chip} ${styles[activeBooking ? bookingTone(activeBooking.status) : statusTone(threadStatus)]} ${styles.threadHeaderChip}`}>
+                  {activeBooking ? bookingStatusLabels[activeBooking.status] : sentenceCase(statusLabel(threadStatus))}
+                </span>
+                <button className={styles.detailsToggle} type="button" aria-pressed={showDetails} onClick={() => setShowDetails((value) => !value)}>
+                  Details
+                </button>
               </header>
 
               <div className={styles.threadBody}>
-                <aside className={styles.eventSummary}>
-                  <h3>Event details</h3>
-                  <dl>
-                    <div><dt>Event</dt><dd>{eventTypeLabel(detail.inquiry.event_type)}</dd></div>
-                    {detail.inquiry.event_date ? <div><dt>Date</dt><dd>{formatDate(detail.inquiry.event_date)}</dd></div> : null}
-                    {(detail.inquiry.event_city || detail.inquiry.event_region) ? <div><dt>Location</dt><dd>{[detail.inquiry.event_city, detail.inquiry.event_region].filter(Boolean).join(", ")}</dd></div> : null}
-                    {detail.inquiry.automatic_sharing ? <>
-                      {detail.inquiry.event_start_time ? <div><dt>Start time</dt><dd>{displayTime(detail.inquiry.event_start_time)}</dd></div> : null}
-                      {detail.inquiry.venue_name ? <div><dt>Venue</dt><dd>{detail.inquiry.venue_name}</dd></div> : null}
-                      {detail.inquiry.event_postal_code ? <div><dt>ZIP code</dt><dd>{detail.inquiry.event_postal_code}</dd></div> : null}
-                      {detail.inquiry.budget_range ? <div><dt>Budget</dt><dd>{detail.inquiry.budget_range}</dd></div> : null}
-                      <div><dt>Venue speakers</dt><dd>{detail.inquiry.venue_has_speakers == null ? "Not sure" : detail.inquiry.venue_has_speakers ? "Yes" : "No"}</dd></div>
-                      <div><dt>Venue microphone</dt><dd>{detail.inquiry.venue_has_microphone == null ? "Not sure" : detail.inquiry.venue_has_microphone ? "Yes" : "No"}</dd></div>
-                      {detail.inquiry.music_requests ? <div><dt>Music requests</dt><dd>{detail.inquiry.music_requests}</dd></div> : null}
-                    </> : null}
-                    {detail.inquiry.guest_count ? <div><dt>Attendees</dt><dd>{detail.inquiry.guest_count}</dd></div> : null}
-                    {perspective !== "organizer" && detail.inquiry.automatic_sharing ? <>
-                      <div><dt>Organizer</dt><dd>{detail.inquiry.contact_name}</dd></div>
-                      {detail.inquiry.company_name ? <div><dt>Company</dt><dd>{detail.inquiry.company_name}</dd></div> : null}
-                      {detail.inquiry.contact_email ? <div className={styles.organizerEmail}><dt>Email</dt><dd><a href={`mailto:${detail.inquiry.contact_email}`}>{detail.inquiry.contact_email}</a></dd></div> : null}
-                      {detail.inquiry.contact_phone_e164 ? <div><dt>Phone</dt><dd><a href={`tel:${detail.inquiry.contact_phone_e164}`}>{detail.inquiry.contact_phone_e164}</a></dd></div> : null}
-                    </> : perspective === "admin" ? <div><dt>Contact</dt><dd>{detail.inquiry.contact_name || detail.inquiry.contact_email || "Organizer"}</dd></div> : null}
-                  </dl>
-                  {selectedRow?.counterparty_profile_slug && perspective !== "instructor" ? (
-                    <Link href={`/profile/?instructor=${encodeURIComponent(selectedRow.counterparty_profile_slug)}`}>View instructor profile</Link>
+                <div className={styles.conversationColumn}>
+                  {strip ? (
+                    <div className={styles.quoteStrip}>
+                      <div>
+                        <strong>{strip.title}</strong>
+                        <span>{strip.text}</span>
+                      </div>
+                      {strip.action === "review" ? (
+                        <button className={styles.stripButton} type="button" onClick={() => requestBookingPanel("review")}>Review, sign, and pay</button>
+                      ) : strip.action === "pay" && activeBooking ? (
+                        <button className={styles.stripButton} type="button" onClick={() => requestBookingPanel("pay")}>{`Finish payment of ${money(activeBooking.total_cents)}`}</button>
+                      ) : strip.action === "quote" ? (
+                        <button className={styles.stripButton} type="button" onClick={() => requestBookingPanel("quote")}>Send a quote</button>
+                      ) : strip.action === "payouts" ? (
+                        <Link className={styles.stripButton} href="/account/?tab=payouts">Set up payouts</Link>
+                      ) : null}
+                    </div>
                   ) : null}
-                  {!detail.inquiry.automatic_sharing && !hasPlatformBooking && (perspective !== "instructor" || detail.thread.is_current_assignment === true) ? (
+                  {threadStatus === "declined" && canReply ? <p className={styles.threadNotice}>You can still message here after the instructor marks themselves unavailable.</p> : null}
+                  {threadStatus === "timed_out" && canReply ? <p className={styles.threadNotice}>The response window has ended. Other instructors may be contacted, and you can still reply while the event is open.</p> : null}
+                  <div ref={messageTimelineRef} className={styles.messageTimeline} aria-live="polite">
+                    {detail.messages.map((message) => {
+                      const ownMessage = Boolean(accountId && message.sender_account_id === accountId);
+                      const systemMessage = message.message_type === "system" || message.sender_role === "system";
+                      const body = message.redacted_at ? "This message was removed by Hire Line Dancers." : message.body;
+                      return systemMessage ? (
+                        <p className={styles.systemMessage} key={message.id}>
+                          <time dateTime={message.created_at}>{formatDate(message.created_at, true)}</time>{" · "}{body}
+                        </p>
+                      ) : (
+                        <article className={`${styles.messageBubble} ${ownMessage ? styles.ownMessage : ""}`} key={message.id}>
+                          <p>{body}</p>
+                          <div><strong>{senderLabel(message, perspective)}</strong><time dateTime={message.created_at}>{formatDate(message.created_at, true)}</time></div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                  {canReply ? (
+                    <form className={styles.messageComposer} onSubmit={sendMessage}>
+                      <label>
+                        <span className={styles.srOnly}>Reply</span>
+                        <textarea required maxLength={4000} rows={1} value={messageBody} onChange={(event) => {
+                          const value = event.target.value;
+                          if (openThreadId) setDrafts((current) => ({ ...current, [openThreadId]: value }));
+                        }} placeholder="Write a reply" />
+                      </label>
+                      <button className={styles.button} disabled={sending || !messageBody.trim()} type="submit">
+                        <Send aria-hidden="true" size={17} /> <span>{sending ? "Sending..." : "Send"}</span>
+                      </button>
+                    </form>
+                  ) : perspective !== "admin" ? <p className={styles.threadNotice}>This conversation is closed for replies.</p> : null}
+                </div>
+
+                <aside className={styles.eventSummary} aria-label="Event and booking">
+                  <section className={styles.railCard}>
+                    <h3>Event details</h3>
+                    <dl>
+                      <div><dt>Event</dt><dd>{eventTypeLabel(detail.inquiry.event_type)}</dd></div>
+                      {detail.inquiry.event_date ? <div><dt>Date</dt><dd>{formatDate(detail.inquiry.event_date)}</dd></div> : null}
+                      {(detail.inquiry.event_city || detail.inquiry.event_region) ? <div><dt>Location</dt><dd>{[detail.inquiry.event_city, detail.inquiry.event_region].filter(Boolean).join(", ")}</dd></div> : null}
+                      {detail.inquiry.automatic_sharing ? <>
+                        {detail.inquiry.event_start_time ? <div><dt>Start time</dt><dd>{displayTime(detail.inquiry.event_start_time)}</dd></div> : null}
+                        {detail.inquiry.venue_name ? <div><dt>Venue</dt><dd>{detail.inquiry.venue_name}</dd></div> : null}
+                        {detail.inquiry.event_postal_code ? <div><dt>ZIP code</dt><dd>{detail.inquiry.event_postal_code}</dd></div> : null}
+                        {detail.inquiry.budget_range ? <div><dt>Budget</dt><dd>{detail.inquiry.budget_range}</dd></div> : null}
+                        <div><dt>Venue speakers</dt><dd>{detail.inquiry.venue_has_speakers == null ? "Not sure" : detail.inquiry.venue_has_speakers ? "Yes" : "No"}</dd></div>
+                        <div><dt>Venue microphone</dt><dd>{detail.inquiry.venue_has_microphone == null ? "Not sure" : detail.inquiry.venue_has_microphone ? "Yes" : "No"}</dd></div>
+                        {detail.inquiry.music_requests ? <div><dt>Music requests</dt><dd>{detail.inquiry.music_requests}</dd></div> : null}
+                      </> : null}
+                      {detail.inquiry.guest_count ? <div><dt>Attendees</dt><dd>{detail.inquiry.guest_count}</dd></div> : null}
+                      {perspective !== "organizer" && detail.inquiry.automatic_sharing ? <>
+                        <div><dt>Organizer</dt><dd>{detail.inquiry.contact_name}</dd></div>
+                        {detail.inquiry.company_name ? <div><dt>Company</dt><dd>{detail.inquiry.company_name}</dd></div> : null}
+                        {detail.inquiry.contact_email ? <div className={styles.organizerEmail}><dt>Email</dt><dd><a href={`mailto:${detail.inquiry.contact_email}`}>{detail.inquiry.contact_email}</a></dd></div> : null}
+                        {detail.inquiry.contact_phone_e164 ? <div><dt>Phone</dt><dd><a href={`tel:${detail.inquiry.contact_phone_e164}`}>{detail.inquiry.contact_phone_e164}</a></dd></div> : null}
+                      </> : perspective === "admin" ? <div><dt>Contact</dt><dd>{detail.inquiry.contact_name || detail.inquiry.contact_email || "Organizer"}</dd></div> : null}
+                    </dl>
+                    {selectedRow?.counterparty_profile_slug && perspective !== "instructor" ? (
+                      <Link className={styles.railLink} href={`/profile/?instructor=${encodeURIComponent(selectedRow.counterparty_profile_slug)}`}>View instructor profile</Link>
+                    ) : null}
+                  </section>
+
+                  {openThreadId && detail.inquiry.automatic_sharing ? <InquiryOpportunity threadId={openThreadId} perspective={perspective} state={detail.opportunity ?? null} onOpen={(threadId, quote) => {
+                    if (threadId === openThreadId) {
+                      if (quote) setShowDetails(true);
+                      else setShowDetails(false);
+                    } else { requestedSectionRef.current = { threadId, quote }; chooseThread(threadId); }
+                  }} onChanged={async () => { await Promise.all([loadDetail(openThreadId, true), loadThreads(true)]); }} /> : null}
+
+                  {openThreadId && (perspective !== "admin" || bookingState?.booking) ? (
+                    <BookingPanel
+                      threadId={openThreadId}
+                      state={bookingState}
+                      loading={loadingBooking}
+                      finalizationBlocked={detail.thread.finalization_blocked === true}
+                      automaticSharing={detail.inquiry.automatic_sharing === true}
+                      openRequest={bookingRequest}
+                      counterpartyName={perspective === "instructor" ? selectedRow?.counterparty_name ?? detail.inquiry.contact_name : null}
+                      onChanged={async () => {
+                        if (openThreadId && selectedThreadRef.current === openThreadId) {
+                          await Promise.all([loadBooking(openThreadId), loadDetail(openThreadId, true)]);
+                        }
+                        void loadThreads(true);
+                        onDataChange?.();
+                      }}
+                    />
+                  ) : null}
+
+                  {perspective === "organizer" && !detail.inquiry.automatic_sharing && detail.thread.can_recommend === true && openThreadId ? (
+                    <InquiryRecommendations threadId={openThreadId} inquiry={detail.inquiry} onSent={(threadId) => {
+                      setSelectedThreadId(threadId);
+                      void loadThreads(true);
+                      onDataChange?.();
+                    }} />
+                  ) : null}
+
+                  {!detail.inquiry.automatic_sharing && !hasPlatformBooking && !hasOpenQuote && (perspective !== "instructor" || detail.thread.is_current_assignment === true) ? (
                     <InquiryOutcomeActions
                       threadId={openThreadId!}
                       inquiry={detail.inquiry}
@@ -629,74 +803,17 @@ export function InquiryInbox({
                       }}
                     />
                   ) : null}
-                  {perspective === "instructor" && !hasPaidBooking && !["declined", "withdrawn", "closed"].includes(threadStatus) && (threadStatus !== "timed_out" || detail.inquiry.automatic_sharing) ? (
-                    <button className={styles.secondaryButton} disabled={busyAction !== null} type="button" onClick={() => void runThreadAction("decline")}>
-                      {busyAction === "decline" ? "Updating..." : "Unavailable"}
-                    </button>
-                  ) : null}
-                  {perspective === "organizer" && !hasPaidBooking && !["withdrawn", "closed"].includes(threadStatus) ? (
-                    <button className={styles.dangerButton} disabled={busyAction !== null} type="button" onClick={() => void runThreadAction("withdraw")}>
-                      {busyAction === "withdraw" ? "Withdrawing..." : "Withdraw inquiry"}
-                    </button>
-                  ) : null}
-                </aside>
 
-                <div className={styles.conversationColumn}>
-                  {openThreadId && detail.inquiry.automatic_sharing ? <InquiryOpportunity threadId={openThreadId} perspective={perspective} state={detail.opportunity ?? null} onOpen={(threadId, quote) => {
-                    if (threadId === openThreadId) document.querySelector(quote ? '[aria-label="Booking"]' : '[aria-label="Messages"] textarea')?.scrollIntoView({ behavior: "smooth", block: "center" });
-                    else { requestedSectionRef.current = { threadId, quote }; chooseThread(threadId); }
-                  }} onChanged={async () => { await Promise.all([loadDetail(openThreadId, true), loadThreads(true)]); }} /> : null}
-                  {threadStatus === "declined" && canReply ? <p className={styles.notice}>You can still message here after the instructor marks themselves unavailable.</p> : null}
-                  {openThreadId && (perspective !== "admin" || bookingState?.booking) ? (
-                    <BookingPanel
-                      threadId={openThreadId}
-                      state={bookingState}
-                      loading={loadingBooking}
-                      finalizationBlocked={detail.thread.finalization_blocked === true}
-                      automaticSharing={detail.inquiry.automatic_sharing === true}
-                      onChanged={async () => {
-                        if (openThreadId && selectedThreadRef.current === openThreadId) {
-                          await Promise.all([loadBooking(openThreadId), loadDetail(openThreadId, true)]);
-                        }
-                        void loadThreads(true);
-                        onDataChange?.();
-                      }}
-                    />
+                  {canDecline || canWithdraw ? (
+                    <div className={styles.quietActions}>
+                      {canDecline ? (
+                        <button className={styles.quietLink} disabled={busyAction !== null} type="button" onClick={() => setConfirming("decline")}>Unavailable</button>
+                      ) : null}
+                      {canWithdraw ? (
+                        <button className={`${styles.quietLink} ${styles.quietDanger}`} disabled={busyAction !== null} type="button" onClick={() => setConfirming("withdraw")}>Withdraw inquiry</button>
+                      ) : null}
+                    </div>
                   ) : null}
-                  {threadStatus === "timed_out" && canReply ? <p className={styles.notice}>The response window has ended. Other instructors may be contacted, and you can still reply while the event is open.</p> : null}
-                  {perspective === "organizer" && !detail.inquiry.automatic_sharing && detail.thread.can_recommend === true && openThreadId ? (
-                    <InquiryRecommendations threadId={openThreadId} inquiry={detail.inquiry} onSent={(threadId) => {
-                      setSelectedThreadId(threadId);
-                      void loadThreads(true);
-                      onDataChange?.();
-                    }} />
-                  ) : null}
-                  <div ref={messageTimelineRef} className={styles.messageTimeline} aria-live="polite">
-                    {detail.messages.map((message) => {
-                      const ownMessage = Boolean(accountId && message.sender_account_id === accountId);
-                      const systemMessage = message.message_type === "system" || message.sender_role === "system";
-                      return (
-                        <article className={`${styles.messageBubble} ${ownMessage ? styles.ownMessage : ""} ${systemMessage ? styles.systemMessage : ""}`} key={message.id}>
-                          <div><strong>{senderLabel(message, perspective)}</strong><time dateTime={message.created_at}>{formatDate(message.created_at, true)}</time></div>
-                          <p>{message.redacted_at ? "This message was removed by Hire Line Dancers." : message.body}</p>
-                        </article>
-                      );
-                    })}
-                  </div>
-                  {canReply ? (
-                    <form className={styles.messageComposer} onSubmit={sendMessage}>
-                      <label>
-                        <span className={styles.srOnly}>Reply</span>
-                        <textarea required maxLength={4000} value={messageBody} onChange={(event) => {
-                          const value = event.target.value;
-                          if (openThreadId) setDrafts((current) => ({ ...current, [openThreadId]: value }));
-                        }} placeholder="Write a reply" />
-                      </label>
-                      <button className={styles.button} disabled={sending || !messageBody.trim()} type="submit">
-                        <Send aria-hidden="true" size={17} /> {sending ? "Sending..." : "Send"}
-                      </button>
-                    </form>
-                  ) : perspective !== "admin" ? <p className={styles.notice}>This conversation is closed for replies.</p> : null}
 
                   {perspective === "admin" ? (
                     <div className={styles.adminThreadTools}>
@@ -736,12 +853,38 @@ export function InquiryInbox({
                       </section> : null}
                     </div>
                   ) : null}
-                </div>
+                </aside>
               </div>
             </>
           ) : null}
         </div>
       </div>
+
+      {confirming === "withdraw" ? (
+        <ConfirmDialog
+          title="Withdraw this inquiry?"
+          message="This conversation will close for replies. You cannot undo this."
+          confirmLabel="Withdraw inquiry"
+          busyLabel="Withdrawing..."
+          cancelLabel="Keep inquiry"
+          danger
+          busy={busyAction === "withdraw"}
+          onCancel={() => setConfirming(null)}
+          onConfirm={() => void runThreadAction("withdraw").then(() => setConfirming(null))}
+        />
+      ) : null}
+      {confirming === "decline" ? (
+        <ConfirmDialog
+          title="Mark yourself unavailable?"
+          message="The organizer will be notified that you are unavailable."
+          confirmLabel="Unavailable"
+          busyLabel="Updating..."
+          cancelLabel="Cancel"
+          busy={busyAction === "decline"}
+          onCancel={() => setConfirming(null)}
+          onConfirm={() => void runThreadAction("decline").then(() => setConfirming(null))}
+        />
+      ) : null}
     </section>
   );
 }

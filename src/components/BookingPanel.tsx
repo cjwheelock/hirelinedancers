@@ -1,8 +1,9 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
-import { CalendarCheck, FileSignature, ShieldCheck } from "lucide-react";
+import { ArrowLeft, CalendarCheck, FileSignature, ShieldCheck } from "lucide-react";
 import {
   bookingStatusLabels,
   bookingTerms,
@@ -26,6 +27,9 @@ import {
 } from "@/lib/booking";
 import { getMarketplaceClient, type InstructorSocialLinks, type ProfilePackage } from "@/lib/marketplace";
 import { BookingAgreementReview } from "./BookingAgreementReview";
+import { ConfirmDialog } from "./ConfirmDialog";
+import { LogoMark } from "./Logo";
+import quote from "./QuoteDialog.module.css";
 import styles from "./Marketplace.module.css";
 
 const timeZones = [
@@ -46,6 +50,8 @@ export function BookingPanel({
   loading,
   finalizationBlocked = false,
   automaticSharing = false,
+  openRequest = null,
+  counterpartyName = null,
   onChanged
 }: {
   threadId: string;
@@ -53,9 +59,15 @@ export function BookingPanel({
   loading: boolean;
   finalizationBlocked?: boolean;
   automaticSharing?: boolean;
+  /** Opens a panel from outside, for example the quote strip above the conversation. */
+  openRequest?: { panel: "quote" | "review" | "pay"; nonce: number } | null;
+  counterpartyName?: string | null;
   onChanged: () => void | Promise<void>;
 }) {
   const [panel, setPanel] = useState<Panel>("none");
+  const [confirming, setConfirming] = useState<"withdrawQuote" | "declineQuote" | "adminCancel" | null>(null);
+  const [reason, setReason] = useState("");
+  const handledRequest = useRef(0);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -67,7 +79,26 @@ export function BookingPanel({
     setError(null);
     setNotice(null);
     setShowAgreement(false);
+    setConfirming(null);
+    setReason("");
   }, [threadId]);
+
+  useEffect(() => {
+    if (!openRequest || openRequest.nonce === handledRequest.current) return;
+    handledRequest.current = openRequest.nonce;
+    if (openRequest.panel === "pay") {
+      const bookingId = state?.booking?.id;
+      if (bookingId) void run("pay", async () => {
+        const result = await invokeBookingFunction<{ url?: string }>("booking-checkout", { bookingId });
+        if (result.url) window.location.assign(result.url);
+      });
+      return;
+    }
+    setError(null);
+    setPanel(openRequest.panel);
+    // run and state are read at request time only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openRequest]);
 
   // Returning from Stripe Checkout.
   useEffect(() => {
@@ -181,30 +212,21 @@ export function BookingPanel({
       {booking?.paid_at && role === "organizer" ? <InstructorLinks threadId={threadId} /> : null}
       {showAgreement && booking && panel !== "review" ? <BookingAgreementReview booking={booking} onClose={() => setShowAgreement(false)} /> : null}
 
-      <div className={styles.buttonRow}>
+      <div className={`${styles.buttonRow} ${styles.bookingActions}`}>
         {canQuote && state.payouts_ready ? (
           <button className={booking && open ? styles.secondaryButton : styles.button} type="button" disabled={busy !== null} onClick={() => setPanel(panel === "quote" ? "none" : "quote")}>
             <FileSignature aria-hidden="true" size={17} /> {booking && ["quote_sent", "awaiting_payment"].includes(booking.status) ? "Send updated quote" : "Send a quote"}
           </button>
         ) : null}
         {role === "instructor" && booking && ["quote_sent", "awaiting_payment"].includes(booking.status) ? (
-          <button className={styles.dangerButton} type="button" disabled={busy !== null} onClick={() => void run("withdraw", async () => {
-            if (!window.confirm("Withdraw this quote? The organizer will no longer be able to sign it.")) return;
-            await rpc("withdraw_booking_quote", { p_booking_id: booking.id });
-            return "Quote withdrawn.";
-          })}>{busy === "withdraw" ? "Withdrawing..." : "Withdraw quote"}</button>
+          <button className={`${styles.quietLink} ${styles.quietDanger}`} type="button" disabled={busy !== null} onClick={() => setConfirming("withdrawQuote")}>Withdraw quote</button>
         ) : null}
         {role === "organizer" && !finalizationBlocked && booking?.status === "quote_sent" ? (
           <>
             <button className={`${styles.button} ${styles.quoteReviewButton}`} type="button" disabled={busy !== null} onClick={() => setPanel("review")}>
               <FileSignature aria-hidden="true" size={17} /> Review, sign, and pay
             </button>
-            <button className={styles.dangerButton} type="button" disabled={busy !== null} onClick={() => void run("decline", async () => {
-              const reason = window.prompt("Decline this quote? You can add a short reason for the instructor (optional).");
-              if (reason === null) return;
-              await rpc("decline_booking_quote", { p_booking_id: booking.id, p_reason: reason || null });
-              return "Quote declined. The instructor can send a revised quote.";
-            })}>{busy === "decline" ? "Declining..." : "Decline quote"}</button>
+            <button className={styles.quietLink} type="button" disabled={busy !== null} onClick={() => { setReason(""); setConfirming("declineQuote"); }}>Decline quote</button>
           </>
         ) : null}
         {role === "organizer" && booking?.status === "awaiting_payment" ? (
@@ -218,21 +240,16 @@ export function BookingPanel({
           })}>{busy === "release" ? "Updating..." : "Release selection"}</button> : null}</>
         ) : null}
         {booking?.can_cancel && role !== "admin" ? (
-          <button className={styles.dangerButton} type="button" disabled={busy !== null} onClick={() => setPanel(panel === "cancel" ? "none" : "cancel")}>Cancel booking</button>
+          <button className={`${styles.quietLink} ${styles.quietDanger}`} type="button" disabled={busy !== null} onClick={() => setPanel(panel === "cancel" ? "none" : "cancel")}>Cancel booking</button>
         ) : null}
         {role === "organizer" && booking?.problem_report_open ? (
-          <button className={styles.secondaryButton} type="button" disabled={busy !== null} onClick={() => setPanel(panel === "problem" ? "none" : "problem")}>Report a problem</button>
+          <button className={styles.quietLink} type="button" disabled={busy !== null} onClick={() => setPanel(panel === "problem" ? "none" : "problem")}>Report a problem</button>
         ) : null}
         {role === "admin" && booking?.problem_reported_at && !booking.problem_resolved_at ? (
           <button className={styles.button} type="button" disabled={busy !== null} onClick={() => setPanel(panel === "resolve" ? "none" : "resolve")}>Resolve problem</button>
         ) : null}
         {role === "admin" && booking && booking.status === "confirmed" ? (
-          <button className={styles.dangerButton} type="button" disabled={busy !== null} onClick={() => void run("admin-cancel", async () => {
-            const reason = window.prompt("Cancel this booking and refund the organizer in full? Enter a reason for the record.");
-            if (!reason) return;
-            const result = await invokeBookingFunction<{ refundStatus?: string; message?: string }>("booking-cancel", { bookingId: booking.id, reason, asAdmin: true });
-            return result.message ?? "Booking cancelled and refunded in full.";
-          })}>Cancel and refund</button>
+          <button className={styles.dangerButton} type="button" disabled={busy !== null} onClick={() => { setReason(""); setConfirming("adminCancel"); }}>Cancel and refund</button>
         ) : null}
       </div>
 
@@ -241,12 +258,76 @@ export function BookingPanel({
           defaults={state.defaults}
           previous={booking && ["quote_sent", "awaiting_payment"].includes(booking.status) ? booking : null}
           busy={busy === "quote"}
+          organizerName={counterpartyName}
+          submitError={error}
           onCancel={() => setPanel("none")}
           onSubmit={(quote) => void run("quote", async () => {
             await invokeBookingFunction("booking-quote", { threadId, quote });
             return "Quote sent. The organizer will be notified to review, sign, and pay.";
           })}
         />
+      ) : null}
+
+      {confirming === "withdrawQuote" && booking ? (
+        <ConfirmDialog
+          title="Withdraw this quote?"
+          message="The organizer will no longer be able to sign it."
+          confirmLabel="Withdraw quote"
+          busyLabel="Withdrawing..."
+          cancelLabel="Cancel"
+          danger
+          busy={busy === "withdraw"}
+          onCancel={() => setConfirming(null)}
+          onConfirm={() => void run("withdraw", async () => {
+            await rpc("withdraw_booking_quote", { p_booking_id: booking.id });
+            return "Quote withdrawn.";
+          }).then(() => setConfirming(null))}
+        />
+      ) : null}
+
+      {confirming === "declineQuote" && booking ? (
+        <ConfirmDialog
+          title="Decline this quote?"
+          message="You can add a short reason for the instructor (optional)."
+          confirmLabel="Decline quote"
+          busyLabel="Declining..."
+          cancelLabel="Cancel"
+          danger
+          busy={busy === "decline"}
+          onCancel={() => setConfirming(null)}
+          onConfirm={() => void run("decline", async () => {
+            await rpc("decline_booking_quote", { p_booking_id: booking.id, p_reason: reason.trim() || null });
+            return "Quote declined. The instructor can send a revised quote.";
+          }).then(() => setConfirming(null))}
+        >
+          <label>
+            <span className={styles.srOnly}>Reason (shared in the conversation)</span>
+            <textarea maxLength={2000} value={reason} onChange={(event) => setReason(event.target.value)} />
+          </label>
+        </ConfirmDialog>
+      ) : null}
+
+      {confirming === "adminCancel" && booking ? (
+        <ConfirmDialog
+          title="Cancel and refund"
+          message="Cancel this booking and refund the organizer in full? Enter a reason for the record."
+          confirmLabel="Cancel and refund"
+          busyLabel="Cancelling..."
+          cancelLabel="Keep booking"
+          danger
+          busy={busy === "admin-cancel"}
+          confirmDisabled={!reason.trim()}
+          onCancel={() => setConfirming(null)}
+          onConfirm={() => void run("admin-cancel", async () => {
+            const result = await invokeBookingFunction<{ refundStatus?: string; message?: string }>("booking-cancel", { bookingId: booking.id, reason: reason.trim(), asAdmin: true });
+            return result.message ?? "Booking cancelled and refunded in full.";
+          }).then(() => setConfirming(null))}
+        >
+          <label>
+            <span className={styles.srOnly}>Internal note</span>
+            <textarea maxLength={2000} required value={reason} onChange={(event) => setReason(event.target.value)} />
+          </label>
+        </ConfirmDialog>
       ) : null}
 
       {panel === "review" && booking ? (
@@ -385,15 +466,38 @@ function QuoteForm({
   defaults,
   previous,
   busy,
+  organizerName,
+  submitError,
   onCancel,
   onSubmit
 }: {
   defaults: BookingDefaults;
   previous: Booking | null;
   busy: boolean;
+  organizerName?: string | null;
+  submitError?: string | null;
   onCancel: () => void;
   onSubmit: (quote: Record<string, unknown>) => void;
 }) {
+  const dialog = useRef<HTMLElement>(null);
+  const backButton = useRef<HTMLButtonElement>(null);
+  const [editing, setEditing] = useState<"cancellation" | "insurance" | null>(null);
+
+  useEffect(() => {
+    const origin = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    const siblings = [...document.body.children].filter((element): element is HTMLElement => element instanceof HTMLElement && element !== dialog.current);
+    const previousInert = siblings.map((element) => element.inert);
+    siblings.forEach((element) => { element.inert = true; });
+    document.body.style.overflow = "hidden";
+    backButton.current?.focus();
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      siblings.forEach((element, index) => { element.inert = previousInert[index]; });
+      origin?.focus({ preventScroll: true });
+    };
+  }, []);
+
   const initialPolicy = previous?.cancellation_policy ?? defaults.cancellation_policy;
   const initialWindows = previous?.cancellation_policy === "custom"
     ? previous.cancellation_windows
@@ -510,84 +614,151 @@ function QuoteForm({
 
   const zoneKnown = timeZones.some(([zone]) => zone === form.timeZone);
 
-  return (
-    <form className={styles.bookingForm} onSubmit={submit}>
-      <h4>{previous ? "Send an updated quote" : "Send a quote"}</h4>
-      <p className={styles.help}>This becomes the booking agreement. You sign it when you send it, and the organizer signs and pays in full to confirm. {previous ? "Sending an update withdraws the current quote." : ""}</p>
-      <div className={styles.bookingFormGrid}>
-        <label className={styles.field}><span>Event date</span><input required type="date" value={form.eventDate} onChange={(event) => set("eventDate", event.target.value)} /></label>
-        <label className={styles.field}><span>Time zone</span>
-          <select value={form.timeZone} onChange={(event) => set("timeZone", event.target.value)}>
-            {!zoneKnown ? <option value={form.timeZone}>{form.timeZone}</option> : null}
-            {timeZones.map(([zone, label]) => <option key={zone} value={zone}>{label}</option>)}
-          </select>
-        </label>
-        <label className={styles.field}><span>Start time</span><input required type="time" value={form.startTime} onChange={(event) => set("startTime", event.target.value)} /></label>
-        <label className={styles.field}><span>End time</span><input required type="time" value={form.endTime} onChange={(event) => set("endTime", event.target.value)} /></label>
-        <label className={styles.field}><span>Venue name (optional)</span><input maxLength={200} value={form.venueName} onChange={(event) => set("venueName", event.target.value)} /></label>
-        <label className={styles.field}><span>Venue address</span><input required minLength={3} maxLength={300} value={form.venueAddress} onChange={(event) => set("venueAddress", event.target.value)} /></label>
-      </div>
-      {packages.length ? (
-        <label className={styles.field}>
-          <span>Start from a package (optional)</span>
-          <select defaultValue="" onChange={(event) => applyPackage(event.target.value)}>
-            <option value="">Choose a package</option>
-            {packages.map((item) => <option key={item.name} value={item.name}>{item.name}</option>)}
-          </select>
-        </label>
-      ) : null}
-      <label className={styles.field}><span>What you will provide</span><textarea required minLength={3} maxLength={2000} value={form.serviceDescription} onChange={(event) => set("serviceDescription", event.target.value)} placeholder="For example: two hours of beginner line dance instruction, four dances, all ages." /></label>
+  const cancellationSummary = form.cancellationPolicy === "standard"
+    ? `Standard: ${cancellationLines(defaults.standard_cancellation_windows).join("; ")}`
+    : validCancellationWindows(windows) ? `Custom: ${cancellationLines(windows).join("; ")}` : "Custom";
+  const insuranceSummary = form.insuranceChoice === "coi_on_file"
+    ? "I carry liability insurance and will share a certificate on request"
+    : "I will handle insurance outside this agreement";
+  const firstName = organizerName?.trim().split(/\s+/)[0] || null;
 
-      <fieldset className={styles.bookingFieldset}>
-        <legend className={styles.legend}>Price</legend>
-        <div className={styles.buttonRow}>
-          <label className={styles.check}><input type="radio" checked={form.pricingMode === "hourly"} onChange={() => set("pricingMode", "hourly")} /> Hourly</label>
-          <label className={styles.check}><input type="radio" checked={form.pricingMode === "flat"} onChange={() => set("pricingMode", "flat")} /> Flat price</label>
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <section ref={dialog} className={quote.dialog} role="dialog" aria-modal="true" aria-labelledby="quote-dialog-title" onKeyDown={(event) => { if (event.key === "Escape" && !busy) { event.preventDefault(); onCancel(); } }}>
+      <header className={quote.header}>
+        <div className={quote.headerLead}>
+          <span className={quote.mark} aria-hidden="true"><LogoMark size={40} /></span>
+          <div>
+            <button ref={backButton} className={quote.back} type="button" disabled={busy} onClick={onCancel}>
+              <ArrowLeft aria-hidden="true" size={15} /> {organizerName ? `Back to conversation with ${organizerName}` : "Back to conversation"}
+            </button>
+            <h1 id="quote-dialog-title">{previous ? "Send an updated quote" : "Send a quote"}</h1>
+          </div>
         </div>
-        <div className={styles.bookingFormGrid}>
-          {form.pricingMode === "hourly" ? (
+        <ol className={quote.steps} aria-label="Quote steps">
+          <li aria-current={form.signatureName.trim() ? undefined : "step"}><span>1</span> Details</li>
+          <li aria-current={form.signatureName.trim() ? "step" : undefined}><span>2</span> Sign and send</li>
+        </ol>
+      </header>
+
+      <form className={quote.layout} onSubmit={submit}>
+        <div className={quote.sections}>
+          <section className={quote.card}>
+            <h2>When and where</h2>
+            <div className={quote.grid4}>
+              <label className={quote.field}><span>Event date</span><input required type="date" value={form.eventDate} onChange={(event) => set("eventDate", event.target.value)} /></label>
+              <label className={quote.field}><span>Start time</span><input required type="time" value={form.startTime} onChange={(event) => set("startTime", event.target.value)} /></label>
+              <label className={quote.field}><span>End time</span><input required type="time" value={form.endTime} onChange={(event) => set("endTime", event.target.value)} /></label>
+              <label className={quote.field}><span>Time zone</span>
+                <select value={form.timeZone} onChange={(event) => set("timeZone", event.target.value)}>
+                  {!zoneKnown ? <option value={form.timeZone}>{form.timeZone}</option> : null}
+                  {timeZones.map(([zone, label]) => <option key={zone} value={zone}>{label}</option>)}
+                </select>
+              </label>
+            </div>
+            <div className={quote.grid2}>
+              <label className={quote.field}><span>Venue name (optional)</span><input maxLength={200} value={form.venueName} onChange={(event) => set("venueName", event.target.value)} /></label>
+              <label className={quote.field}><span>Venue address</span><input required minLength={3} maxLength={300} value={form.venueAddress} onChange={(event) => set("venueAddress", event.target.value)} /></label>
+            </div>
+          </section>
+
+          <section className={quote.card}>
+            <h2>What you will provide</h2>
+            {packages.length ? (
+              <label className={quote.field}>
+                <span>Start from a package (optional)</span>
+                <select defaultValue="" onChange={(event) => applyPackage(event.target.value)}>
+                  <option value="">Choose a package</option>
+                  {packages.map((item) => <option key={item.name} value={item.name}>{item.name}</option>)}
+                </select>
+              </label>
+            ) : null}
+            <label className={quote.field}><span className={styles.srOnly}>What you will provide</span><textarea required minLength={3} maxLength={2000} rows={3} value={form.serviceDescription} onChange={(event) => set("serviceDescription", event.target.value)} placeholder="For example: two hours of beginner line dance instruction, four dances, all ages." /></label>
+            <div className={quote.checks}>
+              <label className={quote.check}><input type="checkbox" checked={form.providesSpeakers} onChange={(event) => set("providesSpeakers", event.target.checked)} /> I will bring speakers</label>
+              <label className={quote.check}><input type="checkbox" checked={form.providesMicrophone} onChange={(event) => set("providesMicrophone", event.target.checked)} /> I will bring a microphone</label>
+            </div>
+          </section>
+
+          <section className={quote.card}>
+            <h2>Price</h2>
+            <div className={quote.segmented} role="radiogroup" aria-label="Price">
+              <button type="button" role="radio" aria-checked={form.pricingMode === "hourly"} onClick={() => set("pricingMode", "hourly")}>Hourly</button>
+              <button type="button" role="radio" aria-checked={form.pricingMode === "flat"} onClick={() => set("pricingMode", "flat")}>Flat price</button>
+            </div>
+            <div className={quote.grid3}>
+              {form.pricingMode === "hourly" ? (
+                <>
+                  <label className={quote.field}><span>Hourly rate ($)</span><input required type="number" min="10" max="5000" step="0.01" value={form.hourlyRate} onChange={(event) => set("hourlyRate", event.target.value)} /></label>
+                  <label className={quote.field}><span>Hours</span><input required type="number" min={defaults.minimum_hours ?? 0.5} max="24" step="0.25" value={form.hours} onChange={(event) => set("hours", event.target.value)} /></label>
+                </>
+              ) : (
+                <label className={quote.field}><span>Flat price ($)</span><input required type="number" min="10" max="10000" step="0.01" value={form.flatPrice} onChange={(event) => set("flatPrice", event.target.value)} /></label>
+              )}
+              <label className={quote.field}><span>Travel fee ($, optional)</span><input type="number" min="0" max="2000" step="0.01" value={form.travelFee} onChange={(event) => set("travelFee", event.target.value)} /></label>
+            </div>
+            {defaults.minimum_hours && form.pricingMode === "hourly" && Number(form.hours) < defaults.minimum_hours ? (
+              <p className={quote.help}>This is below your usual {defaults.minimum_hours}-hour minimum.</p>
+            ) : null}
+          </section>
+
+          <section className={`${quote.card} ${quote.rows}`}>
+            <div className={quote.row}>
+              <div><strong>Cancellation policy</strong><span>{cancellationSummary}</span></div>
+              <button className={quote.change} type="button" aria-expanded={editing === "cancellation"} onClick={() => setEditing(editing === "cancellation" ? null : "cancellation")}>Change</button>
+            </div>
+            {editing === "cancellation" ? (
+              <fieldset className={quote.rowEditor}>
+                <legend className={styles.srOnly}>Cancellation policy</legend>
+                <label className={quote.check}><input type="radio" checked={form.cancellationPolicy === "standard"} onChange={() => set("cancellationPolicy", "standard")} /> Standard: {cancellationLines(defaults.standard_cancellation_windows).join("; ")}</label>
+                <label className={quote.check}><input type="radio" checked={form.cancellationPolicy === "custom"} onChange={() => set("cancellationPolicy", "custom")} /> Custom</label>
+                {form.cancellationPolicy === "custom" ? <WindowsEditor windows={windows} onChange={setWindows} /> : null}
+                <p className={quote.help}>If you cancel, the organizer always gets a full refund.</p>
+              </fieldset>
+            ) : null}
+            <div className={quote.row}>
+              <div><strong>Insurance</strong><span>{insuranceSummary}</span></div>
+              <button className={quote.change} type="button" aria-expanded={editing === "insurance"} onClick={() => setEditing(editing === "insurance" ? null : "insurance")}>Change</button>
+            </div>
+            {editing === "insurance" ? (
+              <fieldset className={quote.rowEditor}>
+                <legend className={styles.srOnly}>Insurance</legend>
+                <label className={quote.check}><input type="radio" checked={form.insuranceChoice === "coi_on_file"} onChange={() => set("insuranceChoice", "coi_on_file")} /> I carry liability insurance and will share a certificate on request</label>
+                <label className={quote.check}><input type="radio" checked={form.insuranceChoice === "instructor_handles_outside_agreement"} onChange={() => set("insuranceChoice", "instructor_handles_outside_agreement")} /> I will handle insurance outside this agreement</label>
+              </fieldset>
+            ) : null}
+          </section>
+        </div>
+
+        <aside className={quote.summary} aria-label="Quote summary and signature">
+          <div>
+            <h2>{firstName ? `What ${firstName} will see` : "What the organizer will see"}</h2>
+            <p className={quote.help}>This becomes the booking agreement. You sign it when you send it, and the organizer signs and pays in full to confirm. {previous ? "Sending an update withdraws the current quote." : ""}</p>
+          </div>
+          {amounts ? (
             <>
-              <label className={styles.field}><span>Hourly rate ($)</span><input required type="number" min="10" max="5000" step="0.01" value={form.hourlyRate} onChange={(event) => set("hourlyRate", event.target.value)} /></label>
-              <label className={styles.field}><span>Hours</span><input required type="number" min={defaults.minimum_hours ?? 0.5} max="24" step="0.25" value={form.hours} onChange={(event) => set("hours", event.target.value)} /></label>
+              <dl className={quote.amounts}>
+                <div>
+                  <dt>{form.pricingMode === "hourly" ? `${money(toCents(form.hourlyRate) ?? 0)}/hour × ${form.hours} hours` : "Flat price"}{toCents(form.travelFee) ? ` + ${money(toCents(form.travelFee) ?? 0)} travel` : ""}</dt>
+                  <dd>{money(amounts.priceCents)}</dd>
+                </div>
+                <div><dt>Service fee, paid by organizer ({clientFeeLabel})</dt><dd>{money(amounts.clientFeeCents)}</dd></div>
+                <div className={quote.amountTotal}><dt>Organizer pays</dt><dd>{money(amounts.totalCents)}</dd></div>
+              </dl>
+              <div className={quote.receive}><span>You receive</span><strong>{money(amounts.instructorPayoutCents)}</strong></div>
+              <p className={quote.help}>After the {instructorFeeLabel} platform fee. Paid out {bookingTerms.payoutDelayHours} hours after the event.</p>
             </>
-          ) : (
-            <label className={styles.field}><span>Flat price ($)</span><input required type="number" min="10" max="10000" step="0.01" value={form.flatPrice} onChange={(event) => set("flatPrice", event.target.value)} /></label>
-          )}
-          <label className={styles.field}><span>Travel fee ($, optional)</span><input type="number" min="0" max="2000" step="0.01" value={form.travelFee} onChange={(event) => set("travelFee", event.target.value)} /></label>
-        </div>
-        {defaults.minimum_hours && form.pricingMode === "hourly" && Number(form.hours) < defaults.minimum_hours ? (
-          <p className={styles.help}>This is below your usual {defaults.minimum_hours}-hour minimum.</p>
-        ) : null}
-      </fieldset>
-
-      <fieldset className={styles.bookingFieldset}>
-        <legend className={styles.legend}>Equipment</legend>
-        <label className={styles.check}><input type="checkbox" checked={form.providesSpeakers} onChange={(event) => set("providesSpeakers", event.target.checked)} /> I will bring speakers</label>
-        <label className={styles.check}><input type="checkbox" checked={form.providesMicrophone} onChange={(event) => set("providesMicrophone", event.target.checked)} /> I will bring a microphone</label>
-      </fieldset>
-
-      <fieldset className={styles.bookingFieldset}>
-        <legend className={styles.legend}>Cancellation policy</legend>
-        <label className={styles.check}><input type="radio" checked={form.cancellationPolicy === "standard"} onChange={() => set("cancellationPolicy", "standard")} /> Standard: {cancellationLines(defaults.standard_cancellation_windows).join("; ")}</label>
-        <label className={styles.check}><input type="radio" checked={form.cancellationPolicy === "custom"} onChange={() => set("cancellationPolicy", "custom")} /> Custom</label>
-        {form.cancellationPolicy === "custom" ? <WindowsEditor windows={windows} onChange={setWindows} /> : null}
-        <p className={styles.help}>If you cancel, the organizer always gets a full refund.</p>
-      </fieldset>
-
-      <fieldset className={styles.bookingFieldset}>
-        <legend className={styles.legend}>Insurance</legend>
-        <label className={styles.check}><input type="radio" checked={form.insuranceChoice === "coi_on_file"} onChange={() => set("insuranceChoice", "coi_on_file")} /> I carry liability insurance and will share a certificate on request</label>
-        <label className={styles.check}><input type="radio" checked={form.insuranceChoice === "instructor_handles_outside_agreement"} onChange={() => set("insuranceChoice", "instructor_handles_outside_agreement")} /> I will handle insurance outside this agreement</label>
-      </fieldset>
-
-      <label className={styles.field}><span>Type your full name to sign</span><input required minLength={2} maxLength={120} autoComplete="name" value={form.signatureName} onChange={(event) => set("signatureName", event.target.value)} /></label>
-      <label className={styles.check}><input type="checkbox" checked={form.agreed} onChange={(event) => set("agreed", event.target.checked)} /> <span>I agree to this booking agreement and the <a href="/legal/terms/" target="_blank" rel="noreferrer">Instructor Terms</a>, and I am signing electronically.</span></label>
-      {formError ? <p className={styles.error} role="alert">{formError}</p> : null}
-      <div className={styles.buttonRow}>
-        <button className={styles.button} type="submit" disabled={busy}>{busy ? "Sending..." : "Sign and send quote"}</button>
-        <button className={styles.secondaryButton} type="button" onClick={onCancel} disabled={busy}>Cancel</button>
-      </div>
-    </form>
+          ) : null}
+          <label className={quote.field}><span>Type your full name to sign</span><input required minLength={2} maxLength={120} autoComplete="name" value={form.signatureName} onChange={(event) => set("signatureName", event.target.value)} /></label>
+          <div className={quote.signature} aria-hidden="true">{form.signatureName.trim()}</div>
+          <label className={quote.check}><input type="checkbox" checked={form.agreed} onChange={(event) => set("agreed", event.target.checked)} /> <span>I agree to this booking agreement and the <a href="/legal/terms/" target="_blank" rel="noreferrer">Instructor Terms</a>, and I am signing electronically.</span></label>
+          {formError ? <p className={quote.error} role="alert">{formError}</p> : null}
+          {submitError ? <p className={quote.error} role="alert">{submitError}</p> : null}
+          <button className={quote.submit} type="submit" disabled={busy}>{busy ? "Sending..." : "Sign and send quote"}</button>
+        </aside>
+      </form>
+    </section>,
+    document.body
   );
 }
 
