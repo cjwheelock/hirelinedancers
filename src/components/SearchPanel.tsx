@@ -521,6 +521,9 @@ export function PublicInstructorResults({
   const matchingCard = !results.length && matchingQuery
     ? <MatchingRequestCard query={matchingQuery} eventSlug={eventSlug} />
     : null;
+  const moreMatchingCard = results.length && matchingQuery
+    ? <MatchingRequestCard query={matchingQuery} eventSlug={eventSlug} hasResults />
+    : null;
 
   if (!results.length && !demoResults.length) {
     if (matchingCard) return matchingCard;
@@ -537,6 +540,7 @@ export function PublicInstructorResults({
     <>
       {results.map((profile) => <PublicProfileCard key={profile.id} profile={profile} compact={compact} publishedRoutes={publishedRoutes} />)}
       {matchingCard}
+      {moreMatchingCard}
       {demoResults.length ? (
         <>
           {!matchingCard && (results.length || !suppressEmptyMessage) ? (

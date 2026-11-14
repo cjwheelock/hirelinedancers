@@ -105,12 +105,13 @@ export function MatchingRequest() {
           <span className={own.check} aria-hidden="true"><Check size={30} /></span>
           <p className={styles.eyebrow}>Request received</p>
           <h1 className={styles.title}>We&apos;re on it. Let&apos;s find your {sentPlace} instructor.</h1>
-          <p className={styles.subtitle}>Here&apos;s what happens next.</p>
+          <p className={styles.subtitle}>We sent a copy of your event details to your email. Here&apos;s what happens next.</p>
           <ul className={own.next}>
             <li><span className={own.dot} style={{ background: "#b8482a" }} aria-hidden="true" /><span><strong>Within 2 business days</strong> you&apos;ll hear from us with an update, even if we&apos;re still searching.</span></li>
             <li><span className={own.dot} style={{ background: "#e9a94b" }} aria-hidden="true" /><span><strong>When we find someone available</strong>, we&apos;ll introduce you and you can message them directly.</span></li>
             <li><span className={own.dot} style={{ background: "#1f6f6b" }} aria-hidden="true" /><span><strong>You decide.</strong> No obligation to book, and you only pay if you do.</span></li>
           </ul>
+          <p className={styles.subtitle}>Questions or a tight timeline? Reply to the confirmation email and it comes straight to CJ.</p>
         </div>
       </section>
     );

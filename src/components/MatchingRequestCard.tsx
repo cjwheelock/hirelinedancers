@@ -3,9 +3,22 @@ import { ArrowRight, MapPin } from "lucide-react";
 import { matchingRequestHref, placeFromQuery } from "./matchingPlace";
 import styles from "./MatchingRequestCard.module.css";
 
-export function MatchingRequestCard({ query, eventSlug }: { query: string; eventSlug?: string }) {
+export function MatchingRequestCard({ query, eventSlug, hasResults = false }: { query: string; eventSlug?: string; hasResults?: boolean }) {
   const place = placeFromQuery(query);
   if (!place) return null;
+  if (hasResults) {
+    return (
+      <aside className={styles.more}>
+        <div>
+          <h3 className={styles.moreTitle}>Don&apos;t see the right fit?</h3>
+          <p className={styles.copy}>Tell us about your event and we&apos;ll find someone in {place.short} for you.</p>
+        </div>
+        <Link className={`button secondary small ${styles.cta}`} href={matchingRequestHref(query, eventSlug)}>
+          Get matched <ArrowRight size={15} aria-hidden="true" />
+        </Link>
+      </aside>
+    );
+  }
   return (
     <>
       <article className={styles.card}>

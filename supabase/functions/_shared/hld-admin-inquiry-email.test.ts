@@ -1,4 +1,4 @@
-import { adminInquiryEmail, AdminInquiryEmailError, sendAdminInquiryEmail, type AdminInquiryNotificationJob } from './hld-admin-inquiry-email.ts';
+import { adminInquiryEmail, AdminInquiryEmailError, matchingRequestConfirmationEmail, sendAdminInquiryEmail, type AdminInquiryNotificationJob } from './hld-admin-inquiry-email.ts';
 const assert = (condition: unknown, message = 'Assertion failed') => { if (!condition) throw new Error(message); };
 const job: AdminInquiryNotificationJob = {
   job_id: 42, attempt_number: 1, delivered_to_email: 'cjwheelock1@gmail.com',
@@ -64,4 +64,25 @@ Deno.test('matching requests email the owner with contact details and no instruc
   assert(email.text.includes('Phone: 208-555-0100') && email.text.includes('Searched for: Boise, ID'));
   assert(email.html.includes('Pat &lt;b&gt;') && !email.text.includes('/admin/'));
   assert(email.reply_to === 'pat@example.test' && email.to[0] === 'cjwheelock1@gmail.com');
+});
+Deno.test('matching requests also confirm to the requester, once per key', async () => {
+  const matchingJob: AdminInquiryNotificationJob = { ...job, inquiry_id: null, matching_request_id: 'm1',
+    inquiry: { kind: 'matching_request', id: 'm1', contact_name: 'Pat <b> Lee', contact_email: 'pat@example.test', event_city: 'Boise', event_region: 'ID', event_type: 'corporate-events', event_date: '2027-06-12', message: 'private note' } };
+  const confirmation = matchingRequestConfirmationEmail(matchingJob)!;
+  assert(confirmation.to[0] === 'pat@example.test' && confirmation.reply_to === 'cj@cjwheelock.com');
+  assert(confirmation.subject === "We're on it: finding your Boise line dance instructor");
+  assert(confirmation.text.startsWith('Hi Pat,') && confirmation.text.includes('Event type: Corporate events'));
+  assert(!confirmation.text.includes('private note') && !confirmation.html.includes('<b>'));
+  assert(!/\u2014/.test(confirmation.text + confirmation.html));
+  const sent: { to: string; key: string }[] = [];
+  const fetcher = ((_url: unknown, init: RequestInit) => {
+    sent.push({ to: JSON.parse(String(init.body)).to[0], key: new Headers(init.headers).get('Idempotency-Key')! });
+    return Promise.resolve(Response.json({ id: `id-${sent.length}` }));
+  }) as typeof fetch;
+  assert(await sendAdminInquiryEmail(matchingJob, config, fetcher) === 'id-1');
+  assert(sent.map(item => `${item.to}|${item.key}`).join(',') === 'cjwheelock1@gmail.com|hld-admin-inquiry-42,pat@example.test|hld-matching-confirmation-42');
+});
+Deno.test('regular inquiries and invalid requester emails send no confirmation', () => {
+  assert(matchingRequestConfirmationEmail(job) === null);
+  assert(matchingRequestConfirmationEmail({ ...job, inquiry: { kind: 'matching_request', contact_email: 'nope' } }) === null);
 });
