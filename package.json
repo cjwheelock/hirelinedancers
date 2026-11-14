@@ -20,7 +20,8 @@
     "test:booking-document": "node --test scripts/test-booking-document.mjs",
     "predev": "node scripts/prepare-video-processor.mjs",
     "test:video": "node --test scripts/test-video-upload.mjs",
-    "test:pricing-guidance": "node --test scripts/test-instructor-pricing-guidance.mjs"
+    "test:pricing-guidance": "node --test scripts/test-instructor-pricing-guidance.mjs",
+    "test:profile-reminder": "node --test scripts/test-profile-reminder.mjs && node scripts/test-profile-reminder-sql.mjs"
   },
   "dependencies": {
     "@ffmpeg/ffmpeg": "0.12.15",
@@ -33,13 +34,14 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.16",
+    "@ffmpeg/core": "0.12.10",
     "@types/node": "^22.10.1",
     "@types/react": "^19.0.1",
     "@types/react-dom": "^19.0.1",
     "eslint": "^9.16.0",
     "eslint-config-next": "^15.5.25",
-    "typescript": "^5.7.2",
-    "@ffmpeg/core": "0.12.10"
+    "typescript": "^5.7.2"
   },
   "overrides": {
     "postcss": "8.5.26"

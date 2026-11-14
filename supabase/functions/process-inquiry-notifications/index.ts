@@ -8,6 +8,8 @@ import { maskContactDetails } from "../_shared/hld-booking.ts";
 
 import { AdminInquiryEmailError, type AdminInquiryNotificationJob, sendAdminInquiryEmail } from "../_shared/hld-admin-inquiry-email.ts";
 
+import { ProfileReminderError, type ProfileReminderJob, sendProfileReminder, profileReminderSuppressed, PROFILE_REMINDER_FROM, PROFILE_REMINDER_REPLY_TO, profileReminderEmail } from "../_shared/hld-profile-reminder.ts";
+
 type ReadOnlyTable<Row extends Record<string, unknown>> = {
   Row: Row;
   Insert: Row;
@@ -53,6 +55,11 @@ type WorkerDatabase = {
     };
     Views: Record<string, never>;
     Functions: {
+      reserve_profile_reminder_test: { Args: Record<string, never>; Returns: boolean };
+      complete_profile_reminder_test: { Args: { p_status: string; p_provider_message_id: string | null }; Returns: undefined };
+      claim_profile_completion_reminders: { Args: { p_limit: number }; Returns: ProfileReminderJob[] };
+      profile_completion_reminder_is_sendable: { Args: { p_job_id: number }; Returns: boolean };
+      complete_profile_completion_reminder: { Args: { p_job_id: number; p_status: string; p_provider_message_id: string | null; p_error: string | null }; Returns: string };
       claim_admin_inquiry_notification_jobs: { Args: ClaimArgs; Returns: AdminInquiryNotificationJob[] };
       complete_admin_inquiry_notification_job: { Args: CompletionArgs & { p_attempt_number: number }; Returns: string };
       get_inquiry_notification_context: { Args: { p_job_id: number }; Returns: { automatic: boolean; opportunity_closed?: boolean; invited_count?: number; brief?: Record<string, string | number> } };
@@ -1728,6 +1735,30 @@ async function processAdminInquiryJob(admin: AdminClient, job: AdminInquiryNotif
   return String(data);
 }
 
+async function processProfileReminder(admin: AdminClient, job: ProfileReminderJob): Promise<string> {
+  const { data: sendable, error: checkError } = await admin.rpc("profile_completion_reminder_is_sendable", { p_job_id: job.id });
+  if (checkError) throw new Error("Unable to check profile reminder eligibility");
+  let status = "cancelled", providerMessageId: string | null = null, failure: string | null = null;
+  if (sendable) {
+    try { providerMessageId = await sendProfileReminder(job, requiredEnv("RESEND_API_KEY"), fetch, false, async () => {
+      const { data, error } = await admin.rpc("profile_completion_reminder_is_sendable", { p_job_id: job.id });
+      if (error) throw new ProfileReminderError("Final eligibility check failed; no email sent", "failed");
+      return data === true;
+    }); status = "sent"; }
+    catch (error) {
+      const known = error instanceof ProfileReminderError ? error : new ProfileReminderError("Unknown reminder failure", "uncertain");
+      status = known.outcome; failure = known.message;
+    }
+  }
+  const { data, error } = await admin.rpc("complete_profile_completion_reminder", {
+    p_job_id: job.id, p_status: status, p_provider_message_id: providerMessageId, p_error: failure,
+  });
+  // Acknowledgement failure is not a failed send. The lease becomes uncertain,
+  // never a candidate for an automatic duplicate.
+  if (error) throw new Error("Unable to acknowledge profile reminder");
+  return String(data);
+}
+
 export default {
   fetch: withSupabase<WorkerDatabase>(
     {
@@ -1749,7 +1780,27 @@ export default {
       return Response.json({ error: "Notification worker is not configured" }, { status: 503 });
     }
 
-    const body = await req.json().catch(() => ({})) as { limit?: number };
+    const body = await req.json().catch(() => ({})) as { limit?: number; action?: string };
+    if (body.action === "profile-reminder-readiness" || body.action === "profile-reminder-test") {
+      const sample: ProfileReminderJob = { id: 0, recipient_email: "cjwheelock1@gmail.com", display_name: "CJ", city: null };
+      try {
+        const suppressed = body.action === "profile-reminder-readiness" ? await profileReminderSuppressed(sample.recipient_email, requiredEnv("RESEND_API_KEY")) : false;
+        if (body.action === "profile-reminder-readiness") return Response.json({
+          from: PROFILE_REMINDER_FROM, replyTo: PROFILE_REMINDER_REPLY_TO,
+          existingSenderMatches: requiredEnv("RESEND_FROM_EMAIL").trim() === PROFILE_REMINDER_FROM,
+          suppressionLookupSucceeded: true, testRecipientSuppressed: suppressed,
+          preview: profileReminderEmail(sample),
+        });
+        if (suppressed) return Response.json({ error: "Test recipient is suppressed; no email sent" }, { status: 409 });
+        const { data: reserved, error: reserveError } = await ctx.supabaseAdmin.rpc("reserve_profile_reminder_test", {});
+        if (reserveError || !reserved) return Response.json({ error: "Test already reserved or reminders enabled; reconcile before retry" }, { status: 409 });
+        let result = "uncertain", providerId: string | null = null;
+        try { providerId = await sendProfileReminder(sample, requiredEnv("RESEND_API_KEY"), fetch, true); result = "sent"; }
+        catch (error) { result = error instanceof ProfileReminderError ? error.outcome : "uncertain"; }
+        const { error: completeError } = await ctx.supabaseAdmin.rpc("complete_profile_reminder_test", { p_status: result, p_provider_message_id: providerId });
+        return Response.json({ status: result, providerMessageId: providerId, acknowledgementSucceeded: !completeError });
+      } catch { return Response.json({ error: "Provider suppression check unavailable; no test email sent" }, { status: 503 }); }
+    }
     const requestedLimit = Number.isInteger(body.limit) ? Number(body.limit) : 10;
     const limit = Math.max(1, Math.min(requestedLimit, 25));
     // A separate queue means one administrator copy per inquiry, independent of
@@ -1762,6 +1813,17 @@ export default {
     const adminInquirySettled = await Promise.allSettled(
       adminInquiryJobs.map((job) => processAdminInquiryJob(ctx.supabaseAdmin, job)),
     );
+
+    const { data: reminderData, error: reminderError } = await ctx.supabaseAdmin.rpc(
+      "claim_profile_completion_reminders", { p_limit: 1 },
+    );
+    if (reminderError) console.error("Unable to claim profile completion reminders", reminderError.code);
+    const reminderJobs = (reminderData ?? []) as ProfileReminderJob[];
+    const reminderSettled = [];
+    for (const job of reminderJobs) {
+      try { reminderSettled.push(await processProfileReminder(ctx.supabaseAdmin, job)); }
+      catch { reminderSettled.push("worker_error"); }
+    }
 
     const { data: expiredGracePeriods, error: expiryError } = await ctx
       .supabaseAdmin.rpc("expire_instructor_billing_grace_periods");
@@ -1869,6 +1931,7 @@ export default {
     const profileOutcomes = profileSettled.map((result) => result.status === "fulfilled" ? result.value : "worker_error");
     const serviceOutcomes = serviceSettled.map((result) => result.status === "fulfilled" ? result.value : "worker_error");
     const allOutcomes = [
+      ...reminderSettled,
       ...outcomes,
       ...threadOutcomes,
       ...profileOutcomes,
@@ -1877,7 +1940,9 @@ export default {
     ];
 
     return Response.json({
-      claimed: jobs.length + threadJobs.length + profileJobs.length + serviceJobs.length + adminInquiryJobs.length,
+      claimed: jobs.length + threadJobs.length + profileJobs.length + serviceJobs.length + adminInquiryJobs.length + reminderJobs.length,
+      profileReminderClaimed: reminderJobs.length,
+      profileReminderClaimError: !!reminderError,
       adminInquiryClaimed: adminInquiryJobs.length,
       adminInquiryClaimError: !!adminInquiryError,
       inquiryClaimed: jobs.length,
