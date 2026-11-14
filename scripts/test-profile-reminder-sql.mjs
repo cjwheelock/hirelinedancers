@@ -11,8 +11,8 @@ create table public.instructor_profiles(id uuid primary key,account_id uuid,stat
 create table public.inquiry_thread_notification_jobs(channel text,recipient_email text,delivery_status text);
 create function public.is_marketplace_admin() returns boolean language sql as $$ select false $$;
 `);
-await db.exec(fs.readFileSync('supabase/migrations/20261114043000_profile_completion_reminders.sql','utf8'));
-await db.exec(fs.readFileSync('supabase/migrations/20261114053000_profile_reminder_delivery_receipts.sql','utf8'));
+await db.exec(fs.readFileSync('supabase/migrations/20261114043532_profile_completion_reminders.sql','utf8'));
+await db.exec(fs.readFileSync('supabase/migrations/20261114044612_profile_reminder_delivery_receipts.sql','utf8'));
 await db.exec(`begin;
 insert into auth.users(id,email,email_confirmed_at) select ('00000000-0000-0000-0000-'||lpad(i::text,12,'0'))::uuid,'person'||i||'@example.com',now() from generate_series(1,8)i;
 insert into accounts select id,email,'instructor' from auth.users;
