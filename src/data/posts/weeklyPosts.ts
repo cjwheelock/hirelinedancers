@@ -230,5 +230,57 @@ export const weeklyPosts: BlogPost[] = [
 <p>That's a significant number of people having a great time, making memories, and doing something together. I think that offers tremendous value, and it's what I'm working to make a reality with Hire Line Dancers.</p>
 <p>Planning a wedding? Be part of the first 1%. <a href="/events/weddings/">Find a wedding line dance instructor</a>.</p>
 `
+  },
+  {
+    slug: "why-wedding-planners-love-line-dancing",
+    title: "Why Wedding Planners Love Line Dancing",
+    description: "A line dance lesson fills the floor after dinner, gets three generations dancing together, and costs a fraction of the DJ. Here's why planners recommend it to their couples.",
+    publishDate: "2026-11-14",
+    status: "ready",
+    category: "Planning",
+    body: `
+<p>You've seen it. Dinner wraps, the toasts land, the DJ drops the first upbeat song, and the dance floor holds the couple, three bridesmaids and a very committed uncle. Everyone else stays glued to their chairs, scrolling their phones.</p>
+<p>A line dance lesson fixes that. It's one of the few things you can add to a reception that reliably gets <em>every</em> guest onto the floor, and the instructor brings host energy that makes every guest feel welcome. It makes you look like a genius for suggesting it. Here's why more planners are putting it in their vendor recommendations.</p>
+<h2>Six reasons planners love a line dance lesson</h2>
+<p><strong>1. It solves the empty-floor problem on cue.</strong> An instructor doesn't wait for the right song to pull people up. They invite the whole room by name, and a group lesson feels safe in a way freestyle dancing doesn't. No partner, no experience, no one watching just you.</p>
+<p><strong>2. It's the bridge between dinner and the party.</strong> The hardest transition of the night is from seated to standing. A lesson right after dinner or toasts gives guests a reason to get up, and once they're up, the DJ keeps them there.</p>
+<p><strong>3. Grandma and the groomsmen dance together.</strong> Line dancing is one of the rare activities that puts three generations on one floor. Older guests often already know the steps; younger guests pick them up in minutes. Couples remember that.</p>
+<p><strong>4. It's a timeline you control.</strong> Each lesson runs about 20 minutes. Most couples book one or two; with two, there's a song or two of open dancing in between, about 45 minutes total. It flexes with how the room and the couple are feeling, and the instructor works with the DJ on music and cues. It slots into the run of show like any other moment, with no surprises.</p>
+<p><strong>5. The photos and video are incredible.</strong> A packed floor of guests moving in sync is the shot photographers and videographers dream about. It's also the clip that gets posted, which is good for everyone credited.</p>
+<p><strong>6. It's easy to say yes to.</strong> One vendor, one short slot, light setup (often just the DJ's sound system), and a price that barely moves the total. It's the rare upgrade that makes the night better without adding planning work.</p>
+<h2>Part instructor, part host</h2>
+<p>A great line dance instructor doesn't teach a few steps and leave. They work the room like a host. They greet the guests hanging back by the bar, coax the shy cousin onto the floor, and get grandma laughing next to the groomsmen.</p>
+<p>Picture it: dinner plates are cleared, and someone with a mic and a big smile tells the whole room to come on up. Nobody needs to know a single step. Within two songs, the floor is full, people are cheering each other on, and guests who met an hour ago are dancing side by side.</p>
+<p>That's what couples are really buying: a reception that feels warm and connected, where everyone is included and doing something together.</p>
+<h2>The budget math</h2>
+<p>A line dance lesson costs a fraction of what couples already spend on music, and it's what makes that music spend pay off. A DJ playing to empty chairs is the most expensive part of a reception that nobody enjoys.</p>
+<ul>
+<li><strong>Live band:</strong> $4,500 average, according to <a href="https://www.theknot.com/content/average-cost-wedding-band-dj" target="_blank" rel="noopener">The Knot</a></li>
+<li><strong>DJ:</strong> $1,800 average, according to <a href="https://www.theknot.com/content/average-cost-wedding-band-dj" target="_blank" rel="noopener">The Knot</a></li>
+<li><strong>Line dance lesson:</strong> a few hundred dollars, varies by instructor and city (see our <a href="/guides/cost-to-hire-line-dance-instructor/">cost guide</a>)</li>
+</ul>
+<p>For couples, the question isn't really price. It's whether they knew the option existed. That's where you come in.</p>
+<h2>Where it fits in the night</h2>
+<p>The sweet spot is right after dinner and toasts, as the first thing that opens the dance floor. Other slots that work well:</p>
+<ul>
+<li><strong>After the first dance and parent dances</strong>, to pull everyone else in immediately.</li>
+<li><strong>Mid-reception</strong>, to re-energize the room after a lull or cake cutting.</li>
+<li><strong>During cocktail hour</strong>, as a quick teaser lesson so guests know the steps when the song comes on later.</li>
+<li><strong>At the rehearsal dinner or welcome party</strong>, so the two families meet on the dance floor before the big day.</li>
+</ul>
+<p>The instructor coordinates songs and timing with the DJ ahead of time, so the handoff is seamless.</p>
+<h2>How to bring it up with your couples</h2>
+<p>The easiest moment is when you walk through entertainment. Once the DJ or band is on the list, ask one question: <em>"How do you want to make sure everyone actually dances?"</em> Then mention a line dance lesson as an option.</p>
+<p>A few things that make it land:</p>
+<ul>
+<li><strong>Frame it as guest experience</strong>, not a theme. It works at black-tie ballroom weddings as well as barn weddings, and the songs can be modern pop, country or whatever fits the couple.</li>
+<li><strong>Lead with the grandparents.</strong> Couples light up at the idea of every generation dancing together.</li>
+<li><strong>Hand them something.</strong> We have a one-page card for couples made for exactly this: <a href="/contact/">ask us for a copy</a> and drop it in your proposal, client portal or welcome packet.</li>
+</ul>
+<h2>Find an instructor</h2>
+<p>Hire Line Dancers connects couples and planners with local line dance instructors for weddings, rehearsal dinners and welcome parties. Tell us the city and date, and we'll match you with someone, even in cities where we're just getting started.</p>
+<p>Your couples get a full dance floor. You get the credit. <a href="/events/weddings/">Find a wedding line dance instructor</a>.</p>
+`
   }
 ];
+
