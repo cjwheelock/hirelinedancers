@@ -216,7 +216,10 @@ export default function Home() {
         <div className={styles.quoteInner}>
           <p>Our mission is simple: get more people dancing.</p>
           <p>That means more people moving to music, trying something new, and having fun together. It also means more great local instructors making a living doing what they love.</p>
-          <span>{site.name}</span>
+          <Link className={styles.missionSignature} href="/about/">
+            <span>CJ Wheelock</span>
+            <span>{site.name}</span>
+          </Link>
         </div>
       </section>
 
