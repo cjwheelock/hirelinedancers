@@ -4,6 +4,7 @@ import { supabaseServerOptions } from "../_shared/hld-supabase-admin.ts";
 import {
   cityName,
   cleanBusinessName,
+  featuredFor,
   crawlPlannerSite,
   GmailError,
   gmailConfigured,
@@ -12,6 +13,7 @@ import {
   gmailThreadState,
   isPlanner,
   milesBetween,
+  type MarketInstructor,
   type OutreachLead,
   type OutreachMarket,
   type OutreachTemplate,
@@ -171,10 +173,11 @@ async function sendStep(db: Db, cfg: Config, log: string[]): Promise<void> {
   const { data: claimed, error } = await db.rpc("outreach_claim_batch", { p_limit: 10 });
   if (error) throw error;
   if (!claimed?.length) return;
-  const [{ data: templates }, { data: markets }, { data: serviceMarkets }] = await Promise.all([
+  const [{ data: templates }, { data: markets }, { data: serviceMarkets }, { data: instructors }] = await Promise.all([
     db.from("outreach_templates").select("*").eq("active", true),
     db.from("outreach_markets").select("*"),
     db.from("service_markets").select("slug, name"),
+    db.from("outreach_market_instructors").select("*"),
   ]);
   for (const item of claimed as { lead_id: number; kind: "first_touch" | "follow_up" }[]) {
     const { data: lead } = await db.from("outreach_leads").select("*").eq("id", item.lead_id).single();
@@ -190,7 +193,11 @@ async function sendStep(db: Db, cfg: Config, log: string[]): Promise<void> {
     }
     let rendered;
     try {
-      rendered = renderTemplate(template, lead as OutreachLead, market, cityName(sm.name));
+      const featured = featuredFor(market, (instructors ?? []) as (MarketInstructor & { service_market_slug: string })[], lead.id, lead.featured_instructor_profile_id);
+      rendered = renderTemplate(template, lead as OutreachLead, featured.market, cityName(sm.name));
+      if (featured.instructorId && featured.instructorId !== lead.featured_instructor_profile_id) {
+        await db.from("outreach_leads").update({ featured_instructor_profile_id: featured.instructorId }).eq("id", lead.id);
+      }
     } catch (e) {
       await release(item.kind === "first_touch" ? "approved" : "sent", `Not sent: ${(e as Error).message}`);
       log.push(`skip lead ${lead.id}: ${(e as Error).message}`);
@@ -249,6 +256,52 @@ async function replyStep(db: Db, cfg: Config, log: string[]): Promise<void> {
   }
 }
 
+type Snapshot = {
+  sent_today: number;
+  today: string;
+  markets: { slug: string; name: string; queued_at: string | null; sending_approved: boolean; completed_notified_at: string | null; remaining: number; sent: number; replied: number; bounced: number }[];
+};
+
+// Status emails to CJ (internal): daily cap reached, a city finished, or a new city needs details.
+async function notifyStep(db: Db, cfg: Config & { notify_email: string | null; last_daily_report_on: string | null }, log: string[]): Promise<void> {
+  if (!cfg.notify_email) return;
+  const notify = (subject: string, body: string) =>
+    gmailSend({ fromEmail: cfg.sender_email, fromName: "Hire Line Dancers Outreach", to: cfg.notify_email!, subject, body });
+
+  const { data: missing } = await db.rpc("outreach_activate_markets");
+  for (const m of (missing ?? []) as { service_market_slug: string; missing: string[] }[]) {
+    const { data: row } = await db.from("outreach_markets").select("details_requested_at, featured_instructor_name").eq("service_market_slug", m.service_market_slug).single();
+    if (row?.details_requested_at || !m.missing.length) continue;
+    await notify(`Outreach: ${m.service_market_slug} is researched and needs details`,
+      `Planner research for ${m.service_market_slug} is done. Before its emails can go out, add the featured instructor's ${m.missing.join(" and ")} for ${row?.featured_instructor_name ?? "the instructor"} in Admin > Outreach > Cities.\n\nThe city will join the sending queue automatically once that's filled in.`);
+    await db.from("outreach_markets").update({ details_requested_at: new Date().toISOString() }).eq("service_market_slug", m.service_market_slug);
+    log.push(`asked for details: ${m.service_market_slug}`);
+  }
+
+  const { data: snap } = await db.rpc("outreach_status_snapshot") as { data: Snapshot };
+  if (!snap) return;
+  const queue = snap.markets.filter((m) => m.sending_approved && m.remaining > 0);
+  const line = (m: Snapshot["markets"][number]) => `${m.name}: ${m.sent} sent, ${m.replied} replied, ${m.bounced} bounced, ${m.remaining} left`;
+
+  for (const m of snap.markets) {
+    if (m.sending_approved && m.remaining === 0 && m.sent > 0 && !m.completed_notified_at) {
+      const next = queue[0];
+      await notify(`Outreach: ${m.name} planners all emailed`,
+        `Every wedding planner with an email in ${m.name} has now been contacted.\n\n${line(m)}\n\n${next ? `Next up: ${next.name} (${next.remaining} planners).` : "No other city is queued yet. A new city starts automatically when an instructor joins somewhere new."}`);
+      await db.from("outreach_markets").update({ completed_notified_at: new Date().toISOString() }).eq("service_market_slug", m.slug);
+      log.push(`city complete: ${m.slug}`);
+    }
+  }
+
+  if (snap.sent_today >= cfg.daily_limit && cfg.last_daily_report_on !== snap.today) {
+    const active = snap.markets.filter((m) => m.sent > 0 || (m.sending_approved && m.remaining > 0));
+    await notify(`Outreach: ${snap.sent_today} planner emails sent today`,
+      `Today's ${snap.sent_today} emails are out from ${cfg.sender_email}.\n\n${active.map(line).join("\n")}\n\n${queue.length ? `Queue: ${queue.map((m) => m.name).join(", then ")}.` : "Nothing left in the queue."}`);
+    await db.rpc("outreach_mark_daily_report", { p_day: snap.today });
+    log.push("daily report sent");
+  }
+}
+
 export default {
   fetch: withSupabase<Db>(
     { auth: "secret:automations", cors: false, supabaseOptions: supabaseServerOptions() },
@@ -267,6 +320,7 @@ export default {
         try {
           if (cfg.enabled && hour >= cfg.send_hour_start && hour < cfg.send_hour_end) await sendStep(db, cfg, log);
           if (minute < 15 || body.skip?.includes("force-replies")) await replyStep(db, cfg, log);
+          await notifyStep(db, cfg, log);
         } catch (e) {
           log.push(`send error: ${(e as Error).message}`);
         }

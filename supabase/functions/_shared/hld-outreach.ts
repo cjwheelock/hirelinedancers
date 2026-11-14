@@ -64,6 +64,30 @@ export function renderTemplate(
   return { subject: fill(template.subject_template), body: fill(template.body_template) };
 }
 
+export type MarketInstructor = {
+  instructor_profile_id: string;
+  name: string;
+  years: number | null;
+  pronoun: "she" | "he" | "they" | null;
+  profile_url: string;
+};
+
+// Cities with several featured instructors alternate between the complete ones; a lead keeps the one it was given.
+export function featuredFor(
+  market: OutreachMarket,
+  instructors: (MarketInstructor & { service_market_slug: string })[],
+  leadId: number,
+  assigned: string | null,
+): { market: OutreachMarket; instructorId: string | null } {
+  const complete = instructors.filter((i) => i.service_market_slug === market.service_market_slug && i.years !== null && i.pronoun);
+  if (!complete.length) return { market, instructorId: null };
+  const pick = complete.find((i) => i.instructor_profile_id === assigned) ?? complete[leadId % complete.length];
+  return {
+    market: { ...market, featured_instructor_name: pick.name, featured_instructor_years: pick.years, featured_instructor_pronoun: pick.pronoun, featured_profile_url: pick.profile_url },
+    instructorId: pick.instructor_profile_id,
+  };
+}
+
 // ---------- Gmail ----------
 
 export class GmailError extends Error {
