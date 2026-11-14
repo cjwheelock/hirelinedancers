@@ -34,6 +34,7 @@ import { InquiryInbox } from "./InquiryInbox";
 import { MembershipCreditAdmin } from "./MembershipCreditAdmin";
 import { PayoutsCard } from "./PayoutsCard";
 import { AdminBookings } from "./AdminBookings";
+import { AdminOutreach } from "./AdminOutreach";
 import { AdminInquiries } from "./AdminInquiries";
 import {
   accountEntryRedirect,
@@ -2066,7 +2067,7 @@ function MembershipGuaranteeAdmin({ isOwner }: { isOwner: boolean }) {
 }
 
 function AdminDashboard({ isOwner }: { isOwner: boolean }) {
-  const [tab, setTab] = useState<"overview" | "inquiries" | "messages" | "bookings" | "profiles" | "memberships" | "invitations" | "delivery" | "access">("overview");
+  const [tab, setTab] = useState<"overview" | "inquiries" | "messages" | "bookings" | "outreach" | "profiles" | "memberships" | "invitations" | "delivery" | "access">("overview");
   const [focusedProfileId, setFocusedProfileId] = useState<string | null>(null);
   const [focusedInquiryId, setFocusedInquiryId] = useState<string | null>(null);
   const [focusedThreadId, setFocusedThreadId] = useState<string | null>(null);
@@ -2214,7 +2215,7 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const requestedTab = params.get("tab");
-    if (["overview", "inquiries", "messages", "bookings", "profiles", "memberships", "invitations", "delivery", "access"].includes(requestedTab ?? "")) {
+    if (["overview", "inquiries", "messages", "bookings", "outreach", "profiles", "memberships", "invitations", "delivery", "access"].includes(requestedTab ?? "")) {
       setTab(requestedTab as typeof tab);
     }
     setFocusedProfileId(params.get("profile"));
@@ -2484,8 +2485,8 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
     <>
       <div className={styles.tabs} role="tablist" aria-label="Admin dashboard sections">
         {(isOwner
-          ? (["overview", "inquiries", "messages", "bookings", "profiles", "memberships", "invitations", "delivery", "access"] as const)
-          : (["overview", "inquiries", "messages", "bookings", "profiles", "memberships", "invitations", "delivery"] as const)
+          ? (["overview", "inquiries", "messages", "bookings", "outreach", "profiles", "memberships", "invitations", "delivery", "access"] as const)
+          : (["overview", "inquiries", "messages", "bookings", "outreach", "profiles", "memberships", "invitations", "delivery"] as const)
         ).map((name) => (
           <button key={name} className={`${styles.tab} ${tab === name ? styles.activeTab : ""}`} type="button" onClick={() => selectAdminTab(name)}>
             {name === "profiles" ? `Instructor reviews${pending.length ? ` (${pending.length})` : ""}` : name[0].toUpperCase() + name.slice(1)}
@@ -2497,6 +2498,7 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
       {loading ? <div className={styles.loading}>Loading marketplace operations...</div> : null}
 
       {!loading && tab === "bookings" ? <AdminBookings /> : null}
+      {!loading && tab === "outreach" ? <AdminOutreach /> : null}
 
       {!loading && tab === "inquiries" ? <AdminInquiries focusInquiryId={focusedInquiryId} onOpenThread={(threadId) => {
         setFocusedInquiryId(null);
