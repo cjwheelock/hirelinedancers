@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { InstructorContactLink } from "@/components/InstructorContactLink";
 import {
@@ -179,6 +179,29 @@ function VideoEmbed({ item, title }: { item: ProfileMedia; title: string }) {
   );
 }
 
+// Uploaded welcome videos can be portrait (phone) or landscape. Read the file's
+// real shape once it loads so portrait clips get the tall frame, like vertical embeds.
+function WelcomeVideo({ item, instructorName }: { item: ProfileMedia; instructorName: string }) {
+  const frame = useRef<HTMLDivElement>(null);
+  const [portrait, setPortrait] = useState(false);
+  const verticalEmbed = Boolean(item.embed_provider && isVerticalProvider(item.embed_provider, item.external_url));
+
+  useEffect(() => {
+    const video = frame.current?.querySelector("video");
+    if (!video) return;
+    const measure = () => setPortrait(video.videoHeight > video.videoWidth);
+    if (video.readyState >= 1) measure();
+    video.addEventListener("loadedmetadata", measure);
+    return () => video.removeEventListener("loadedmetadata", measure);
+  }, [item]);
+
+  return (
+    <div ref={frame} className={`${styles.welcomeVideo} ${verticalEmbed || portrait ? styles.welcomeVideoTall : ""}`}>
+      <MediaItem item={item} instructorName={instructorName} />
+    </div>
+  );
+}
+
 function MediaItem({ item, instructorName }: { item: ProfileMedia; instructorName: string }) {
   const url = mediaUrl(item);
   const isVideo = item.media_type === "video" || item.media_type === "welcome_video";
@@ -189,7 +212,8 @@ function MediaItem({ item, instructorName }: { item: ProfileMedia; instructorNam
   if (isVideo) {
     const isDirectVideo = Boolean(item.storage_path || item.mime_type?.startsWith("video/") || /\.(mp4|m4v|webm|ogg|mov)(?:[?#]|$)/i.test(url));
     return isDirectVideo ? (
-      <video className={styles.media} src={url} controls playsInline preload="metadata">
+      // The #t fragment makes mobile Safari paint the first frame instead of a blank box.
+      <video className={styles.media} src={url.includes("#") ? url : `${url}#t=0.001`} controls playsInline preload="metadata">
         Your browser does not support this video.
       </video>
     ) : (
@@ -453,12 +477,8 @@ export function PublicProfile({ initialProfile = null, initialMedia = [] }: { in
           {bio || welcome ? (
             <section className={styles.section} aria-labelledby="about-instructor-heading">
               <p className={styles.kicker}>About the instructor</p>
+              {welcome ? <WelcomeVideo item={welcome} instructorName={profile.display_name} /> : null}
               <h2 id="about-instructor-heading">Meet {profile.display_name}</h2>
-              {welcome ? (
-                <div className={`${styles.welcomeVideo} ${welcome.embed_provider && isVerticalProvider(welcome.embed_provider, welcome.external_url) ? styles.welcomeVideoTall : ""}`}>
-                  <MediaItem item={welcome} instructorName={profile.display_name} />
-                </div>
-              ) : null}
               {bio ? <p className={styles.bodyCopy}>{bio}</p> : null}
             </section>
           ) : null}

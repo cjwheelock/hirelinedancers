@@ -387,7 +387,9 @@
 }
 
 .welcomeVideo {
-  margin: 4px 0 22px;
+  max-width: 720px;
+  margin: 4px 0 24px;
+  overflow: hidden;
   border: 1px solid var(--line);
   background: #2a1e17; border-radius: var(--radius);
 }
@@ -395,6 +397,10 @@
 .welcomeVideo .media {
   aspect-ratio: 16 / 9;
   object-fit: contain;
+}
+
+.welcomeVideoTall .media {
+  aspect-ratio: 9 / 16;
 }
 
 .welcomeVideoTall {
