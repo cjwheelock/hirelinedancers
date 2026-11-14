@@ -59,7 +59,12 @@ async function researchStep(db: Db, log: string[]): Promise<void> {
     const places = [];
     for (const query of DISCOVERY_QUERIES) {
       for (let page = 1; page <= 5; page++) {
-        const found = await serperMaps(query, `${locality}, United States`, page);
+        let found: Awaited<ReturnType<typeof serperMaps>> = [];
+        try {
+          found = await serperMaps(query, locality, page);
+        } catch (e) {
+          log.push(`serper ${locality} ${query} p${page}: ${(e as Error).message}`);
+        }
         places.push(...found);
         if (found.length < 20) break;
       }

@@ -215,7 +215,7 @@ export async function serperMaps(query: string, location: string, page: number):
   const response = await fetch("https://google.serper.dev/maps", {
     method: "POST",
     headers: { "X-API-KEY": key, "Content-Type": "application/json" },
-    body: JSON.stringify({ q: query, location, gl: "us", page }),
+    body: JSON.stringify({ q: `${query} in ${location}`, gl: "us", page }),
     signal: AbortSignal.timeout(30_000),
   });
   if (!response.ok) throw new Error(`Serper ${response.status}`);
