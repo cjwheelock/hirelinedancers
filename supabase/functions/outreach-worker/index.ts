@@ -6,6 +6,7 @@ import {
   cleanBusinessName,
   featuredFor,
   crawlPlannerSite,
+  domainAcceptsMail,
   GmailError,
   gmailConfigured,
   gmailMessageIdHeader,
@@ -18,6 +19,7 @@ import {
   type OutreachMarket,
   type OutreachTemplate,
   renderTemplate,
+  searchBusinessEmail,
   serperMaps,
   websiteHost,
 } from "../_shared/hld-outreach.ts";
@@ -26,7 +28,9 @@ import {
 type Db = any;
 
 const DISCOVERY_QUERIES = ["wedding planner", "wedding coordinator", "wedding and event planner"];
-const CRAWL_BATCH = 12;
+const CRAWL_BATCH = 25;
+const GRID_QUERIES = ["wedding planner", "wedding coordinator"];
+const GRID_POINTS_PER_RUN = 10;
 
 type Config = {
   enabled: boolean;
@@ -46,6 +50,28 @@ function localHourAndDay(timezone: string): { hour: number; weekday: string; min
   return { hour: Number(get("hour")) % 24, minute: Number(get("minute")), weekday: get("weekday") };
 }
 
+type Place = Awaited<ReturnType<typeof serperMaps>>["places"][number];
+
+async function searchPlaces(query: string, locality: string, maxPages: number, log: string[]): Promise<Place[]> {
+  // Grid entries look like "@32.85,-96.85,13z"; everything else is a place name.
+  const grid = locality.startsWith("@");
+  let ll: string | null = grid ? locality : null;
+  const out: Place[] = [];
+  for (let page = 1; page <= maxPages; page++) {
+    let found: Place[] = [];
+    try {
+      const result = await serperMaps(query, grid ? "" : locality, page, ll);
+      found = result.places;
+      ll = ll ?? result.ll;
+    } catch (e) {
+      log.push(`serper ${locality} ${query} p${page}: ${(e as Error).message}`);
+    }
+    out.push(...found);
+    if (found.length < 20) break;
+  }
+  return out;
+}
+
 async function researchStep(db: Db, log: string[]): Promise<void> {
   const { data: market } = await db.from("outreach_markets").select("*")
     .in("research_status", ["pending", "discovering", "crawling"]).order("created_at").limit(1).maybeSingle();
@@ -53,27 +79,18 @@ async function researchStep(db: Db, log: string[]): Promise<void> {
 
   if (market.research_status !== "crawling") {
     const queue: string[] = market.research_localities?.length ? [...market.research_localities] : [];
-    const locality = queue.shift();
-    if (!locality) {
+    if (!queue.length) {
       await db.from("outreach_markets").update({ research_status: "crawling" }).eq("service_market_slug", market.service_market_slug);
       return;
     }
-    const places = [];
-    for (const query of DISCOVERY_QUERIES) {
-      let ll: string | null = null;
-      for (let page = 1; page <= 5; page++) {
-        let found: Awaited<ReturnType<typeof serperMaps>>["places"] = [];
-        try {
-          const result = await serperMaps(query, locality, page, ll);
-          found = result.places;
-          ll = ll ?? result.ll;
-        } catch (e) {
-          log.push(`serper ${locality} ${query} p${page}: ${(e as Error).message}`);
-        }
-        places.push(...found);
-        if (found.length < 20) break;
-      }
-    }
+    // One named locality per run, or a batch of map-grid points searched in parallel.
+    const batch = queue[0].startsWith("@")
+      ? queue.splice(0, queue.findIndex((q) => !q.startsWith("@")) === -1 ? GRID_POINTS_PER_RUN : Math.min(GRID_POINTS_PER_RUN, queue.findIndex((q) => !q.startsWith("@"))))
+      : queue.splice(0, 1);
+    const searches = batch.flatMap((locality) =>
+      (locality.startsWith("@") ? GRID_QUERIES : DISCOVERY_QUERIES).map((q) => searchPlaces(q, locality, locality.startsWith("@") ? 3 : 5, log))
+    );
+    const places = (await Promise.all(searches)).flat();
     let lat = market.research_center_lat as number | null;
     let lng = market.research_center_lng as number | null;
     if (lat === null || lng === null) {
@@ -108,7 +125,7 @@ async function researchStep(db: Db, log: string[]): Promise<void> {
         review_count: p.ratingCount ?? null,
         google_maps_cid: p.cid ?? null,
         source: "Google Maps via Serper",
-        crawl_status: host ? "pending" : "done",
+        crawl_status: "pending",
         status: "new",
       });
     }
@@ -123,50 +140,74 @@ async function researchStep(db: Db, log: string[]): Promise<void> {
       research_center_lat: lat,
       research_center_lng: lng,
     }).eq("service_market_slug", market.service_market_slug);
-    log.push(`research ${market.service_market_slug}: ${locality} -> ${inserted} new planners`);
+    log.push(`research ${market.service_market_slug}: ${batch.length > 1 ? `${batch.length} grid points` : batch[0]} -> ${inserted} new planners`);
     return;
   }
 
-  const { data: pending } = await db.from("outreach_leads").select("id, website")
-    .eq("service_market_slug", market.service_market_slug).eq("crawl_status", "pending").limit(CRAWL_BATCH);
+  const [{ data: pending }, { data: sm }] = await Promise.all([
+    db.from("outreach_leads").select("id, business, city, website, email, status, first_name")
+      .eq("service_market_slug", market.service_market_slug).eq("crawl_status", "pending").limit(CRAWL_BATCH),
+    db.from("service_markets").select("name, region").eq("slug", market.service_market_slug).single(),
+  ]);
   if (!pending?.length) {
     await db.from("outreach_markets").update({ research_status: "done", researched_at: new Date().toISOString() })
       .eq("service_market_slug", market.service_market_slug);
     log.push(`research ${market.service_market_slug}: done`);
     return;
   }
-  const results = await Promise.all(pending.map((lead: { id: number; website: string }) =>
-    crawlPlannerSite(lead.website).catch(() => null).then((r) => ({ lead, r }))
-  ));
-  for (const { lead, r } of results) {
-    if (!r) {
+  type Pending = { id: number; business: string; city: string | null; website: string | null; email: string | null; status: string; first_name: string | null };
+  const enrich = async (lead: Pending) => {
+    const r = lead.website ? await crawlPlannerSite(lead.website).catch(() => null) : null;
+    let email = r?.email ?? null;
+    let foundBy = email ? "website" : null;
+    if (!lead.email && !email) {
+      email = await searchBusinessEmail(cleanBusinessName(lead.business), lead.city ?? cityName(sm?.name ?? ""), sm?.region ?? "", lead.website);
+      if (email) foundBy = "Google search result";
+    }
+    if (email && !(await domainAcceptsMail(email))) {
+      email = null;
+      foundBy = null;
+    }
+    return { lead, r, email, foundBy };
+  };
+  const results = await Promise.all((pending as Pending[]).map(enrich));
+  let found = 0;
+  for (const { lead, r, email, foundBy } of results) {
+    if (lead.website && !r) {
       await db.from("outreach_leads").update({ crawl_status: "failed" }).eq("id", lead.id);
       continue;
     }
-    const update: Record<string, unknown> = { crawl_status: "done", other_emails: r.otherEmails.join(";") || null };
-    if (r.firstName) {
+    const update: Record<string, unknown> = { crawl_status: "done" };
+    if (r) update.other_emails = r.otherEmails.join(";") || null;
+    if (r?.firstName && !lead.first_name) {
       update.first_name = r.firstName;
       update.greeting = `Hi ${r.firstName},`;
       update.name_evidence = r.nameEvidence;
     }
-    if (r.email) {
-      update.email = r.email;
+    const untouched = ["new", "form_pending"].includes(lead.status);
+    if (!lead.email && email && untouched) {
+      update.email = email;
       update.contact_method = "email";
-    } else if (r.formUrl) {
+      update.status = "new";
+      update.notes = `Email found by ${foundBy}`;
+      found++;
+    } else if (!lead.email && r?.formUrl && untouched) {
       update.contact_method = "contact_form";
       update.contact_form_url = r.formUrl;
       update.status = "form_pending";
     }
     const { error } = await db.from("outreach_leads").update(update).eq("id", lead.id);
-    if (error && r.email) {
+    if (error && update.email) {
       // Same email already belongs to another lead: keep this one without it.
       delete update.email;
-      update.contact_method = "website";
-      update.notes = `Email ${r.email} already used by another lead`;
+      update.contact_method = r?.formUrl ? "contact_form" : lead.website ? "website" : "phone";
+      update.status = r?.formUrl ? "form_pending" : lead.status;
+      update.notes = `Email ${email} already used by another lead`;
       await db.from("outreach_leads").update(update).eq("id", lead.id);
+      found--;
     }
   }
-  log.push(`research ${market.service_market_slug}: crawled ${pending.length}`);
+  log.push(`research ${market.service_market_slug}: enriched ${pending.length}, ${found} new emails`);
 }
 
 async function sendStep(db: Db, cfg: Config, log: string[]): Promise<void> {

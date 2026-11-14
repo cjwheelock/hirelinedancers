@@ -262,7 +262,13 @@ export async function serperMaps(query: string, location: string, page: number, 
   const response = await fetch("https://google.serper.dev/maps", {
     method: "POST",
     headers: { "X-API-KEY": key, "Content-Type": "application/json" },
-    body: JSON.stringify(page > 1 && ll ? { q: `${query} in ${location}`, gl: "us", page, ll } : { q: `${query} in ${location}`, gl: "us", page }),
+    // An empty location means a map-grid search: the query runs at the given ll point on every page.
+    body: JSON.stringify({
+      q: location ? `${query} in ${location}` : query,
+      gl: "us",
+      page,
+      ...((page > 1 || !location) && ll ? { ll } : {}),
+    }),
     signal: AbortSignal.timeout(30_000),
   });
   if (!response.ok) throw new Error(`Serper ${response.status}`);
@@ -301,7 +307,8 @@ export function cleanBusinessName(name: string): string {
   return b;
 }
 
-const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
+const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,10}/g;
+const EMAIL_EXACT = /^[^\s<>@,;]+@[^\s<>@,;]+\.[^\s<>@,;]+$/;
 const BAD_EMAIL = /(wixpress|sentry|example\.|domain\.com|yourdomain|mysite\.com|email\.com|godaddy|squarespace|@2x|\.png|\.jpe?g|\.gif|\.webp|\.svg|u003e|wix\.com|cloudflare|schema\.org|jquery|noreply|no-reply|privacy@|webmaster)/i;
 const NAME_STOP = new Set(
   "the your our a an so here from just going not excited happy passionate based located texas wedding weddings events event planner planning team there and with you this that we in very proud ready thrilled".split(" "),
@@ -310,8 +317,10 @@ const UA = { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Appl
 
 async function getPage(url: string): Promise<{ html: string; url: string }> {
   try {
-    const response = await fetch(url, { headers: UA, redirect: "follow", signal: AbortSignal.timeout(10_000) });
-    if (!response.ok || !(response.headers.get("content-type") ?? "text/html").includes("html")) return { html: "", url };
+    const response = await fetch(url, { headers: UA, redirect: "follow", signal: AbortSignal.timeout(8_000) });
+    if (!response.ok) return { html: "", url };
+    const type = response.headers.get("content-type") ?? "text/html";
+    if (!type.includes("html") && !type.includes("xml")) return { html: "", url };
     return { html: (await response.text()).slice(0, 1_500_000), url: response.url };
   } catch {
     return { html: "", url };
@@ -323,34 +332,63 @@ function pageText(html: string): string {
     .replace(/&amp;/g, "&").replace(/&#39;|&rsquo;|&#8217;/g, "'").replace(/\s+/g, " ");
 }
 
-export type CrawlResult = { email: string | null; otherEmails: string[]; firstName: string | null; nameEvidence: string | null; formUrl: string | null };
+// Cloudflare email protection stores addresses XOR-encoded in data-cfemail or /cdn-cgi/l/email-protection#...
+function cfDecode(enc: string): string {
+  const key = parseInt(enc.slice(0, 2), 16);
+  let out = "";
+  for (let i = 2; i < enc.length; i += 2) out += String.fromCharCode(parseInt(enc.slice(i, i + 2), 16) ^ key);
+  return out;
+}
+
+const OBFUSCATED = /\b([A-Za-z0-9._%+-]{2,})\s*(?:\[at\]|\(at\)|\{at\}|\s+at\s+)\s*([A-Za-z0-9-]{2,})\s*(?:\[dot\]|\(dot\)|\s+dot\s+)\s*(com|net|org|co|us|events)\b/gi;
+
+function extractEmails(html: string): Set<string> {
+  const out = new Set<string>();
+  for (const m of html.matchAll(/data-cfemail="([0-9a-f]+)"/gi)) out.add(cfDecode(m[1]).toLowerCase());
+  for (const m of html.matchAll(/\/cdn-cgi\/l\/email-protection#([0-9a-f]+)/gi)) out.add(cfDecode(m[1]).toLowerCase());
+  for (const m of html.matchAll(/href=["']mailto:([^"'?]+)/gi)) {
+    try { out.add(decodeURIComponent(m[1]).toLowerCase().trim()); } catch { /* bad escape */ }
+  }
+  const t = html.replace(/\\u0040/g, "@").replace(/&#64;|&#x40;|%40|\[at\]|\(at\)/gi, "@");
+  for (const e of t.match(EMAIL) ?? []) out.add(e.toLowerCase().replace(/\.$/, ""));
+  for (const m of pageText(html).matchAll(OBFUSCATED)) out.add(`${m[1]}@${m[2]}.${m[3]}`.toLowerCase());
+  return out;
+}
+
+export type CrawlResult = { email: string | null; otherEmails: string[]; firstName: string | null; nameEvidence: string | null; formUrl: string | null; reachable: boolean };
+
+const PAGE_KEYWORDS = /contact|about|inquir|connect|team|meet|founder|our-story|who-we-are|faq|book|pricing|services|investment|get-in-touch|hello|start/i;
 
 export async function crawlPlannerSite(site: string): Promise<CrawlResult> {
-  const result: CrawlResult = { email: null, otherEmails: [], firstName: null, nameEvidence: null, formUrl: null };
+  const result: CrawlResult = { email: null, otherEmails: [], firstName: null, nameEvidence: null, formUrl: null, reachable: false };
   const home = await getPage(site);
   if (!home.html) return result;
+  result.reachable = true;
   const base = new URL(home.url);
-  const sameHost = (u: URL) => u.host.replace(/^www\./, "") === base.host.replace(/^www\./, "");
-  const links = [...home.html.matchAll(/href=["']([^"'#]+)/gi)].map((m) => {
-    try { return new URL(m[1], base); } catch { return null; }
-  }).filter((u): u is URL => !!u);
-  const emails = new Set<string>();
-  for (const u of links) if (u.protocol === "mailto:") emails.add(decodeURIComponent(u.pathname).toLowerCase());
-  const about = [...new Set(links.filter((u) => sameHost(u) && /about|meet|team|founder|our-story|who-we-are/i.test(u.pathname)).map((u) => u.origin + u.pathname))].slice(0, 2);
-  const contact = [...new Set(links.filter((u) => sameHost(u) && /contact|inquir|connect|get-in-touch/i.test(u.pathname)).map((u) => u.origin + u.pathname))].slice(0, 2);
-  const pages = [home.html];
-  for (const u of [...about, ...contact]) pages.push((await getPage(u)).html);
-  for (const html of pages) {
-    for (const e of html.replace(/%40|\[at\]|\(at\)/g, "@").match(EMAIL) ?? []) emails.add(e.toLowerCase().replace(/\.$/, ""));
-  }
   const host = base.host.replace(/^www\./, "");
-  const good = [...emails].filter((e) => !BAD_EMAIL.test(e) && e.length <= 60);
+  const sameHost = (u: URL) => u.host.replace(/^www\./, "") === host;
+  const toUrl = (h: string) => { try { return new URL(h, base); } catch { return null; } };
+  const links = [...home.html.matchAll(/href=["']([^"'#]+)/gi)].map((m) => toUrl(m[1])).filter((u): u is URL => !!u);
+  const sitemap = await getPage(`${base.origin}/sitemap.xml`);
+  for (const m of sitemap.html.matchAll(/<loc>([^<]+)<\/loc>/gi)) {
+    const u = toUrl(m[1].trim());
+    if (u) links.push(u);
+    if (links.length > 400) break;
+  }
+  const candidates = [...new Set(links.filter((u) => sameHost(u) && PAGE_KEYWORDS.test(u.pathname) && !/\.xml$/i.test(u.pathname)).map((u) => u.origin + u.pathname))].slice(0, 8);
+  const about = candidates.filter((u) => /about|meet|team|founder|our-story|who-we-are/i.test(u));
+  const fetched = await Promise.all(candidates.map((u) => getPage(u).then((p) => ({ url: u, html: p.html }))));
+  const pages = [{ url: home.url, html: home.html }, ...fetched];
+
+  const emails = new Set<string>();
+  for (const p of pages) for (const e of extractEmails(p.html)) emails.add(e);
+  const good = [...emails].filter((e) => EMAIL_EXACT.test(e) && !BAD_EMAIL.test(e) && e.length <= 60 && !/^\d/.test(e));
   good.sort((a, b) => Number(b.endsWith("@" + host)) - Number(a.endsWith("@" + host)));
   result.email = good[0] ?? null;
   result.otherEmails = good.slice(1, 5);
 
   // First name: only strong self-introductions ("I'm Kristin", "my name is Lily", "Meet Shawna" repeated).
-  const text = pages.slice(0, 1 + about.length).map(pageText).join(" ");
+  const text = [home.html, ...fetched.filter((p) => about.includes(p.url)).map((p) => p.html)].map(pageText).join(" ");
   const strong = /(?:hi|hey|hello)[,!.]*\s+i['’]m\s+([A-Z][a-z]{2,14})\b|my name is\s+([A-Z][a-z]{2,14})\b/g;
   for (const m of text.matchAll(strong)) {
     const name = m[1] ?? m[2];
@@ -376,12 +414,59 @@ export async function crawlPlannerSite(site: string): Promise<CrawlResult> {
 
   if (!result.email) {
     const formPattern = /<form|wpforms|gform|hsforms|jotform|typeform|honeybook|dubsado|17hats|tave|squarespace-form|form-wrapper|wix-forms/i;
-    if (formPattern.test(home.html)) result.formUrl = home.url;
-    else {
-      for (let i = 0; i < contact.length; i++) {
-        if (formPattern.test(pages[1 + about.length + i] ?? "")) { result.formUrl = contact[i]; break; }
-      }
-    }
+    const withForm = pages.find((p) => formPattern.test(p.html) && (p.url === home.url || /contact|inquir|connect|get-in-touch|book/i.test(p.url)));
+    if (withForm) result.formUrl = withForm.url;
   }
   return result;
+}
+
+const FREE_MAIL = new Set(["gmail.com", "yahoo.com", "icloud.com", "hotmail.com", "outlook.com", "aol.com", "live.com", "me.com", "msn.com", "att.net", "sbcglobal.net", "ymail.com"]);
+const letters = (t: string) => t.toLowerCase().replace(/[^a-z]/g, "");
+
+// Google (via Serper, 1 credit): '"<business>" <city> <state> email', keeping only addresses that clearly belong to the business.
+export async function searchBusinessEmail(business: string, city: string, region: string, website: string | null): Promise<string | null> {
+  const key = Deno.env.get("SERPER_API_KEY")?.trim();
+  if (!key) return null;
+  let data: { organic?: { title?: string; snippet?: string }[]; knowledgeGraph?: unknown };
+  try {
+    const response = await fetch("https://google.serper.dev/search", {
+      method: "POST",
+      headers: { "X-API-KEY": key, "Content-Type": "application/json" },
+      body: JSON.stringify({ q: `"${business}" ${city} ${region} email`, gl: "us", num: 10 }),
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (!response.ok) return null;
+    data = await response.json();
+  } catch {
+    return null;
+  }
+  const text = (data.organic ?? []).map((o) => `${o.title ?? ""} ${o.snippet ?? ""}`).join(" ") + " " + JSON.stringify(data.knowledgeGraph ?? {});
+  const host = websiteHost(website);
+  const root = host ? host.split(".").slice(-2).join(".") : null;
+  const name = letters(business);
+  for (const raw of new Set(text.match(EMAIL) ?? [])) {
+    const e = raw.toLowerCase().replace(/\.$/, "");
+    if (!EMAIL_EXACT.test(e) || BAD_EMAIL.test(e)) continue;
+    const domain = e.split("@")[1];
+    const core = letters(domain.split(".")[0]);
+    const local = letters(e.split("@")[0]);
+    const matches = (root && domain.endsWith(root)) ||
+      (core.length >= 5 && (name.includes(core.slice(0, 7)) || core.includes(name.slice(0, 7)))) ||
+      (FREE_MAIL.has(domain) && local.length >= 5 && (name.includes(local.slice(0, 7)) || local.includes(name.slice(0, 7))));
+    if (matches) return e;
+  }
+  return null;
+}
+
+// True when the email's domain has a mail server; unknown (lookup error) counts as true.
+export async function domainAcceptsMail(email: string): Promise<boolean> {
+  const domain = email.split("@")[1];
+  try {
+    const mx = await Deno.resolveDns(domain, "MX");
+    if (mx.length) return true;
+    const a = await Deno.resolveDns(domain, "A").catch(() => []);
+    return a.length > 0;
+  } catch (e) {
+    return !/no.?data|not.?found|NXDOMAIN/i.test(String(e));
+  }
 }
