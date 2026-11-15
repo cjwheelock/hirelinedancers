@@ -321,7 +321,7 @@ async function getPage(url: string): Promise<{ html: string; url: string }> {
     if (!response.ok) return { html: "", url };
     const type = response.headers.get("content-type") ?? "text/html";
     if (!type.includes("html") && !type.includes("xml")) return { html: "", url };
-    return { html: (await response.text()).slice(0, 1_500_000), url: response.url };
+    return { html: (await response.text()).slice(0, 300_000), url: response.url };
   } catch {
     return { html: "", url };
   }
@@ -373,9 +373,9 @@ export async function crawlPlannerSite(site: string): Promise<CrawlResult> {
   for (const m of sitemap.html.matchAll(/<loc>([^<]+)<\/loc>/gi)) {
     const u = toUrl(m[1].trim());
     if (u) links.push(u);
-    if (links.length > 400) break;
+    if (links.length > 200) break;
   }
-  const candidates = [...new Set(links.filter((u) => sameHost(u) && PAGE_KEYWORDS.test(u.pathname) && !/\.xml$/i.test(u.pathname)).map((u) => u.origin + u.pathname))].slice(0, 8);
+  const candidates = [...new Set(links.filter((u) => sameHost(u) && PAGE_KEYWORDS.test(u.pathname) && !/\.xml$/i.test(u.pathname)).map((u) => u.origin + u.pathname))].slice(0, 6);
   const about = candidates.filter((u) => /about|meet|team|founder|our-story|who-we-are/i.test(u));
   const fetched = await Promise.all(candidates.map((u) => getPage(u).then((p) => ({ url: u, html: p.html }))));
   const pages = [{ url: home.url, html: home.html }, ...fetched];

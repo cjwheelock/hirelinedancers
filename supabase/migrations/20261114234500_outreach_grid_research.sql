@@ -43,3 +43,6 @@ select cron.schedule('hld-booker-research', '5,10,20,25,35,40,50,55 * * * *', $$
     timeout_milliseconds := 140000
   );
 $$);
+
+-- Research runs every 2 minutes (odd minutes); the crawl batch is 8 leads to stay inside edge-function limits.
+select cron.alter_job((select jobid from cron.job where jobname = 'hld-booker-research'), schedule := '1-59/2 * * * *');

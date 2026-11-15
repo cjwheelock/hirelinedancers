@@ -28,7 +28,7 @@ import {
 type Db = any;
 
 const DISCOVERY_QUERIES = ["wedding planner", "wedding coordinator", "wedding and event planner"];
-const CRAWL_BATCH = 25;
+const CRAWL_BATCH = 8;
 const GRID_QUERIES = ["wedding planner", "wedding coordinator"];
 const GRID_POINTS_PER_RUN = 10;
 
