@@ -28,9 +28,10 @@ import {
 type Db = any;
 
 const DISCOVERY_QUERIES = ["wedding planner", "wedding coordinator", "wedding and event planner"];
-const CRAWL_BATCH = 8;
+// Checkpoint one lead per invocation before the next expensive site is attempted.
+const CRAWL_BATCH = 1;
 const GRID_QUERIES = ["wedding planner", "wedding coordinator"];
-const GRID_POINTS_PER_RUN = 10;
+const GRID_POINTS_PER_RUN = 1;
 
 type Config = {
   enabled: boolean;

@@ -307,7 +307,8 @@ export function cleanBusinessName(name: string): string {
   return b;
 }
 
-const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,10}/g;
+// Bounded email tokens prevent quadratic regex backtracking on base64/script blobs.
+const EMAIL = /[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9.-]{1,253}\.[A-Za-z]{2,10}/g;
 const EMAIL_EXACT = /^[^\s<>@,;]+@[^\s<>@,;]+\.[^\s<>@,;]+$/;
 const BAD_EMAIL = /(wixpress|sentry|example\.|domain\.com|yourdomain|mysite\.com|email\.com|godaddy|squarespace|@2x|\.png|\.jpe?g|\.gif|\.webp|\.svg|u003e|wix\.com|cloudflare|schema\.org|jquery|noreply|no-reply|privacy@|webmaster)/i;
 const NAME_STOP = new Set(
@@ -315,13 +316,36 @@ const NAME_STOP = new Set(
 );
 const UA = { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130 Safari/537.36" };
 
+const MAX_PAGE_BYTES = 300_000;
+
+export async function boundedPageText(response: Response): Promise<string> {
+  if (!response.body) return "";
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let bytes = 0;
+  let text = "";
+  try {
+    while (bytes < MAX_PAGE_BYTES) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const part = value.subarray(0, MAX_PAGE_BYTES - bytes);
+      text += decoder.decode(part, { stream: true });
+      bytes += part.byteLength;
+    }
+    return text + decoder.decode();
+  } finally {
+    await reader.cancel().catch(() => {});
+    reader.releaseLock();
+  }
+}
+
 async function getPage(url: string): Promise<{ html: string; url: string }> {
   try {
     const response = await fetch(url, { headers: UA, redirect: "follow", signal: AbortSignal.timeout(8_000) });
     if (!response.ok) return { html: "", url };
     const type = response.headers.get("content-type") ?? "text/html";
     if (!type.includes("html") && !type.includes("xml")) return { html: "", url };
-    return { html: (await response.text()).slice(0, 300_000), url: response.url };
+    return { html: await boundedPageText(response), url: response.url };
   } catch {
     return { html: "", url };
   }
@@ -340,7 +364,7 @@ function cfDecode(enc: string): string {
   return out;
 }
 
-const OBFUSCATED = /\b([A-Za-z0-9._%+-]{2,})\s*(?:\[at\]|\(at\)|\{at\}|\s+at\s+)\s*([A-Za-z0-9-]{2,})\s*(?:\[dot\]|\(dot\)|\s+dot\s+)\s*(com|net|org|co|us|events)\b/gi;
+const OBFUSCATED = /\b([A-Za-z0-9._%+-]{2,64})\s*(?:\[at\]|\(at\)|\{at\}|\s+at\s+)\s*([A-Za-z0-9-]{2,63})\s*(?:\[dot\]|\(dot\)|\s+dot\s+)\s*(com|net|org|co|us|events)\b/gi;
 
 function extractEmails(html: string): Set<string> {
   const out = new Set<string>();
