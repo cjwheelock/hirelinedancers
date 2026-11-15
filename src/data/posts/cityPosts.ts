@@ -2,6 +2,52 @@ import type { BlogPost } from "../blog";
 
 export const cityPosts: BlogPost[] = [
   {
+    slug: "where-to-line-dance-phoenix",
+    title: "Where to Go Line Dancing in Phoenix and Mesa",
+    description: "Three Phoenix-area places with verified line-dance lessons, from a live-music night at Foley Ranch to dance-hall and studio classes in Mesa.",
+    publishDate: "2026-11-15",
+    updatedDate: "2026-11-15",
+    status: "ready",
+    category: "City guide",
+    citySlug: "phoenix-az",
+    author: "Hire Line Dancers",
+    body: `
+<p>A line-dancing night in the Phoenix area can mean a restaurant with short lessons between music sets, a dedicated dance hall, or a daytime studio class. These three places publish explicit line-dance instruction, so there is no need to guess whether a generic country night actually teaches line dances.</p>
+<p>This is a practical shortlist, not a ranking. Two stops are in Mesa, so plan around the part of the Valley that works for your group.</p>
+<p><strong>Last checked: November 15, 2026.</strong> Times below are local to Arizona. Check the linked schedule before traveling, especially around holidays.</p>
+<h2>1. Foley Ranch, Phoenix</h2>
+<p><strong>Address:</strong> 21001 North Tatum Boulevard, Unit 93, Phoenix, AZ 85050.</p>
+<p>Foley Ranch combines a restaurant and live-music night with short beginner lessons. Its official schedule lists line dancing on Tuesdays and Wednesdays at 7 and 8:15 p.m., in roughly 30-minute sessions between music sets. Sunday line instruction starts at 7:30 p.m.; the earlier Sunday lesson is swing, a separate partner-dance format.</p>
+<p>The date-specific calendar confirms beginner line lessons on November 17 and 18, as well as a November 15 Sunday line session. Lessons are included with a food or beverage purchase, rather than being an unconditional free class. All ages can attend lessons before 9 p.m.; the venue becomes 21 and over afterward.</p>
+<p><strong>Choose this for:</strong> a first lesson as part of an evening out. Thursday's advertised class is country swing, not line dancing.</p>
+<p><a href="https://www.foleyranch.com/dance">Official dance calendar, admission details and directions</a></p>
+<h2>2. Scootin' Boots Dance Hall, Mesa</h2>
+<p><strong>Address:</strong> 515 North Stapley Drive, Mesa, AZ 85203.</p>
+<p>Scootin' Boots offers multiple line-dance levels throughout the week. Tuesday is an easy schedule to understand: beginner instruction runs from 6 to 6:45 p.m., intermediate instruction from 7:15 to 8 p.m., and open line dancing fills the breaks and continues afterward. The listed price is $10 per person.</p>
+<p>For a daytime option, Monday's line classes progress from beginner at 9 a.m. to improver at 9:45 and intermediate at 10:30. These are separate from the hall's two-step and country-swing offerings, so select the line-dance session that matches your experience.</p>
+<p>The venue describes an 18-plus environment where minors may attend with an adult. Its current holiday notice lists November 26, 2026 as closed, so the normal Thursday timetable does not apply that day.</p>
+<p><strong>Choose this for:</strong> a clearly labeled skill level and time to practice after learning.</p>
+<p><a href="https://www.scootinboots.com/group-classes">Weekly classes and prices</a> · <a href="https://www.scootinboots.com/contact">Directions, age guidance and holiday hours</a></p>
+<h2>3. Kaleidoscope Dance Space, Mesa</h2>
+<p><strong>Address:</strong> 2848 South Carriage Lane, Mesa, AZ 85202.</p>
+<p>Kaleidoscope offers a different entry point: its 1-Wall Line Dance class keeps dancers facing forward, without spins or wall changes. Instructor Trudy Sherman teaches and practices the moves before the music and calls them as the dance progresses. The class uses pop music across decades rather than only country songs.</p>
+<p>The weekly schedule lists 1-Wall sessions on Wednesday from 3 to 3:55 p.m., Thursday from 9:15 to 10:10 a.m., and Saturday from 10:30 to 11:25 a.m. The separate class-description page omits Wednesday, so confirm that particular session before going. Thursday and Saturday appear on both pages.</p>
+<p>Experienced dancers can check the Monday intermediate line class with Bernadette Petrucci, listed from 9:30 to 11 a.m. Use the studio's reservation page for availability and current fees.</p>
+<p><strong>Choose this for:</strong> a daytime studio lesson, especially if repeated turns are not the experience you want.</p>
+<p><a href="https://www.kaleidoscope-dance.com/schedules">Weekly schedule</a> · <a href="https://www.kaleidoscope-dance.com/adult-classes-descriptions">Class descriptions</a> · <a href="https://www.kaleidoscope-dance.com/reserve-your-spot">Reservations</a> · <a href="https://www.kaleidoscope-dance.com/">Studio location</a></p>
+<h2>Pick the lesson before planning the night</h2>
+<ul>
+<li>Start with a beginner class if the steps are new to you. A line dance does not require a partner.</li>
+<li>Check the exact dance style. Country swing and two-step are not interchangeable with line dancing.</li>
+<li>Confirm holiday hours, age rules and the cost for your date.</li>
+<li>Arrive before instruction starts, with comfortable shoes and room to move.</li>
+</ul>
+<h2>Bring line dancing to your event</h2>
+<p>For a wedding, company gathering or private party, <a href="/cities/phoenix-az/">explore Phoenix-area instructors</a> and include your event location, group size and experience level in your inquiry.</p>
+`,
+  },
+
+  {
     slug: "where-to-line-dance-nashville",
     title: "Where to Go Line Dancing in Nashville",
     description: "Four Nashville places to try line dancing, from social dance floors to bookable beginner lessons, with official calendars and practical arrival tips.",
