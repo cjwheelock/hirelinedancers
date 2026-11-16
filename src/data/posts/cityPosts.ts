@@ -2,6 +2,52 @@ import type { BlogPost } from "../blog";
 
 export const cityPosts: BlogPost[] = [
   {
+    slug: "where-to-line-dance-fort-worth",
+    title: "Where to Go Line Dancing in Fort Worth",
+    description: "Three Fort Worth venues with line-dance instruction, including official schedules, admission details and the difference between line lessons and partner dancing.",
+    publishDate: "2026-11-16",
+    updatedDate: "2026-11-16",
+    status: "ready",
+    category: "City guide",
+    citySlug: "fort-worth-tx",
+    author: "Hire Line Dancers",
+    body: `
+<p>Fort Worth has plenty of country dance floors, but a country night does not always include a line-dance lesson. These three venues explicitly advertise line-dance instruction on their own websites, with different options for a daytime visit or an evening out.</p>
+<p>This is a practical shortlist, not a ranking. All three venues are in Fort Worth. Dallas is a separate destination, so check the address before planning a night across the metroplex.</p>
+<p><strong>Last checked: November 16, 2026.</strong> Times are local to Fort Worth. These are the venues' published recurring schedules, not guarantees for every date. Check the official links for holiday changes, private events and current admission.</p>
+<h2>1. Billy Bob's Texas</h2>
+<p><strong>Address:</strong> 2520 Rodeo Plaza, Fort Worth, TX 76164.</p>
+<p>Billy Bob's lists line-dance lessons on Tuesday and Wednesday at 7 p.m., plus a Saturday noon session. The daytime option is useful for anyone who would rather learn before an evening crowd arrives.</p>
+<p>The lesson itself is advertised as free, but that does not necessarily mean free entry. Saturday's listing explicitly requires a daily admission ticket. The venue currently lists $6 admission before 5 p.m., with evening prices varying. Check the cost for the actual date instead of assuming a lesson includes a concert or other entertainment.</p>
+<p>Minors may attend with a parent or legal guardian, with proof required. The venue asks visitors over 18 to bring valid government-issued ID. Sunday classes with Bill and Bonnie are couples country dancing, not the same line-dance offering.</p>
+<p><strong>Choose this for:</strong> a published Saturday daytime lesson or a weeknight visit to the Stockyards.</p>
+<p><a href="https://www.billybobstexas.com/events/dancing">Official dance lesson schedule</a> · <a href="https://www.billybobstexas.com/plan-your-visit/directions">Location, admission and age information</a></p>
+<h2>2. Rodeo Exchange</h2>
+<p><strong>Address:</strong> 221 West Exchange Avenue, Fort Worth, TX 76164.</p>
+<p>Rodeo Exchange's Wednesday program is specifically line dancing with Marcia. Doors open at 6 p.m., and the lesson runs from 6:30 to 8:30 p.m. The venue lists a $5 cover until 8 p.m.; instruction is included with that cover. This is a 21-and-over venue with ID required.</p>
+<p>The distinction between nights matters here. Thursday teaches the Fort Worth Shuffle, a partner dance, while Friday and Saturday are open-floor nights without a lesson. For a first line-dancing visit, Wednesday is the advertised instructional option, not simply any night the venue is open.</p>
+<p><strong>Choose this for:</strong> an early-evening line lesson with a clearly stated teaching window. Arrive before instruction begins rather than treating the door-opening time as the lesson time.</p>
+<p><a href="https://www.rodeoex.com/">Official weekly program, lessons and visitor information</a></p>
+<h2>3. Guitars and Cadillacs</h2>
+<p><strong>Address:</strong> 4750 Bryant Irvin Road, Suite 868, Fort Worth, TX 76132.</p>
+<p>Guitars and Cadillacs advertises two line dances on Wednesday nights: one beginner and one intermediate. Lessons are included with the cover charge. It is a useful alternative to the Stockyards stops for a group looking around southwest Fort Worth.</p>
+<p><strong>Confirm the Wednesday details before going.</strong> The official lesson page lists doors at 7 p.m., but does not specify Wednesday's lesson start time or Wednesday admission price. The times and cover amounts given for Thursday and Friday should not be applied to Wednesday. Check the age policy for the same reason.</p>
+<p>Thursday's bar-style country lesson and Friday's traditional two-step lesson are partner-dance offerings. Choose Wednesday if line dancing is the goal.</p>
+<p><strong>Choose this for:</strong> a night that advertises both beginner and intermediate line instruction, after confirming the exact start time and entry requirements.</p>
+<p><a href="https://iloveguitarsandcadillacs.com/weekly-night-dance-lessons/">Official weekly lesson information</a></p>
+<h2>Make the first visit easier</h2>
+<ul>
+<li>Pick a beginner line-dance lesson rather than assuming every country class teaches the same thing.</li>
+<li>Check the venue's calendar, admission and age rules for your date.</li>
+<li>Arrive before the lesson, wear comfortable shoes and leave room for other dancers.</li>
+<li>Follow the instructor's floor layout. Partner dancers and line dancers may use different areas.</li>
+</ul>
+<h2>Bring the lesson to your group</h2>
+<p>Planning a wedding, company event or private party? <a href="/cities/fort-worth-tx/">Explore Fort Worth-area instructors</a> and include the event location, group size and experience level in your inquiry.</p>
+`,
+  },
+
+  {
     slug: "where-to-line-dance-phoenix",
     title: "Where to Go Line Dancing in Phoenix and Mesa",
     description: "Three Phoenix-area places with verified line-dance lessons, from a live-music night at Foley Ranch to dance-hall and studio classes in Mesa.",
