@@ -1577,6 +1577,187 @@ async function edgeFunctionError(error: unknown) {
   return (await edgeFunctionFailure(error)).message;
 }
 
+const instructorStatusGroups = [
+  { key: "all", label: "All" },
+  { key: "active", label: "Active" },
+  { key: "submitted", label: "Submitted" },
+  { key: "draft", label: "Draft" }
+] as const;
+
+function instructorStatus(status: InstructorProfile["status"]) {
+  if (status === "published") return { group: "active", label: "Active", chip: adminStyles.chipPine };
+  if (status === "pending_review") return { group: "submitted", label: "Submitted", chip: adminStyles.chipAmber };
+  if (status === "draft") return { group: "draft", label: "Draft", chip: "" };
+  if (status === "suspended") return { group: "other", label: "Suspended", chip: adminStyles.chipAlert };
+  return { group: "other", label: statusLabel(status), chip: "" };
+}
+
+function startingRate(profile: InstructorProfile, setup?: AdminInstructorPaymentSetup) {
+  const prices = (profile.packages ?? []).map((item) => item.priceCents).filter((value): value is number => typeof value === "number" && value > 0);
+  if (prices.length) return Math.min(...prices);
+  return setup?.minimum_rate_cents ?? null;
+}
+
+function AdminInstructors({ profiles, media, setups, mediaUrl, onReview }: {
+  profiles: InstructorProfile[];
+  media: ProfileMedia[];
+  setups: AdminInstructorPaymentSetup[];
+  mediaUrl: (item: ProfileMedia) => string;
+  onReview: (profileId: string) => void;
+}) {
+  const [group, setGroup] = useState<(typeof instructorStatusGroups)[number]["key"]>("all");
+  const [search, setSearch] = useState("");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const counts = useMemo(() => {
+    const result: Record<string, number> = { all: profiles.length, active: 0, submitted: 0, draft: 0 };
+    for (const profile of profiles) {
+      const key = instructorStatus(profile.status).group;
+      if (key in result) result[key] += 1;
+    }
+    return result;
+  }, [profiles]);
+
+  const visible = useMemo(() => {
+    const needle = search.trim().toLocaleLowerCase();
+    return profiles
+      .filter((profile) => group === "all" || instructorStatus(profile.status).group === group)
+      .filter((profile) => !needle || [profile.display_name, profile.business_name, profile.city, profile.region]
+        .filter(Boolean).join(" ").toLocaleLowerCase().includes(needle))
+      .sort((a, b) => {
+        const order = { active: 0, submitted: 1, draft: 2, other: 3 } as Record<string, number>;
+        return order[instructorStatus(a.status).group] - order[instructorStatus(b.status).group] || a.display_name.localeCompare(b.display_name);
+      });
+  }, [group, profiles, search]);
+
+  const selected = visible.find((profile) => profile.id === selectedId) ?? visible[0] ?? null;
+  const setup = selected ? setups.find((item) => item.instructor_profile_id === selected.id) : undefined;
+  const headshot = selected ? media.find((item) => item.instructor_profile_id === selected.id && item.media_type === "headshot" && item.status === "ready") : undefined;
+  const selectedStatus = selected ? instructorStatus(selected.status) : null;
+  const equipment = selected ? [
+    selected.provides_speakers ? "Speakers" : null,
+    selected.provides_microphone ? "Microphone" : null,
+    selected.provides_music_playback ? "Music playback" : null
+  ].filter(Boolean).join(", ") : "";
+
+  return (
+    <div className={styles.membershipAdminLayout}>
+      <section className={`${styles.card} ${styles.compactAdminCard}`}>
+        <div className={styles.compactSectionHeader}>
+          <div>
+            <h2>Instructors</h2>
+            <p className={styles.muted}>Select an instructor to see their profile, rates and packages.</p>
+          </div>
+          <span className={styles.recordCount} aria-live="polite">{visible.length} of {profiles.length}</span>
+        </div>
+        <div className={styles.tabs} role="tablist" aria-label="Instructor status">
+          {instructorStatusGroups.map((item) => (
+            <button
+              key={item.key}
+              className={`${styles.tab} ${group === item.key ? styles.activeTab : ""}`}
+              type="button"
+              role="tab"
+              aria-selected={group === item.key}
+              onClick={() => setGroup(item.key)}
+            >{item.label} ({counts[item.key] ?? 0})</button>
+          ))}
+        </div>
+        <div className={styles.membershipToolbar}>
+          <label className={styles.field}>
+            <span>Search</span>
+            <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Name, business, or city" />
+          </label>
+        </div>
+        {!visible.length ? <p className={styles.notice} role="status">No instructors match.</p> : (
+          <div className={styles.tableWrap} role="region" aria-label="Instructors" tabIndex={0}>
+            <table className={styles.dataTable}>
+              <caption className={styles.srOnly}>Instructors</caption>
+              <thead><tr><th scope="col">Instructor</th><th scope="col">City</th><th scope="col">Status</th><th scope="col">Starting rate</th></tr></thead>
+              <tbody>
+                {visible.map((profile) => {
+                  const status = instructorStatus(profile.status);
+                  const rate = startingRate(profile, setups.find((item) => item.instructor_profile_id === profile.id));
+                  return (
+                    <tr key={profile.id} className={selected?.id === profile.id ? styles.selectedTableRow : ""}>
+                      <td>
+                        <button className={styles.tableSelectButton} type="button" aria-current={selected?.id === profile.id ? "true" : undefined} onClick={() => setSelectedId(profile.id)}>{profile.display_name}</button>
+                        {profile.business_name ? <small>{profile.business_name}</small> : null}
+                      </td>
+                      <td>{[profile.city, profile.region].filter(Boolean).join(", ") || "Not set"}</td>
+                      <td><span className={`${adminStyles.chip} ${status.chip}`}>{status.label}</span></td>
+                      <td>{rate ? money(rate) : "Not entered"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      {selected && selectedStatus ? (
+        <div className={styles.membershipDetail}>
+          <div className={`${styles.card} ${styles.compactAdminCard}`}>
+            <div className={styles.membershipHeader}>
+              <div className={styles.buttonRow}>
+                {headshot ? (
+                  // Uploaded user content has a runtime URL that Next Image cannot optimize during static export.
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={mediaUrl(headshot)} alt="" width={64} height={64} style={{ borderRadius: 999, objectFit: "cover" }} />
+                ) : null}
+                <div>
+                  <span className={`${adminStyles.chip} ${selectedStatus.chip}`}>{selectedStatus.label}</span>
+                  <h2>{selected.display_name}</h2>
+                  <p className={styles.muted}>{[selected.business_name, [selected.city, selected.region].filter(Boolean).join(", ")].filter(Boolean).join(" · ")}</p>
+                </div>
+              </div>
+              <div className={styles.buttonRow}>
+                {selected.status === "published" ? <a className={`${styles.secondaryButton} ${styles.compactButton}`} href={`/profile/${encodeURIComponent(selected.slug || selected.id)}/`} target="_blank" rel="noreferrer">View public profile</a> : null}
+                {selected.status === "pending_review" ? <button className={`${styles.button} ${styles.compactButton}`} type="button" onClick={() => onReview(selected.id)}>Review submission</button> : null}
+              </div>
+            </div>
+
+            <h3>Rates and packages</h3>
+            {(selected.packages ?? []).length ? (
+              <div className={styles.membershipFacts}>
+                {(selected.packages ?? []).map((item, index) => (
+                  <div key={`${item.name}-${index}`}>
+                    <dt>{item.name || "Untitled package"}{item.durationHours ? ` · ${item.durationHours} ${item.durationHours === 1 ? "hour" : "hours"}` : ""}</dt>
+                    <dd><strong>{item.priceCents ? money(item.priceCents) : "No price"}</strong>{item.description ? <small> {item.description}</small> : null}</dd>
+                  </div>
+                ))}
+              </div>
+            ) : <p className={styles.muted}>No packages entered.</p>}
+            <dl className={styles.membershipFacts}>
+              <div><dt>Minimum rate</dt><dd>{money(setup?.minimum_rate_cents)}</dd></div>
+              <div><dt>Minimum hours</dt><dd>{setup?.minimum_hours ?? "Not entered"}</dd></div>
+            </dl>
+
+            <h3>Profile</h3>
+            <dl className={styles.membershipFacts}>
+              <div><dt>Headline</dt><dd>{selected.headline || "Not provided"}</dd></div>
+              <div><dt>Years teaching</dt><dd>{selected.years_teaching ?? "Not provided"}</dd></div>
+              <div><dt>Largest group</dt><dd>{selected.max_group_size ?? "Not provided"}</dd></div>
+              <div><dt>Travel radius</dt><dd>{selected.travel_radius_miles ? `${selected.travel_radius_miles} miles` : "Not provided"}</dd></div>
+              <div><dt>Brings</dt><dd>{equipment || "Not provided"}</dd></div>
+              <div><dt>Events</dt><dd>{selected.event_types.length ? selected.event_types.map((value) => eventTypes.find((item) => item.slug === value)?.label ?? statusLabel(value)).join(", ") : "None selected"}</dd></div>
+              <div><dt>Styles</dt><dd>{selected.styles.length ? selected.styles.join(", ") : "None selected"}</dd></div>
+              <div><dt>Inquiry email</dt><dd>{setup?.inquiry_email || "Not set"}</dd></div>
+            </dl>
+            {selected.bio ? <><h3>Bio</h3><p style={{ whiteSpace: "pre-line" }}>{selected.bio}</p></> : null}
+            {(selected.highlights ?? []).length ? (
+              <>
+                <h3>Highlights</h3>
+                <ul>{(selected.highlights ?? []).map((item, index) => <li key={`${item.title}-${index}`}><strong>{item.title}</strong>{item.detail ? `: ${item.detail}` : ""}</li>)}</ul>
+              </>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function MembershipGuaranteeAdmin({ isOwner }: { isOwner: boolean }) {
   const [search, setSearch] = useState("");
   const [cityFilter, setCityFilter] = useState("all");
@@ -2043,7 +2224,7 @@ function MembershipGuaranteeAdmin({ isOwner }: { isOwner: boolean }) {
 }
 
 function AdminDashboard({ isOwner }: { isOwner: boolean }) {
-  const [tab, setTab] = useState<"overview" | "inquiries" | "messages" | "bookings" | "outreach" | "profiles" | "memberships" | "invitations" | "delivery" | "access">("overview");
+  const [tab, setTab] = useState<"overview" | "inquiries" | "messages" | "bookings" | "outreach" | "profiles" | "instructors" | "memberships" | "invitations" | "delivery" | "access">("overview");
   const [focusedProfileId, setFocusedProfileId] = useState<string | null>(null);
   const [focusedInquiryId, setFocusedInquiryId] = useState<string | null>(null);
   const [focusedThreadId, setFocusedThreadId] = useState<string | null>(null);
@@ -2192,7 +2373,7 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const requestedTab = params.get("tab");
-    if (["overview", "inquiries", "messages", "bookings", "outreach", "profiles", "memberships", "invitations", "delivery", "access"].includes(requestedTab ?? "")) {
+    if (["overview", "inquiries", "messages", "bookings", "outreach", "profiles", "instructors", "memberships", "delivery", "access"].includes(requestedTab ?? "")) {
       setTab(requestedTab as typeof tab);
     }
     setFocusedProfileId(params.get("profile"));
@@ -2448,9 +2629,9 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
   const collected = collectedCents(adminBookings.rows, overviewRange.start, overviewRange.end);
   const adminMenu: Array<{ label: string; items: Array<typeof tab> }> = [
     { label: "Operations", items: ["overview", "inquiries", "messages", "bookings"] },
-    { label: "Instructors", items: ["profiles", "memberships", "invitations"] },
+    { label: "Instructors", items: ["instructors", "profiles"] },
     { label: "Growth", items: ["outreach"] },
-    { label: "System", items: isOwner ? ["delivery", "access"] : ["delivery"] }
+    { label: "System", items: isOwner ? ["delivery", "access", "memberships"] : ["delivery", "memberships"] }
   ];
 
   function selectAdminTab(nextTab: typeof tab) {
@@ -2463,6 +2644,14 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
       url.searchParams.delete("inquiry");
       url.searchParams.delete("thread");
     }
+    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+  }
+
+  function openProfileReview(profileId: string) {
+    setFocusedProfileId(profileId);
+    selectAdminTab("profiles");
+    const url = new URL(window.location.href);
+    url.searchParams.set("profile", profileId);
     window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
   }
 
@@ -2484,7 +2673,7 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
             <p className={adminStyles.menuLabel}>{group.label}</p>
             {group.items.map((name) => (
               <button key={name} className={`${adminStyles.menuItem} ${tab === name ? adminStyles.menuItemActive : ""}`} type="button" aria-current={tab === name ? "page" : undefined} onClick={() => selectAdminTab(name)}>
-                <span>{name === "profiles" ? "Reviews" : name[0].toUpperCase() + name.slice(1)}</span>
+                <span>{name === "profiles" ? "Reviews" : name === "memberships" ? "Legacy billing" : name[0].toUpperCase() + name.slice(1)}</span>
                 {name === "profiles" && pending.length ? <span className={adminStyles.menuBadge}>{pending.length}</span> : null}
               </button>
             ))}
@@ -2949,6 +3138,7 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
         </div>
       ) : null}
 
+      {!loading && tab === "instructors" ? <AdminInstructors profiles={profiles} media={media} setups={paymentSetups} mediaUrl={mediaUrl} onReview={openProfileReview} /> : null}
       {!loading && tab === "memberships" ? <MembershipGuaranteeAdmin isOwner={isOwner} /> : null}
 
       {!loading && tab === "invitations" ? (

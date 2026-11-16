@@ -65,7 +65,10 @@ export default [
       "jsx-a11y/aria-unsupported-elements": "warn",
       "jsx-a11y/role-has-required-aria-props": "warn",
       "jsx-a11y/role-supports-aria-props": "warn",
-      "react/prop-types": "off"
+      "react/prop-types": "off",
+      // The root [landing] route (email-only outreach pages) makes this pages-router rule
+      // treat every internal path as a page; the site intentionally uses <a> for full loads.
+      "@next/next/no-html-link-for-pages": "off"
     }
   }
 ];
