@@ -87,3 +87,15 @@ Deno.test('regular inquiries and invalid requester emails send no confirmation',
   assert(matchingRequestConfirmationEmail(job) === null);
   assert(matchingRequestConfirmationEmail({ ...job, inquiry: { kind: 'matching_request', contact_email: 'nope' } }) === null);
 });
+Deno.test('first instructor reply matches owner style and safely includes response timing', async () => {
+  const replyJob = { ...job, inquiry: { kind: 'first_instructor_reply', instructor_name: 'Pat <script>\r\n', reply_body: '<script>hello</script>', response_seconds: 7260, contact_name: 'Organizer' } };
+  const email = adminInquiryEmail(replyJob, config.appUrl, config.supportEmail);
+  assert(email.subject.startsWith('Instructor replied · Pat') && !/[\r\n]/.test(email.subject));
+  assert(email.text.includes('Time to first reply: 2h 1m'));
+  assert(email.html.includes('&lt;script&gt;hello') && !email.html.includes('<script>'));
+  assert(email.reply_to === config.supportEmail && email.to[0] === 'cjwheelock1@gmail.com');
+  assert(matchingRequestConfirmationEmail(replyJob) === null);
+  let sends = 0;
+  await sendAdminInquiryEmail(replyJob, config, (() => { sends++; return Promise.resolve(Response.json({ id: 'owner-reply-test' })); }) as typeof fetch);
+  assert(sends === 1);
+});

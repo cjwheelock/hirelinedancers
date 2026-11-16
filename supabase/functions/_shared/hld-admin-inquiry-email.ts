@@ -37,7 +37,32 @@ function matchingRequestEmail(job: AdminInquiryNotificationJob, supportEmail: st
   };
 }
 
+function firstInstructorReplyEmail(job: AdminInquiryNotificationJob, appUrl: URL, supportEmail: string) {
+  if (!job.inquiry_id) throw new AdminInquiryEmailError('Reply notification is missing its inquiry', false);
+  const reply = job.inquiry;
+  const reviewUrl = new URL('admin/', appUrl);
+  reviewUrl.searchParams.set('tab', 'inquiries');
+  reviewUrl.searchParams.set('inquiry', job.inquiry_id);
+  const seconds = Number(reply.response_seconds);
+  const elapsed = Number.isFinite(seconds) && seconds >= 0
+    ? `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m` : 'Not provided';
+  const fields: [string, unknown][] = [
+    ['Inquiry ID', job.inquiry_id], ['Submitted', reply.created_at],
+    ['Instructor', reply.instructor_name], ['First reply', reply.reply_at],
+    ['Time to first reply', elapsed], ['Organizer', reply.contact_name], ['Organizer email', reply.contact_email],
+    ['Event type', reply.event_type], ['Event date', reply.event_date], ['Location', reply.location],
+    ['Reply', reply.reply_body],
+  ];
+  return {
+    to: ['cjwheelock1@gmail.com'], reply_to: supportEmail,
+    subject: `Instructor replied · ${String(reply.instructor_name || job.inquiry_id).replace(/[\r\n]/g, ' ')}`,
+    text: [...fields.map(([label, value]) => `${label}: ${display(value)}`), '', `View inquiry: ${reviewUrl}`].join('\n'),
+    html: `<!doctype html><html lang="en"><body style="font-family:Arial,sans-serif;line-height:1.5"><h1>First instructor reply</h1><table>${fields.map(([label, value]) => `<tr><th align="left" valign="top" style="padding:6px 16px 6px 0">${escapeHtml(label)}</th><td style="padding:6px 0;white-space:pre-wrap">${escapeHtml(display(value))}</td></tr>`).join('')}</table><p><a href="${escapeHtml(reviewUrl.toString())}">View inquiry</a></p></body></html>`,
+  };
+}
+
 export function adminInquiryEmail(job: AdminInquiryNotificationJob, appUrl: URL, supportEmail: string) {
+  if (job.inquiry.kind === 'first_instructor_reply') return firstInstructorReplyEmail(job, appUrl, supportEmail);
   if (job.inquiry.kind === 'matching_request') return matchingRequestEmail(job, supportEmail);
   const inquiry = job.inquiry;
   if (!job.inquiry_id) throw new AdminInquiryEmailError('Inquiry notification is missing its inquiry', false);
