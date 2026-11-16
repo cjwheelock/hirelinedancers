@@ -51,7 +51,17 @@ if (!base || !apikey) {
   });
 }
 
-const version = createHash("sha256").update(JSON.stringify(profiles)).digest("hex");
+// Email-only landing pages for instructors featured in planner outreach.
+let landing = [];
+if (base && apikey) {
+  const response = await fetch(new URL("/rest/v1/rpc/outreach_landing_pages", base), {
+    method: "POST", headers: { apikey, "Content-Type": "application/json" }, body: "{}", signal: AbortSignal.timeout(30000)
+  });
+  if (!response.ok) throw new Error(`Reading outreach landing pages failed (${response.status}).`);
+  const ids = new Set(profiles.map(({ profile }) => profile.id));
+  landing = (await response.json()).filter(row => ids.has(row.instructor_profile_id) && /^[a-z0-9-]+$/.test(row.slug));
+}
+const version = createHash("sha256").update(JSON.stringify(landing.length ? { profiles, landing } : profiles)).digest("hex");
 if (check) {
   const live = await fetch("https://hirelinedancers.com/profiles-version.json", { cache: "no-store", signal: AbortSignal.timeout(30000) });
   if (!live.ok && live.status !== 404) throw new Error(`Reading the deployed profile version failed (${live.status}).`);
@@ -63,5 +73,6 @@ if (check) {
   await writeFile("tmp/published-profiles.json", JSON.stringify(profiles) + "\n");
   await writeFile("public/profile-routes.json", JSON.stringify(profiles.map(({ profile }) => profile.slug || profile.id)) + "\n");
   await writeFile("public/profiles-version.json", JSON.stringify({ version }) + "\n");
+  await writeFile("tmp/landing-pages.json", JSON.stringify(landing) + "\n");
   console.log(`Included ${profiles.length} published profile(s).`);
 }
