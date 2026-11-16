@@ -1680,7 +1680,7 @@ function AdminInstructors({ profiles, media, setups, mediaUrl, onReview }: {
                   return (
                     <tr key={profile.id} className={selected?.id === profile.id ? styles.selectedTableRow : ""}>
                       <td>
-                        <button className={styles.tableSelectButton} type="button" aria-current={selected?.id === profile.id ? "true" : undefined} onClick={() => setSelectedId(profile.id)}>{profile.display_name}</button>
+                        <button className={styles.tableSelectButton} type="button" aria-current={selected?.id === profile.id ? "true" : undefined} onClick={() => { setSelectedId(profile.id); window.requestAnimationFrame(() => document.getElementById("instructor-detail")?.scrollIntoView({ behavior: "smooth", block: "start" })); }}>{profile.display_name}</button>
                         {profile.business_name ? <small>{profile.business_name}</small> : null}
                       </td>
                       <td>{[profile.city, profile.region].filter(Boolean).join(", ") || "Not set"}</td>
@@ -1696,7 +1696,7 @@ function AdminInstructors({ profiles, media, setups, mediaUrl, onReview }: {
       </section>
 
       {selected && selectedStatus ? (
-        <div className={styles.membershipDetail}>
+        <div className={styles.membershipDetail} id="instructor-detail">
           <div className={`${styles.card} ${styles.compactAdminCard}`}>
             <div className={styles.membershipHeader}>
               <div className={styles.buttonRow}>
@@ -1717,7 +1717,7 @@ function AdminInstructors({ profiles, media, setups, mediaUrl, onReview }: {
               </div>
             </div>
 
-            <h3>Rates and packages</h3>
+            <h3 style={{ marginTop: 24 }}>Rates and packages</h3>
             {(selected.packages ?? []).length ? (
               <div className={styles.membershipFacts}>
                 {(selected.packages ?? []).map((item, index) => (
@@ -1733,7 +1733,7 @@ function AdminInstructors({ profiles, media, setups, mediaUrl, onReview }: {
               <div><dt>Minimum hours</dt><dd>{setup?.minimum_hours ?? "Not entered"}</dd></div>
             </dl>
 
-            <h3>Profile</h3>
+            <h3 style={{ marginTop: 24 }}>Profile</h3>
             <dl className={styles.membershipFacts}>
               <div><dt>Headline</dt><dd>{selected.headline || "Not provided"}</dd></div>
               <div><dt>Years teaching</dt><dd>{selected.years_teaching ?? "Not provided"}</dd></div>
@@ -1744,10 +1744,10 @@ function AdminInstructors({ profiles, media, setups, mediaUrl, onReview }: {
               <div><dt>Styles</dt><dd>{selected.styles.length ? selected.styles.join(", ") : "None selected"}</dd></div>
               <div><dt>Inquiry email</dt><dd>{setup?.inquiry_email || "Not set"}</dd></div>
             </dl>
-            {selected.bio ? <><h3>Bio</h3><p style={{ whiteSpace: "pre-line" }}>{selected.bio}</p></> : null}
+            {selected.bio ? <><h3 style={{ marginTop: 24 }}>Bio</h3><p style={{ whiteSpace: "pre-line" }}>{selected.bio}</p></> : null}
             {(selected.highlights ?? []).length ? (
               <>
-                <h3>Highlights</h3>
+                <h3 style={{ marginTop: 24 }}>Highlights</h3>
                 <ul>{(selected.highlights ?? []).map((item, index) => <li key={`${item.title}-${index}`}><strong>{item.title}</strong>{item.detail ? `: ${item.detail}` : ""}</li>)}</ul>
               </>
             ) : null}
