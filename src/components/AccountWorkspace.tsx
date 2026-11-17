@@ -35,6 +35,7 @@ import { MembershipCreditAdmin } from "./MembershipCreditAdmin";
 import { PayoutsCard } from "./PayoutsCard";
 import { AdminAttentionRows, AdminBookings, AdminRecentBookings, collectedCents, useAdminBookings } from "./AdminBookings";
 import { AdminOutreach } from "./AdminOutreach";
+import { AdminAnalytics } from "./AdminAnalytics";
 import { AdminInquiries } from "./AdminInquiries";
 import {
   accountEntryRedirect,
@@ -2224,7 +2225,7 @@ function MembershipGuaranteeAdmin({ isOwner }: { isOwner: boolean }) {
 }
 
 function AdminDashboard({ isOwner }: { isOwner: boolean }) {
-  const [tab, setTab] = useState<"overview" | "inquiries" | "messages" | "bookings" | "outreach" | "profiles" | "instructors" | "memberships" | "invitations" | "delivery" | "access">("overview");
+  const [tab, setTab] = useState<"overview" | "inquiries" | "messages" | "bookings" | "analytics" | "outreach" | "profiles" | "instructors" | "memberships" | "invitations" | "delivery" | "access">("overview");
   const [focusedProfileId, setFocusedProfileId] = useState<string | null>(null);
   const [focusedInquiryId, setFocusedInquiryId] = useState<string | null>(null);
   const [focusedThreadId, setFocusedThreadId] = useState<string | null>(null);
@@ -2373,7 +2374,7 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const requestedTab = params.get("tab");
-    if (["overview", "inquiries", "messages", "bookings", "outreach", "profiles", "instructors", "memberships", "delivery", "access"].includes(requestedTab ?? "")) {
+    if (["overview", "inquiries", "messages", "bookings", "analytics", "outreach", "profiles", "instructors", "memberships", "delivery", "access"].includes(requestedTab ?? "")) {
       setTab(requestedTab as typeof tab);
     }
     setFocusedProfileId(params.get("profile"));
@@ -2630,7 +2631,7 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
   const adminMenu: Array<{ label: string; items: Array<typeof tab> }> = [
     { label: "Operations", items: ["overview", "inquiries", "messages", "bookings"] },
     { label: "Instructors", items: ["instructors", "profiles"] },
-    { label: "Growth", items: ["outreach"] },
+    { label: "Growth", items: ["analytics", "outreach"] },
     { label: "System", items: isOwner ? ["delivery", "access", "memberships"] : ["delivery", "memberships"] }
   ];
 
@@ -2687,6 +2688,7 @@ function AdminDashboard({ isOwner }: { isOwner: boolean }) {
 
       {!loading && tab === "bookings" ? <AdminBookings /> : null}
       {!loading && tab === "outreach" ? <AdminOutreach /> : null}
+      {!loading && tab === "analytics" ? <AdminAnalytics /> : null}
 
       {!loading && tab === "inquiries" ? <AdminInquiries focusInquiryId={focusedInquiryId} onOpenThread={openAdminThread} /> : null}
 
