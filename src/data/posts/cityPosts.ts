@@ -2,6 +2,49 @@ import type { BlogPost } from "../blog";
 
 export const cityPosts: BlogPost[] = [
   {
+    slug: "where-to-line-dance-dallas",
+    title: "Where to Go Line Dancing in Dallas, Carrollton and Plano",
+    description: "A Dallas-area shortlist with a country dance hall and two soul line-dance class locations, verified addresses, schedules and practical booking notes.",
+    publishDate: "2026-11-17",
+    updatedDate: "2026-11-17",
+    status: "ready",
+    category: "City guide",
+    citySlug: "dallas-tx",
+    author: "Hire Line Dancers",
+    body: `
+<p>Looking for a line-dance lesson in Dallas? Start by choosing between a country-western dance hall and a dedicated soul line-dance class. The options below include one Dallas venue and two suburban class locations, with the differences made clear before you head out.</p>
+<p>This is a practical shortlist, not a ranking. Carrollton and Plano are separate cities in the Dallas area. The two suburban classes are both run by 410 Line Dancers, not two unrelated dance companies.</p>
+<p><strong>Last checked: November 17, 2026.</strong> Times are local. These are published recurring programs, not confirmed bookings for a specific date. Check the linked calendars or registration pages for holiday cancellations, availability, admission and age requirements.</p>
+<h2>1. The Round-Up Saloon, Dallas</h2>
+<p><strong>Address:</strong> 3912 Cedar Springs Road, Dallas, TX 75219.</p>
+<p>For a country-western setting with both partner dancing and line instruction, the Round-Up is a useful starting point. Dallas Does Dance advertises free Tuesday beginner lessons at 8 p.m. and 9 p.m., with one partner dance and one line dance. Its Saturday program runs from 1 to 3 p.m., also combining partner and line lessons, with the level adjusted to the people attending. A partner is not required.</p>
+<p>The venue also lists Wednesday and Thursday line-dance nights. However, its detailed lesson table still shows September, and its times differ from the teaching organization's recurring schedule. Use Dallas Does Dance's calendar for its Tuesday and Saturday sessions, and confirm the venue's current Wednesday or Thursday timetable rather than relying on that older table. Monday's advertised two-step, Barcoast and freestyle program is not the same as a dedicated line-dance lesson.</p>
+<p><strong>Best fit:</strong> people who want a dance-hall setting or a Saturday afternoon option.</p>
+<p><a href="https://dallasdoesdance.org/pages/lessons">Dallas Does Dance lessons and calendar</a> · <a href="https://roundupsaloon.com/lessons/">Round-Up lesson information</a></p>
+<h2>2. 410 Line Dancers at Harmony School of Innovation, Carrollton</h2>
+<p><strong>Address:</strong> 1024 West Rosemeade Parkway, Carrollton, TX 75007.</p>
+<p>410 Line Dancers lists its Thursday soul line-dance class here from 7 to 9 p.m. The program welcomes beginners and does not require a partner. This is a scheduled class held at a school location, not a country bar or an invitation to visit the school outside class hours.</p>
+<p>The organizer's class page links to registration and class packages. Check the booking page for the date you want and its current price before traveling.</p>
+<p><strong>Best fit:</strong> a structured Thursday class for someone based north of Dallas.</p>
+<p><a href="https://www.410linedancers.com/classes">Official locations, class times and registration</a></p>
+<h2>3. 410 Line Dancers at HQ Dance Studio, Plano</h2>
+<p><strong>Address:</strong> 2973 West 15th Street, Suite 2973, Plano, TX 75075.</p>
+<p>The same organizer offers a Sunday soul line-dance class at HQ Dance Studio from 6 to 8 p.m. It is another location for the 410 program, with its own registration link, rather than an additional Dallas city venue.</p>
+<p><strong>Best fit:</strong> dancers who prefer Sunday evening or a Plano location. Choose between the Thursday and Sunday sessions based on your schedule and travel time, then check availability before setting out.</p>
+<p><a href="https://www.410linedancers.com/classes">Official Sunday class and registration</a> · <a href="https://www.410linedancers.com/">About the program</a></p>
+<h2>Choose the lesson, not just the dance floor</h2>
+<ul>
+<li>Country partner dancing, soul line dancing and open social dancing are different experiences. Read the actual class description.</li>
+<li>Check the current calendar, especially around Thanksgiving and other holidays.</li>
+<li>Arrive before instruction starts and wear comfortable shoes suitable for the venue's floor.</li>
+<li>For a bar visit, confirm the age and admission policy. Free instruction does not establish every other entry condition.</li>
+</ul>
+<h2>Bring line dancing to your own event</h2>
+<p>Planning a wedding, company event or private gathering? <a href="/cities/dallas-tx/">Explore Dallas-area instructors</a> and include your venue, group size and experience level in the inquiry.</p>
+`,
+  },
+
+  {
     slug: "where-to-line-dance-fort-worth",
     title: "Where to Go Line Dancing in Fort Worth",
     description: "Three Fort Worth venues with line-dance instruction, including official schedules, admission details and the difference between line lessons and partner dancing.",
