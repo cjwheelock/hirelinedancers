@@ -51,7 +51,7 @@
   letter-spacing: -0.01em;
 }
 .heroCopy h1 { text-wrap: pretty; }
-.heroCopy h1 em { color: var(--clay); }
+.heroCopy h1 em { color: var(--clay); font-style: normal; }
 .lede {
   font-size: clamp(18px, 1.6vw, 20px);
   line-height: 1.55;
