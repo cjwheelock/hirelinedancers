@@ -1,4 +1,4 @@
-name: Check for released instructor spotlights
+name: Check published instructor profiles
 on:
   schedule:
     - cron: '*/5 * * * *'
@@ -20,12 +20,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Compare released articles with the live blog
-        id: articles
-        run: node scripts/sync-spotlights.mjs --check
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: https://wzmyroeowbsxxibkeejf.supabase.co
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_36gNqu74ysQhY2_VvJlS4A_XTYUFyxe
       - name: Compare published profiles with the live directory
         id: profiles
         continue-on-error: true
@@ -34,9 +28,7 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: https://wzmyroeowbsxxibkeejf.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_36gNqu74ysQhY2_VvJlS4A_XTYUFyxe
       - name: Rebuild published content
-        if: steps.articles.outputs.changed == 'true' || steps.profiles.outputs.changed == 'true'
-        run: node scripts/spotlight-watchdog.mjs --force
+        if: steps.profiles.outputs.changed == 'true'
+        run: gh workflow run deploy.yml --ref main
         env:
           GH_TOKEN: ${{ github.token }}
-          NEXT_PUBLIC_SUPABASE_URL: https://wzmyroeowbsxxibkeejf.supabase.co
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_36gNqu74ysQhY2_VvJlS4A_XTYUFyxe

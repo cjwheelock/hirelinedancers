@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { articleProblems, publicationProblems, releasedSpotlights, spotlightVersion, visibleText } from "./spotlight-publication.mjs";
-import { dispatchDecision, watchdog } from "./spotlight-watchdog.mjs";
+import { SpotlightEvents, verifyArticleOnce } from "./spotlight-events.mjs";
 
 const now = Date.parse("2026-11-17T16:00:00Z");
 const row = { profile_id: "001", slug: "spotlight-example", revision: "revision-1", status: "released",
@@ -54,25 +54,77 @@ test("matching manifest cannot hide missing listing, 404, or wrong content", asy
   assert.ok((await check(listing, () => response(html), "old")).some(s => s.includes("stale")));
 });
 
-test("dispatch guards active work, cooldown, stalled jobs, and retry storms", () => {
-  const run = { status: "completed", createdAt: new Date(now - 15 * 60000).toISOString(), databaseId: 123 };
-  assert.equal(dispatchDecision([], now), "dispatch");
-  assert.equal(dispatchDecision([run], now), "dispatch");
-  assert.equal(dispatchDecision([{ ...run, status: "queued" }], now), "deployment-active");
-  assert.equal(dispatchDecision([{ ...run, createdAt: new Date(now - 60000).toISOString() }], now), "deployment-cooldown");
-  assert.throws(() => dispatchDecision([{ ...run, status: "in_progress", createdAt: new Date(now - 31 * 60000).toISOString() }], now), /30 minutes/);
-  assert.throws(() => dispatchDecision([run, run, run], now), /Three deployments/);
+const event = { id: 'event-1', profile_id: row.profile_id, revision: row.revision, action: 'release', due_at: new Date(now).toISOString(), occurred_at: new Date(now + 60000).toISOString() };
+function fixture(options = {}) {
+  let clock = now + 60000;
+  const state = { jobs: {} }, calls = { dispatch: 0, verify: 0, alerts: 0 };
+  const publisher = new SpotlightEvents({ state, now: () => clock, save: async () => {}, readArticle: async () => row,
+    dispatch: async () => { calls.dispatch++; }, findDispatch: async () => false,
+    verify: async () => { calls.verify++; return []; }, notify: async () => { calls.alerts++; }, ...options });
+  return { publisher, state, calls, time: value => { clock = value; } };
+}
+
+test('release dispatches immediately, and verifies once at scheduled time plus five minutes', async () => {
+  const f = fixture();
+  await f.publisher.accept(event);
+  await f.publisher.accept(event);
+  assert.equal(f.calls.dispatch, 1);
+  assert.equal(f.calls.verify, 0);
+  assert.equal(f.state.jobs[event.id].verification.at, new Date(now + 5 * 60000).toISOString());
+  f.time(now + 5 * 60000 - 1); await f.publisher.verifyDue(event.id);
+  assert.equal(f.calls.verify, 0);
+  f.time(now + 5 * 60000); await f.publisher.verifyDue(event.id);
+  await f.publisher.verifyDue(event.id); await f.publisher.accept(event);
+  assert.equal(f.calls.verify, 1);
+  assert.equal(f.calls.dispatch, 1);
+  assert.equal(f.state.jobs[event.id].verification.status, 'passed');
 });
 
-test("watchdog dispatches missing publication, records first detection, and clears on recovery", async () => {
-  const calls = [];
-  const options = { now, readRows: async () => [row], gh: args => { calls.push(args); return "[]"; }, verify: async () => ["missing article"] };
-  const pending = await watchdog(options);
-  assert.equal(pending.action, "dispatch");
-  assert.equal(calls[1][0], "workflow");
-  const again = await watchdog({ ...options, previous: pending, now: now + 1000 });
-  assert.equal(again.firstDetectedAt, pending.firstDetectedAt);
-  const recovered = await watchdog({ ...options, previous: pending, verify: async () => [] });
-  assert.equal(recovered.action, "verified");
-  assert.equal(recovered.firstDetectedAt, null);
+test('failed public check alerts once and never retries or dispatches another build', async () => {
+  let checks = 0;
+  const f = fixture({ verify: async () => { checks++; return ['article HTTP 404']; } });
+  await f.publisher.accept(event); f.time(now + 300000);
+  await f.publisher.verifyDue(event.id); await f.publisher.verifyDue(event.id);
+  assert.equal(checks, 1); assert.equal(f.calls.alerts, 1); assert.equal(f.calls.dispatch, 1);
+  assert.equal(f.state.jobs[event.id].verification.status, 'failed');
+});
+
+test('restart preserves completed checks and marks interrupted checks uncertain without repeating', async () => {
+  const f = fixture(); await f.publisher.accept(event);
+  f.state.jobs[event.id].verification.status = 'started';
+  await f.publisher.recover(); f.time(now + 300000); await f.publisher.verifyDue(event.id);
+  assert.equal(f.state.jobs[event.id].verification.status, 'uncertain'); assert.equal(f.calls.verify, 0); assert.equal(f.calls.alerts, 1);
+});
+
+test('lost dispatch response is reconciled against its event id without duplicate deployment', async () => {
+  let requests = 0;
+  const f = fixture({ dispatch: async () => { requests++; throw new Error('response lost'); }, findDispatch: async () => true });
+  await f.publisher.accept(event); f.time(now + 120000); await f.publisher.publish(event.id);
+  assert.equal(requests, 1); assert.equal(f.state.jobs[event.id].dispatch.status, 'accepted');
+});
+
+test('delivery failure retries are bounded and do not check public pages', async () => {
+  const f = fixture({ dispatch: async () => { throw new Error('unavailable'); } });
+  await f.publisher.accept(event);
+  f.time(now + 120000); await f.publisher.publish(event.id);
+  f.time(now + 180000); await f.publisher.publish(event.id);
+  f.time(now + 240000); await f.publisher.publish(event.id);
+  assert.equal(f.state.jobs[event.id].dispatch.attempts, 3);
+  assert.equal(f.state.jobs[event.id].dispatch.status, 'failed'); assert.equal(f.calls.verify, 0);
+});
+
+test('superseded releases are skipped, and withdrawals deploy without scheduling a public check', async () => {
+  const f = fixture({ readArticle: async () => null }); await f.publisher.accept(event);
+  assert.equal(f.state.jobs[event.id].verification.status, 'superseded'); assert.equal(f.calls.dispatch, 0);
+  await f.publisher.accept({ ...event, id: 'withdrawal', action: 'withdraw', due_at: null });
+  assert.equal(f.calls.dispatch, 1); assert.equal(f.state.jobs.withdrawal.verification.status, 'not-required');
+});
+
+test('one targeted verification reads only the listing and the due article', async () => {
+  const urls = [];
+  const problems = await verifyArticleOnce(row, { fetchImpl: async url => {
+    urls.push(new URL(url).pathname);
+    return response(urls.length === 1 ? '<a href="/blog/spotlight-example/">Article</a>' : html);
+  } });
+  assert.deepEqual(problems, []); assert.deepEqual(urls, ['/blog/', '/blog/spotlight-example/']);
 });

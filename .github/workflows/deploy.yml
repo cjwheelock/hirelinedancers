@@ -1,9 +1,15 @@
 name: Deploy to GitHub Pages
+run-name: Deploy to GitHub Pages ${{ inputs.spotlight_event_id }}
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      spotlight_event_id:
+        description: Publication event receipt, when triggered by a spotlight release
+        type: string
+        required: false
 
 permissions:
   contents: read
@@ -49,7 +55,7 @@ jobs:
       - name: Test published profile export
         run: npm run test:profile-sync
       - name: Test spotlight publication and recovery
-        run: node --test scripts/test-spotlight-publication.mjs
+        run: node --test scripts/test-spotlight-publication.mjs && node scripts/test-spotlight-events-sql.mjs
       - name: Build static export
         run: npm run build
         env:
@@ -61,11 +67,6 @@ jobs:
         run: npm run audit:static
       - name: Verify searchable instructor profiles
         run: npm run test:profile-search
-      - uses: actions/upload-artifact@v4
-        with:
-          name: released-spotlights
-          path: tmp/released-spotlights.json
-          retention-days: 7
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
@@ -82,17 +83,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - uses: actions/download-artifact@v4
-        with:
-          name: released-spotlights
-          path: tmp
       - name: Capture the current sitemap for IndexNow
         continue-on-error: true
         run: node scripts/submit-indexnow.mjs --capture
       - id: deployment
         uses: actions/deploy-pages@v4
-      - name: Verify spotlight pages and blog listing in production
-        run: node scripts/verify-spotlight-publication.mjs --retry
       - name: Notify IndexNow about newly published pages
         continue-on-error: true
         run: node scripts/submit-indexnow.mjs

@@ -1,0 +1,34 @@
+import { PGlite } from '@electric-sql/pglite';
+import { readFile } from 'node:fs/promises';
+import assert from 'node:assert/strict';
+const db = new PGlite();
+await db.exec(`
+create schema private;
+create role anon; create role authenticated;
+create table public.instructor_spotlights(profile_id uuid primary key,revision uuid not null,status text,released_at timestamptz,content jsonb);
+create table private.instructor_spotlight_publications(profile_id uuid primary key,scheduled_at timestamptz,released_at timestamptz);
+`);
+const migration = await readFile('supabase/migrations/20261117164921_spotlight_publication_events.sql','utf8');
+// PGlite has no replication worker; production publication membership is checked separately.
+await db.exec(migration.replace('alter publication supabase_realtime add table public.spotlight_publication_events;', ''));
+const id = '00000000-0000-0000-0000-000000000001';
+const future = '00000000-0000-0000-0000-000000000002';
+await db.exec(`insert into instructor_spotlights values('${id}',gen_random_uuid(),'draft',null,'{}'),('${future}',gen_random_uuid(),'draft',null,'{}');
+insert into private.instructor_spotlight_publications values('${id}',now()-interval '1 minute',null),('${future}',now()+interval '1 day',null);`);
+assert.equal((await db.query('select count(*)::int n from spotlight_publication_events')).rows[0].n,0,'draft/future rows do not emit events');
+await db.exec(`update instructor_spotlights set status='released',released_at=now(),revision=gen_random_uuid() where profile_id='${id}';`);
+let events=(await db.query('select * from spotlight_publication_events')).rows;
+assert.equal(events.length,1);assert.equal(events[0].action,'release');
+assert.equal(Date.parse(events[0].due_at),Date.parse((await db.query('select scheduled_at from private.instructor_spotlight_publications where profile_id=$1',[id])).rows[0].scheduled_at));
+await db.exec(`update instructor_spotlights set content=content where profile_id='${id}'; update instructor_spotlights set status='declined' where profile_id='${future}';`);
+assert.equal((await db.query('select count(*)::int n from spotlight_publication_events')).rows[0].n,1,'no-op and declined drafts do not emit');
+await db.exec(`update instructor_spotlights set status='draft',released_at=null,revision=gen_random_uuid() where profile_id='${id}';`);
+assert.equal((await db.query("select count(*)::int n from spotlight_publication_events where action='withdraw'")).rows[0].n,1);
+await db.exec('set role anon');
+assert.equal((await db.query('select count(*)::int n from spotlight_publication_events')).rows[0].n,2,'public metadata can be read');
+await assert.rejects(db.exec('delete from spotlight_publication_events'), /permission denied/);
+await assert.rejects(db.exec(`insert into spotlight_publication_events(profile_id,revision,action) values('${id}',gen_random_uuid(),'withdraw')`), /permission denied/);
+await db.exec('reset role');
+assert.equal((await db.query("select status from instructor_spotlights where profile_id=$1",[future])).rows[0].status,'declined');
+await db.close();
+console.log('SQL publication-event tests passed: timing, no early events, no-op dedupe, withdrawal, public reads, denied public writes.');
