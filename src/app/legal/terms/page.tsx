@@ -1,19 +1,12 @@
 import { site } from "@/data/site";
 import {
   achBusinessDaysLabel,
-  billingCycles,
   clientFeePercent,
   instructorFeePercent,
   payoutDelayLabel,
   problemReportWindowLabel,
   quoteExpiryLabel,
-  standardCancellationSummary,
-  billingRecoveryLabel,
-  foundingOfferLabel,
-  freePeriod,
-  guaranteeClaimWindow,
-  guaranteeCoverage,
-  monthlyPriceWithCurrency
+  standardCancellationSummary
 } from "@/lib/commercialTerms";
 
 export const metadata = { title: "Terms of Service" };
@@ -22,7 +15,7 @@ export default function TermsPage() {
   return (
     <section className="page-shell article-page">
       <h1>Terms of Service</h1>
-      <p>Last updated: October 27, 2026.</p>
+      <p>Last updated: November 16, 2026.</p>
       <p>These Terms are between you and {site.legalName}, which operates the Hire Line Dancers service.</p>
       <h2>Marketplace role</h2>
       <p>Hire Line Dancers is a marketplace that helps event organizers find line dance instructors, message each other, agree on a booking, and pay for it. Hire Line Dancers provides the platform, the conversation, the standard booking agreement, and the payment flow. Hire Line Dancers does not provide line dance instruction or any other event services.</p>
@@ -57,14 +50,6 @@ export default function TermsPage() {
       <p>Instructors should respond to new inquiries within 48 hours of submission, including when unavailable. Hire Line Dancers sends reminders after 24 and 47 hours if no reply has been recorded. A reply through the platform or an unavailable response satisfies the response requirement. Opening a notification does not count as a reply. Existing inquiries retain the response deadlines originally communicated.</p>
       <p>Hire Line Dancers personnel may access marketplace conversations to operate and support the service. For inquiries submitted with automatic sharing, Hire Line Dancers invites other matching instructors when the selected instructor has not replied within 48 hours or marks themselves unavailable. Invited instructors receive the full event details and organizer contact information, but no previous private conversation. The organizer compares responses and chooses who to book. The original instructor may still reply while the event remains open. Marking an inquiry unavailable does not prevent further messages. New availability responses pause after the organizer signs a quote, while payment is pending. The quote’s existing expiry applies; a bank payment already processing is allowed to clear. The opportunity closes when payment succeeds, and interested instructors are notified. Earlier inquiries retain their original sharing policy. Each instructor receives a separate private conversation. Hire Line Dancers does not guarantee that a replacement instructor will be available or that an inquiry will result in a booking.</p>
       <p>Optional text alerts require phone verification and consent. Message frequency varies, and message and data rates may apply. Reply STOP to opt out or HELP for help. Reply to event inquiries through Hire Line Dancers.</p>
-      <h2>Legacy instructor membership</h2>
-      <p>Hire Line Dancers no longer requires a monthly instructor membership. The terms in this section apply only to instructors who started a paid membership before October 26, 2026 and have not yet canceled it. Under those terms, instructors submit a complete profile and save a valid payment method through Stripe before administrative review. Saving a payment method does not start a subscription or authorize a charge before approval. If the profile is approved, the instructor membership starts automatically. Unless canceled, the membership renews at {monthlyPriceWithCurrency} per month after any applicable free period. Billing is processed by Stripe, and any applicable taxes may be added.</p>
-      <p>The {foundingOfferLabel} who complete payment setup are eligible for the founding instructor offer. If an eligible profile is approved, its first {billingCycles} are free. The membership then renews at {monthlyPriceWithCurrency} per month until canceled. Hire Line Dancers displays the payment terms before redirecting to Stripe and records offer eligibility before activation.</p>
-      <p>If a profile is not approved, no membership begins and Hire Line Dancers does not charge the saved payment method. Hire Line Dancers may ask the instructor to revise and resubmit the profile.</p>
-      <p>If a membership has not completed any positive payment and a charge fails, the profile is not published or is removed immediately, and no grace period applies. After an instructor has completed at least one successful positive membership payment, a later failed recurring payment receives a {billingRecoveryLabel} grace period beginning when the payment first fails. The profile may remain public during that grace period. If the overdue payment is not resolved before the deadline, the profile is removed from the public directory until payment succeeds. Hire Line Dancers may send transactional emails with a secure link for updating the payment method.</p>
-      <p>You may cancel through your account. Cancellation takes effect at the end of the current billing period unless the law requires otherwise.</p>
-      <p>Every membership first activated on or after August 7, 2026 includes a request-based {guaranteeCoverage} booking guarantee. The guarantee begins when Stripe records the first invoice that collects a positive membership payment. For a membership with {freePeriod} free, that invoice comes after the free period. For a membership without a free period, it is the first positive paid invoice after activation. A guarantee request may be submitted only after the {guaranteeCoverage} period ends and within the next {guaranteeClaimWindow}. Requests are reviewed manually, and any approved refund is issued manually before Hire Line Dancers verifies it in its records. The separate <a href="/legal/refund-policy/">refund policy</a> governs eligibility and refund scope. Other payments are nonrefundable except where required by law or expressly stated.</p>
-      <p>An instructor who already qualified for a prior 12-month founding guarantee retains the terms granted at that time. The current offer does not shorten, replace, or cancel an existing legacy guarantee.</p>
       <h2>Profile content</h2>
       <p>Instructor-submitted content may be displayed on profiles, city pages, event pages, and marketing surfaces for the purpose of operating and promoting the directory.</p>
       <p>You represent that you have permission to upload and publish your profile information, photos, videos, music links, and other content. You grant Hire Line Dancers a nonexclusive license to host, display, format, and promote that content in connection with the service. You may request removal of your profile content, subject to reasonable backup and record-retention periods.</p>

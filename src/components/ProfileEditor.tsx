@@ -14,12 +14,6 @@ import {
 } from "lucide-react";
 import { eventTypes, serviceMarkets } from "@/data/site";
 import {
-  foundingOfferLabel,
-  freePeriod,
-  guaranteeCoverage,
-  monthlyPriceWithCurrency
-} from "@/lib/commercialTerms";
-import {
   getMarketplaceClient,
   type InstructorPrivateSettings,
   type InstructorProfile,
@@ -109,8 +103,7 @@ export function ProfileEditor({
   profile,
   settings,
   hasLifetimeAccess,
-  onSaved,
-  describeEdgeError
+  onSaved
 }: {
   profile: InstructorProfile;
   settings: InstructorPrivateSettings | null;
@@ -167,7 +160,6 @@ export function ProfileEditor({
       feedbackRef.current?.focus({ preventScroll: true });
     }
   }, [error, message]);
-  const paymentSetupRequestKey = useRef<string | null>(null);
   const topRef = useRef<HTMLDivElement>(null);
 
   const canEdit = ["draft", "approved", "published"].includes(profile.status);
@@ -385,23 +377,9 @@ export function ProfileEditor({
         return true;
       }
 
-      paymentSetupRequestKey.current ??= crypto.randomUUID();
-      const { data, error: setupError } = await client.functions.invoke("create-instructor-payment-setup", {
-        body: { instructorProfileId: profile.id },
-        headers: { "Idempotency-Key": paymentSetupRequestKey.current }
-      });
-      if (setupError) {
-        setBusy(null);
-        setError(await describeEdgeError(setupError));
-        return false;
-      }
-      if (!data?.url || typeof data.url !== "string") {
-        setBusy(null);
-        setError("Stripe payment setup did not return a secure link.");
-        return false;
-      }
-      window.location.assign(data.url);
-      return true;
+      setBusy(null);
+      setError("Joining is free. Your no-fee instructor access is still being set up. Refresh the page in a moment, or email hello@hirelinedancers.com if this continues.");
+      return false;
     } catch {
       setError("Could not confirm that your changes were saved. Check your connection and try again.");
       return false;
@@ -806,14 +784,7 @@ export function ProfileEditor({
             </div>
           ) : null}
           {canContinue && hasLifetimeAccess === false ? (
-            settings?.payment_setup_completed_at ? (
-              <p className={styles.help}>Your payment method is already saved securely. Choose Submit to resubmit your updated profile without entering your card again.</p>
-            ) : (
-              <>
-                <p className={styles.help}>Stripe will save your card securely. No subscription will start and your card will not be charged before your profile is approved. The {foundingOfferLabel} who complete payment setup receive {freePeriod} free, then the membership renews at {monthlyPriceWithCurrency} per month until canceled. The {guaranteeCoverage} money-back guarantee begins when Stripe collects your first membership payment.</p>
-                <p className={styles.muted}>By continuing, you agree to the <a href="/legal/terms/">Terms of Service</a>, acknowledge the <a href="/legal/privacy/">Privacy Policy</a> and <a href="/legal/refund-policy/">Refund Policy</a>, and authorize Hire Line Dancers to start your membership automatically only if your profile is approved.</p>
-              </>
-            )
+            <p className={styles.help}>Joining is free. Your no-fee instructor access is still being set up. Refresh the page in a moment, or email <a href="mailto:hello@hirelinedancers.com">hello@hirelinedancers.com</a> if this continues.</p>
           ) : null}
           {canContinue && hasLifetimeAccess ? <p className={styles.help}>Joining is free. Submit your profile and we&rsquo;ll review it, usually within a day. By submitting, you agree to the <a href="/legal/terms/">Terms of Service</a>. You&rsquo;ll set up payouts before sending your first quote.</p> : null}
         </section>
@@ -836,7 +807,7 @@ export function ProfileEditor({
           </button>
         ) : canContinue ? (
           <button type="button" className={styles.button} disabled={busy !== null || mediaBusy || hasLifetimeAccess === null} onClick={() => void save(true)}>
-            {busy === "continue" ? "Submitting..." : hasLifetimeAccess === false && !settings?.payment_setup_completed_at ? "Continue to payment setup" : "Submit for review"}
+            {busy === "continue" ? "Submitting..." : "Submit for review"}
           </button>
         ) : canEdit ? (
           <button type="button" className={styles.button} disabled={busy !== null || mediaBusy} onClick={() => void save(false)}>

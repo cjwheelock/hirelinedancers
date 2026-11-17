@@ -16,13 +16,9 @@ import {
 } from "@/lib/adminApproval";
 import {
   billingCycles,
-  capitalizePolicyText,
   commercialTerms,
   currentGuaranteeTermsVersion,
-  foundingOfferLabel,
-  freePeriod,
   guaranteeCoverage,
-  monthlyPriceWithCurrency,
   profileSubmissionWindow
 } from "@/lib/commercialTerms";
 import { useMarketplaceSession } from "@/hooks/useMarketplaceSession";
@@ -316,7 +312,7 @@ export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean })
           <h1 className={styles.title}>This invitation window has ended</h1>
           <p className={styles.error}>The private account and profile submission window expired before an instructor account was created.</p>
           <div className={styles.buttonRow}>
-            <Link className={styles.button} href="/instructors/join/">View instructor membership options</Link>
+            <Link className={styles.button} href="/instructors/join/">Learn about joining as an instructor</Link>
             <button className={styles.secondaryButton} type="button" disabled={signingOut} onClick={() => void restartInvitationSignIn()}>
               {signingOut ? "Signing out..." : "Try another account"}
             </button>
@@ -344,12 +340,10 @@ export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean })
           <p className={styles.eyebrow}>Instructor invitation</p>
           <h1 className={styles.title}>Create your instructor account</h1>
           <p className={styles.subtitle}>
-            Use the email address that received this invitation. Create the account and submit a complete profile{invitationLifecycle.grantsLifetimeAccess ? "" : " with payment setup"}{deadline ? ` by ${deadline}` : ` within the ${profileSubmissionWindow} window`}.
+            Use the email address that received this invitation. Create the account and submit a complete profile{deadline ? ` by ${deadline}` : ` within the ${profileSubmissionWindow} window`}.
           </p>
           {invitationLifecycle.grantsLifetimeAccess ? (
             <p className={styles.notice}>This invitation includes complimentary lifetime instructor access.</p>
-          ) : invitationLifecycle.offerCode === commercialTerms.offer.outreachOfferCode ? (
-            <p className={styles.notice}>Complete payment setup and submit your profile on time to earn your first {billingCycles} free. If approved, your membership will start automatically with the offer applied. Every new paid membership also includes the request-based {guaranteeCoverage} booking guarantee.</p>
           ) : null}
           <OnboardingForm
             email={session.user.email ?? ""}
@@ -586,18 +580,18 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
   const [focusThreadId, setFocusThreadId] = useState<string | null>(null);
   const [profile, setProfile] = useState<InstructorProfile | null>(null);
   const [settings, setSettings] = useState<InstructorPrivateSettings | null>(null);
-  const [billingRecovery, setBillingRecovery] = useState<InstructorBillingRecovery | null>(null);
+  const [, setBillingRecovery] = useState<InstructorBillingRecovery | null>(null);
   const [hasLifetimeAccess, setHasLifetimeAccess] = useState<boolean | null>(null);
-  const [invitationOffer, setInvitationOffer] = useState<InstructorInvitationOfferStatus | null>(null);
+  const [, setInvitationOffer] = useState<InstructorInvitationOfferStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [checkoutPending, setCheckoutPending] = useState(false);
-  const [checkoutRecoveryError, setCheckoutRecoveryError] = useState<string | null>(null);
-  const [checkoutRetryVersion, setCheckoutRetryVersion] = useState(0);
+  const [, setCheckoutRecoveryError] = useState<string | null>(null);
+  const [checkoutRetryVersion] = useState(0);
   const [paymentSetupPending, setPaymentSetupPending] = useState(false);
   const [paymentSetupRecoveryError, setPaymentSetupRecoveryError] = useState<string | null>(null);
   const [paymentSetupRetryVersion, setPaymentSetupRetryVersion] = useState(0);
   const [profileNotice, setProfileNotice] = useState<{ tone: "notice" | "success"; message: string } | null>(null);
-  const [membershipNotice, setMembershipNotice] = useState<{ tone: "notice" | "success"; message: string } | null>(null);
+  const [, setMembershipNotice] = useState<{ tone: "notice" | "success"; message: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function load(silent = false) {
@@ -841,20 +835,7 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
             : data.profileStatus === "published"
               ? "Payment method saved. Your profile is live."
               : "Payment method saved. Your profile is currently suspended.";
-        const membershipTiming = data.profileStatus === "pending_review"
-          ? "If approved, your membership will start automatically"
-          : data.profileStatus === "approved"
-            ? "Your membership is starting automatically"
-            : data.profileStatus === "published"
-              ? "Your membership is active"
-              : null;
-        const pricingMessage = !membershipTiming
-          ? "This confirmation did not start a new membership. Contact support if you have questions about the suspension."
-          : data.entitlementSource === "founding_first_100"
-          ? `Your ${freePeriod} founding instructor offer is reserved. ${membershipTiming} with ${freePeriod} free. It will then renew at ${monthlyPriceWithCurrency} per month until canceled.`
-          : data.entitlementSource === "private_invitation"
-            ? `Your ${freePeriod} private instructor offer is reserved. ${membershipTiming} with ${freePeriod} free. It will then renew at ${monthlyPriceWithCurrency} per month until canceled.`
-            : `${membershipTiming} at ${monthlyPriceWithCurrency} per month until canceled.`;
+        const pricingMessage = "Your instructor account has no membership fee.";
         setPaymentSetupPending(false);
         setPaymentSetupRecoveryError(null);
         setProfileNotice({
@@ -991,42 +972,6 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
 
   return (
     <>
-      {invitationOffer?.offerCode === commercialTerms.offer.outreachOfferCode ? (
-        <div className={styles.card}>
-          <p className={styles.eyebrow}>Private outreach offer</p>
-          {invitationOffer.offerStatus === "redeemed" ? (
-            <>
-              <h2>{capitalizePolicyText(freePeriod)} free applied</h2>
-              <p className={styles.success}>Your earned private offer was applied when your membership started automatically after approval, so your first {billingCycles} are free.</p>
-              {invitationOffer.offerRedeemedAt ? <p className={styles.help}>Applied {new Date(invitationOffer.offerRedeemedAt).toLocaleString()}.</p> : null}
-            </>
-          ) : invitationOffer.offerStatus === "earned" || invitationOffer.offerEligible ? (
-            <>
-              <h2>{capitalizePolicyText(freePeriod)} free earned</h2>
-              <p className={styles.success}>Your profile and payment setup were completed on time. If approved, your membership will start automatically with the first {billingCycles} free. Later review timing will not affect this earned offer.</p>
-              <p className={styles.help}>Every new paid membership also includes the request-based {guaranteeCoverage} booking guarantee, subject to its terms.</p>
-            </>
-          ) : invitationOffer.status === "claim_expired" ? (
-            <>
-              <h2>Private offer window ended</h2>
-              <p className={styles.notice}>You can still finish and submit your instructor profile, but the private {freePeriod} offer is no longer available.</p>
-            </>
-          ) : invitationOffer.profileSubmittedAt ? (
-            <>
-              <h2>Private offer not available</h2>
-              <p className={styles.notice}>Your profile was submitted, but this account is not eligible for the new-instructor {freePeriod} offer.</p>
-            </>
-          ) : (
-            <>
-              <h2>Complete your profile and payment setup on time</h2>
-              <p className={styles.notice}>
-                Choose Continue to save your payment method and submit a complete profile{invitationOffer.profileSubmissionDeadlineAt ? ` by ${new Date(invitationOffer.profileSubmissionDeadlineAt).toLocaleString()}` : " within your invitation window"} to earn your first {billingCycles} free.
-              </p>
-              <p className={styles.help}>Required details include your public name, bio, location, at least one event type, a valid inquiry email, and a ready headshot.</p>
-            </>
-          )}
-        </div>
-      ) : null}
 
       <div className={styles.tabs} role="tablist" aria-label="Instructor account sections">
         {(hasLifetimeAccess === false
@@ -1079,168 +1024,23 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
       {!loading && profile && tab === "payouts" ? (
         <PayoutsCard profileId={profile.id} settings={settings} onSaved={() => void load(true)} />
       ) : null}
-      {!loading && profile && tab === "membership" && hasLifetimeAccess !== null ? (
-        <MembershipCard
-          profile={profile}
-          settings={settings}
-          checkoutPending={checkoutPending}
-          checkoutRecoveryError={checkoutRecoveryError}
-          membershipNotice={membershipNotice}
-          billingRecovery={billingRecovery}
-          hasLifetimeAccess={hasLifetimeAccess}
-          onRetryCheckout={() => setCheckoutRetryVersion((current) => current + 1)}
-        />
-      ) : null}
-      {!loading && profile && tab === "membership" && hasLifetimeAccess === null ? (
-        <div className={styles.card}>
-          <p className={styles.eyebrow}>Instructor access</p>
-          <h2>Access check unavailable</h2>
-          <p className={styles.notice}>Membership controls are unavailable until we can verify your instructor access. Refresh the page to try again.</p>
-        </div>
-      ) : null}
+      {!loading && profile && tab === "membership" ? <MembershipCard profile={profile} /> : null}
     </>
   );
 }
 
-function MembershipCard({
-  profile,
-  settings,
-  checkoutPending,
-  checkoutRecoveryError,
-  membershipNotice,
-  billingRecovery,
-  hasLifetimeAccess,
-  onRetryCheckout,
-}: {
-  profile: InstructorProfile;
-  settings: InstructorPrivateSettings | null;
-  checkoutPending: boolean;
-  checkoutRecoveryError: string | null;
-  membershipNotice: { tone: "notice" | "success"; message: string } | null;
-  billingRecovery: InstructorBillingRecovery | null;
-  hasLifetimeAccess: boolean;
-  onRetryCheckout: () => void;
-}) {
-  const [busy, setBusy] = useState<"checkout" | "portal" | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const checkoutRequestKey = useRef<string | null>(null);
-
-  async function activateMembership() {
-    const client = getMarketplaceClient();
-    if (!client) return;
-    setBusy("checkout");
-    setError(null);
-    checkoutRequestKey.current ??= crypto.randomUUID();
-    const { data, error: checkoutError } = await client.functions.invoke("create-instructor-checkout", {
-      body: { instructorProfileId: profile.id },
-      headers: { "Idempotency-Key": checkoutRequestKey.current }
-    });
-    setBusy(null);
-    if (checkoutError) {
-      setError(await edgeFunctionError(checkoutError));
-      return;
-    }
-    if (!data?.url || typeof data.url !== "string") {
-      setError("Stripe checkout did not return a secure payment link.");
-      return;
-    }
-    window.location.assign(data.url);
-  }
-
-  async function manageMembership() {
-    const client = getMarketplaceClient();
-    if (!client) return;
-    setBusy("portal");
-    setError(null);
-    const { data, error: portalError } = await client.functions.invoke("create-billing-portal", {
-      body: { billingRecovery: Boolean(billingRecovery) }
-    });
-    setBusy(null);
-    if (portalError) {
-      setError(await edgeFunctionError(portalError));
-      return;
-    }
-    if (!data?.url || typeof data.url !== "string") {
-      setError("Stripe did not return a secure billing link.");
-      return;
-    }
-    window.location.assign(data.url);
-  }
-
-  const hasPriorSubscription = Boolean(settings?.stripe_subscription_id);
-  const canManage = ["trialing", "active", "past_due", "unpaid", "paused"].includes(settings?.subscription_status ?? "");
-  const membershipStatusLabel = profile.status === "pending_review"
-    ? "payment method saved"
-    : settings?.subscription_status ?? "inactive";
-
-  if (hasLifetimeAccess) {
-    return (
-      <div className={styles.card}>
-        <p className={styles.eyebrow}>Instructor access</p>
-        <h2>No membership fee</h2>
-        <p>Your instructor account has no membership fee. Hire Line Dancers is paid through a platform fee on bookings that clients pay through Hire Line Dancers.</p>
-        <p><span className={styles.status}>No fee</span></p>
-        {profile.status === "draft" ? <p className={styles.notice}>Complete your profile and choose Continue to submit it for review. It will be published automatically after approval.</p> : null}
-        {profile.status === "pending_review" ? <p className={styles.notice}>Your profile is under review. It will go live automatically when approved.</p> : null}
-        {profile.status === "approved" ? <p className={styles.notice}>Your profile is approved and is being prepared for the directory.</p> : null}
-        {profile.status === "published" ? <p className={styles.success}>Your profile is live in the directory.</p> : null}
-        {profile.status === "suspended" ? <p className={styles.notice}>Your profile is currently suspended. Contact support if you have questions.</p> : null}
-      </div>
-    );
-  }
-
+function MembershipCard({ profile }: { profile: InstructorProfile }) {
   return (
     <div className={styles.card}>
-      <p className={styles.eyebrow}>Instructor membership</p>
-      <h2>{monthlyPriceWithCurrency} per month</h2>
-      <p>New instructors save a payment method before profile review. Stripe does not start a subscription or charge the saved card before approval. If the profile is approved, membership begins automatically. The {foundingOfferLabel} who complete payment setup receive their first {freePeriod} free, then membership renews at {monthlyPriceWithCurrency} per month until canceled. Every new paid membership includes the {guaranteeCoverage} booking guarantee, which begins with the first membership payment.</p>
-      <p><span className={styles.status}>{membershipStatusLabel}</span></p>
-      {billingRecovery?.status === "grace_period" && billingRecovery.grace_ends_at ? (
-        <p className={styles.notice} role="alert">
-          We could not process your latest membership payment. Your profile remains live through {new Date(billingRecovery.grace_ends_at).toLocaleDateString("en-US", { dateStyle: "long" })}. Update your payment method before then to avoid removal from the directory.
-        </p>
-      ) : null}
-      {billingRecovery?.status === "access_paused" ? (
-        <p className={styles.error} role="alert">
-          We could not process the overdue membership payment. Your profile is not currently public. Update your payment method and complete the payment to restore it automatically.
-        </p>
-      ) : null}
-      {membershipNotice ? <p className={styles[membershipNotice.tone]} role="status">{membershipNotice.message}</p> : null}
-      {checkoutRecoveryError ? (
-        <div className={styles.stack}>
-          <p className={styles.error} role="alert">{checkoutRecoveryError}</p>
-          <button className={styles.button} type="button" disabled={busy !== null} onClick={onRetryCheckout}>Check membership again</button>
-        </div>
-      ) : null}
-      {profile.status === "approved" && (!settings?.payment_setup_completed_at || hasPriorSubscription) ? (
-        <>
-          {checkoutPending ? (
-            <p className={styles.notice}>Stripe received your checkout. We are confirming your membership now. This usually takes a few seconds.</p>
-          ) : checkoutRecoveryError ? null : (
-            <>
-              <p>Your profile has been approved. {hasPriorSubscription ? "Restart your membership" : "Activate your membership"} to publish it in the directory.</p>
-              <button className={styles.button} type="button" disabled={busy !== null} onClick={() => void activateMembership()}>
-                {busy === "checkout" ? "Opening secure checkout..." : hasPriorSubscription ? "Restart membership" : "Activate membership"}
-              </button>
-              <p className={styles.muted}>By selecting this button, you agree to the <a href="/legal/terms/">Terms of Use</a>, acknowledge the <a href="/legal/privacy/">Privacy Policy</a> and <a href="/legal/refund-policy/">Refund Policy</a>, and authorize a recurring {monthlyPriceWithCurrency} monthly charge after any free period shown in Checkout until you cancel.</p>
-            </>
-          )}
-        </>
-      ) : null}
-      {profile.status === "approved" && settings?.payment_setup_completed_at && !hasPriorSubscription ? <p className={styles.notice}>Your profile is approved and your automatically started membership is still being confirmed. Do not begin another checkout. Refresh shortly, then contact support if this status does not update.</p> : null}
-      {profile.status === "draft" ? <p className={styles.notice}>{settings?.payment_setup_completed_at ? "Complete your updates and choose Continue to resubmit with your saved payment method." : "Complete your profile and choose Continue to save your payment method securely before review."}</p> : null}
-      {profile.status === "pending_review" ? <p className={styles.notice}>Your payment method is saved. No charge was made and no subscription has started while your profile is under review. If approved, your membership will begin automatically.</p> : null}
+      <p className={styles.eyebrow}>Instructor access</p>
+      <h2>No membership fee</h2>
+      <p>Your instructor account has no membership fee. Hire Line Dancers is paid through a platform fee on bookings that clients pay through Hire Line Dancers.</p>
+      <p><span className={styles.status}>No fee</span></p>
+      {profile.status === "draft" ? <p className={styles.notice}>Complete your profile and choose Continue to submit it for review. It will be published automatically after approval.</p> : null}
+      {profile.status === "pending_review" ? <p className={styles.notice}>Your profile is under review. It will go live automatically when approved.</p> : null}
+      {profile.status === "approved" ? <p className={styles.notice}>Your profile is approved and is being prepared for the directory.</p> : null}
       {profile.status === "published" ? <p className={styles.success}>Your profile is live in the directory.</p> : null}
-      {canManage ? (
-        <button className={styles.secondaryButton} type="button" disabled={busy !== null} onClick={() => void manageMembership()}>
-          {busy === "portal"
-            ? "Opening secure billing..."
-            : billingRecovery
-            ? "Update payment method"
-            : "Manage membership"}
-        </button>
-      ) : null}
-      {error ? <p className={styles.error}>{error}</p> : null}
+      {profile.status === "suspended" ? <p className={styles.notice}>Your profile is currently suspended. Contact support if you have questions.</p> : null}
     </div>
   );
 }
