@@ -12,7 +12,7 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -48,6 +48,8 @@ jobs:
         run: npm run test:indexnow
       - name: Test published profile export
         run: npm run test:profile-sync
+      - name: Test spotlight publication and recovery
+        run: node --test scripts/test-spotlight-publication.mjs
       - name: Build static export
         run: npm run build
         env:
@@ -59,6 +61,11 @@ jobs:
         run: npm run audit:static
       - name: Verify searchable instructor profiles
         run: npm run test:profile-search
+      - uses: actions/upload-artifact@v4
+        with:
+          name: released-spotlights
+          path: tmp/released-spotlights.json
+          retention-days: 7
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
@@ -72,11 +79,20 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          name: released-spotlights
+          path: tmp
       - name: Capture the current sitemap for IndexNow
         continue-on-error: true
         run: node scripts/submit-indexnow.mjs --capture
       - id: deployment
         uses: actions/deploy-pages@v4
+      - name: Verify spotlight pages and blog listing in production
+        run: node scripts/verify-spotlight-publication.mjs --retry
       - name: Notify IndexNow about newly published pages
         continue-on-error: true
         run: node scripts/submit-indexnow.mjs

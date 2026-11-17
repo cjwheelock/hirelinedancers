@@ -8,6 +8,10 @@ permissions:
   contents: read
   actions: write
 
+concurrency:
+  group: published-content-check
+  cancel-in-progress: false
+
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -31,6 +35,8 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_36gNqu74ysQhY2_VvJlS4A_XTYUFyxe
       - name: Rebuild published content
         if: steps.articles.outputs.changed == 'true' || steps.profiles.outputs.changed == 'true'
-        run: gh workflow run deploy.yml --ref main
+        run: node scripts/spotlight-watchdog.mjs --force
         env:
           GH_TOKEN: ${{ github.token }}
+          NEXT_PUBLIC_SUPABASE_URL: https://wzmyroeowbsxxibkeejf.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_36gNqu74ysQhY2_VvJlS4A_XTYUFyxe
