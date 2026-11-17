@@ -281,6 +281,58 @@ export const weeklyPosts: BlogPost[] = [
 <p>Hire Line Dancers connects couples and planners with local line dance instructors for weddings, rehearsal dinners and welcome parties. Tell us the city and date, and we'll match you with someone, even in cities where we're just getting started.</p>
 <p>Your couples get a full dance floor. You get the credit. <a href="/events/weddings/">Find a wedding line dance instructor</a>.</p>
 `
+  },
+  {
+    slug: "one-million-dancer-challenge",
+    title: "Announcing the 1 Million Dancer Challenge",
+    description: "Our goal: get 1 million people dancing together at weddings by the end of 2028. Here's the math, the two-year plan, and why everyone should try a line dance.",
+    publishDate: "2026-11-16",
+    status: "ready",
+    category: "Community",
+    body: `
+<p>Today we're announcing the 1 Million Dancer Challenge. Our goal is simple: get 1 million people dancing together at weddings by the end of 2028.</p>
+<p>That sounds big. The math says it's very doable.</p>
+<h2>The math</h2>
+<p>There were about <a href="https://wedding.report/index.cfm/action/wedding_statistics/view/market/" target="_blank" rel="noopener">2 million weddings in the US in 2025</a>, according to The Wedding Report, and the average wedding had <a href="https://www.theknot.com/content/average-wedding-guest-list-size" target="_blank" rel="noopener">117 guests</a>, according to The Knot Real Weddings Study.</p>
+<p>Now picture just 1% of those weddings with a line dance instructor:</p>
+<ul>
+<li><strong>1% of US weddings:</strong> about 20,000 weddings</li>
+<li><strong>Guests at those weddings:</strong> about 2.35 million people</li>
+<li><strong>If half of them dance:</strong> about 1.2 million dancers</li>
+</ul>
+<p>One percent of weddings. Half the room. One year. That's a million people learning something together on the same floor. (We first laid out the 1% idea in <a href="/blog/one-percent-of-weddings-line-dance/">Nobody at Weddings Knows How to Dance</a>.)</p>
+<h2>The plan: two years</h2>
+<p><strong>2027 is the year of awareness.</strong> Most couples have never thought about hiring a line dance instructor. It's not that they said no; nobody told them it was an option. So in 2027 we're telling everyone: couples, guests, planners, DJs, venues, and every instructor who could be teaching at weddings.</p>
+<p><strong>2028 is the year of the wedding line dancer.</strong> That's when we aim to see 1% of US weddings with an instructor on the floor, and a million people dancing because of it.</p>
+<p>The challenge starts today.</p>
+<h2>The problem: the empty dance floor</h2>
+<p>Every wedding has music. Most have a DJ working hard to get people up. And yet you know the scene: the couple, a few bridesmaids, one very committed uncle, and a room full of people watching from their chairs.</p>
+<p>Most of those guests aren't boring. They just don't know what to do. Freestyle dancing in front of a hundred people, including your boss and your grandparents, is a lot to ask. So everyone waits for someone else to go first, and the floor stays empty.</p>
+<p>A line dance lesson removes the guesswork. Someone with a mic invites the whole room up and teaches the steps slowly, so nobody has to figure it out alone. Everyone is learning the same thing at the same time, so nobody stands out. That's the moment the floor fills.</p>
+<h2>Why moving to music matters</h2>
+<p>This is bigger than weddings. It's about something people have always done together: moving to music.</p>
+<p>Historian William McNeill called it "muscular bonding" in his book <em>Keeping Together in Time</em>: the warm sense of togetherness people feel when they move in unison. He argued that keeping time together has held human groups together for as long as there have been groups. Barbara Ehrenreich's <em>Dancing in the Streets</em> follows the same thread through history. People have always gathered to celebrate by dancing together, and something gets lost when we stop.</p>
+<p>Modern research backs it up. In a study from the University of Oxford, <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC4985033/" target="_blank" rel="noopener">people who danced in sync felt closer to each other</a> and showed signs of an endorphin boost, compared with people who danced out of sync.</p>
+<p>In other words, dancing together is fun, it feels good, and it makes strangers feel connected. That's exactly what a wedding is supposed to do.</p>
+<h2>The lowest barrier to entry there is</h2>
+<p>A lot of dancing takes practice, a partner, or confidence. Line dancing takes none of those.</p>
+<ul>
+<li><strong>No partner.</strong> You dance side by side, so nobody gets left out.</li>
+<li><strong>No experience.</strong> The steps are taught slowly and repeat, so you learn by doing.</li>
+<li><strong>No age limit.</strong> A seven-year-old and a seventy-year-old learn the same dance at the same time.</li>
+<li><strong>No spotlight.</strong> Everyone faces the same way and makes the same mistakes, so nobody is being watched.</li>
+</ul>
+<p>That's why we think everyone should try it. If you've ever said "I don't dance," line dancing is where you start.</p>
+<h2>How to be part of it</h2>
+<ul>
+<li><strong>Getting married?</strong> Add a line dance lesson to your reception. <a href="/events/weddings/">Find a wedding line dance instructor</a>.</li>
+<li><strong>Going to a wedding?</strong> When the instructor calls the room up, get up. Bring someone with you.</li>
+<li><strong>Teach line dancing?</strong> We need instructors in every city. <a href="/instructors/join/">Join Hire Line Dancers</a>; it's free.</li>
+<li><strong>Plan weddings?</strong> Mention it to your couples. Here's <a href="/blog/why-wedding-planners-love-line-dancing/">why planners love it</a>.</li>
+<li><strong>Everyone else:</strong> send this to someone who's getting married.</li>
+</ul>
+<p>One million dancers. Two years. Let's fill some dance floors.</p>
+`
   }
 ];
 
