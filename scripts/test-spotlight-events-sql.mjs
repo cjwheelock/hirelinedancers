@@ -8,7 +8,7 @@ create role anon; create role authenticated;
 create table public.instructor_spotlights(profile_id uuid primary key,revision uuid not null,status text,released_at timestamptz,content jsonb);
 create table private.instructor_spotlight_publications(profile_id uuid primary key,scheduled_at timestamptz,released_at timestamptz);
 `);
-const migration = await readFile('supabase/migrations/20261117164921_spotlight_publication_events.sql','utf8');
+const migration = await readFile('supabase/migrations/20261117170311_spotlight_publication_events.sql','utf8');
 // PGlite has no replication worker; production publication membership is checked separately.
 await db.exec(migration.replace('alter publication supabase_realtime add table public.spotlight_publication_events;', ''));
 const id = '00000000-0000-0000-0000-000000000001';
