@@ -21,6 +21,34 @@ async function collectHtmlFiles(directory) {
   return nested.flat();
 }
 
+// The no-em-dash rule is for Hire Line Dancers' own writing. Instructors write their own
+// bios, headlines, packages and captions, so their words are left exactly as they wrote them.
+const emDash = /\u2014/;
+const instructorText = new Set();
+function collectInstructorText(value) {
+  if (typeof value === "string") {
+    if (emDash.test(value)) for (const line of value.split(/\r?\n/)) if (emDash.test(line)) instructorText.add(line);
+  } else if (Array.isArray(value)) value.forEach(collectInstructorText);
+  else if (value && typeof value === "object") Object.values(value).forEach(collectInstructorText);
+}
+const profilesFile = path.join(projectRoot, "tmp", "published-profiles.json");
+if (existsSync(profilesFile)) collectInstructorText(JSON.parse(await readFile(profilesFile, "utf8")));
+
+function escapeHtml(value) {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#x27;");
+}
+
+function withoutInstructorText(html) {
+  let result = html;
+  for (const text of instructorText) {
+    const json = JSON.stringify(text).slice(1, -1);
+    for (const variant of [text, escapeHtml(text), json, JSON.stringify(json).slice(1, -1)]) {
+      result = result.split(variant).join("");
+    }
+  }
+  return result;
+}
+
 function attributesFrom(tag) {
   const attributes = new Map();
   const pattern = /([^\s=/>]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/g;
@@ -114,7 +142,7 @@ function auditHtml(file, html) {
     auditReference(file, pageUrl, match[1].toLowerCase(), match[2] ?? match[3] ?? "");
   }
 
-  if (/\u2014|&mdash;|&#0*8212;|&#x0*2014;/i.test(html)) {
+  if (/\u2014|&mdash;|&#0*8212;|&#x0*2014;/i.test(withoutInstructorText(html))) {
     report(file, "content style", "contains an em dash");
   }
 }
