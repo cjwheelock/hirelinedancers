@@ -3,9 +3,7 @@ import { Award, ShieldCheck } from "lucide-react";
 import {
   bookingExample,
   foundingInstructorDeadline,
-  instructorFeePercent,
-  payoutDelayLabel,
-  problemReportWindowLabel
+  instructorFeePercent
 } from "@/lib/commercialTerms";
 import styles from "./Marketplace.module.css";
 
@@ -22,16 +20,13 @@ export function InstructorOnboardingPricing() {
         </div>
         <p>Listing fee waived through {foundingInstructorDeadline}. Includes a Founding Instructor badge.</p>
         <ul className="check-list">
-          <li>No monthly fee. You pay nothing until you get paid.</li>
-          <li>Hire Line Dancers keeps a {instructorFeePercent} platform fee from each booking paid through the platform.</li>
-          <li>Example: on a {example.price} booking, you receive {example.payout}.</li>
-          <li>You set your rate, minimum hours, and cancellation policy on every quote.</li>
-          <li>We release your payout to Stripe {payoutDelayLabel} after the event unless the client reports a problem within {problemReportWindowLabel}. Bank delivery may take additional business days.</li>
-          <li>If you need insurance, you can attach your own certificate or note that you handle insurance outside the agreement.</li>
+          <li>No monthly fee, ever.</li>
+          <li>We keep a {instructorFeePercent} platform fee from each booking. On a {example.price} booking, you receive {example.payout}.</li>
+          <li>You set your rate, minimum and cancellation policy on every quote.</li>
         </ul>
-        <p>See the <Link href="/legal/terms/">Terms of Service</Link> and <Link href="/legal/refund-policy/">booking cancellation and refund policy</Link>.</p>
+        <p className={styles.onboardingPricingFootnote}>Payout timing and insurance are covered when you set up payouts. See the <Link href="/legal/terms/">Terms of Service</Link> and <Link href="/legal/refund-policy/">refund policy</Link>.</p>
       </div>
-      <p className={styles.onboardingPricingNote}><ShieldCheck size={16} aria-hidden="true" /> Book and get paid through Hire Line Dancers to keep payment protection, guaranteed payouts, and support if something goes wrong.</p>
+      <p className={styles.onboardingPricingNote}><ShieldCheck size={16} aria-hidden="true" /> Book and get paid through Hire Line Dancers to keep payment protection and support if something goes wrong.</p>
     </section>
   );
 }

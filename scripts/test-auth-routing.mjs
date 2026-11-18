@@ -159,7 +159,7 @@ test("switching accounts signs out locally and preserves the full inquiry destin
 test("switching accounts preserves instructor signup intent", async () => {
   const app = harness(`/account/?intent=instructor&returnTo=${encodeURIComponent(threadPath)}`);
   await app.render();
-  app.nodes().find((node) => node.type === "button" && node.props.children === "Use another account").props.onClick();
+  app.nodes().find((node) => node.type === "button" && node.props.children === "Use another email").props.onClick();
   await app.render();
   const target = new URL(app.navigation[0], "https://hirelinedancers.test");
   assert.equal(target.searchParams.get("role"), "instructor");

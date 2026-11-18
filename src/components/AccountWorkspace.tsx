@@ -413,20 +413,34 @@ export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean })
     const isOrganizerEntry = entryIntent === "organizer";
     return (
       <section className={`${styles.shell} ${styles.narrow}`}>
-        <p className={styles.eyebrow}>{isInstructorEntry ? "Instructor account" : isOrganizerEntry ? "Organizer account" : "One quick step"}</p>
-        <h1 className={styles.title}>{isInstructorEntry ? "Set up your instructor workspace" : isOrganizerEntry ? "Set up your organizer workspace" : "How will you use Hire Line Dancers?"}</h1>
-        <p className={styles.subtitle}>
-          {isInstructorEntry
-            ? "Add your account details, then complete your public instructor profile."
-            : isOrganizerEntry
-              ? "Add your account details, then you can contact instructors and track your inquiries."
-              : "Choose the account workspace you need. You can contact support later if you need both."}
-        </p>
-        {error ? <p className={styles.error}>{error}</p> : null}
-        <p className={styles.notice}>Signed in as {session.user.email}. To use an existing account, sign in with the email address used for that account.</p>
-        <button className={styles.secondaryButton} type="button" disabled={signingOut} onClick={() => void restartAccountSignIn()}>
-          {signingOut ? "Signing out..." : "Use another account"}
-        </button>
+        {isInstructorEntry ? (
+          <>
+            <h1 className={styles.title}>Create your instructor profile</h1>
+            <p className={styles.subtitle}>Add your name to get started. Next you&apos;ll build your public profile.</p>
+            {error ? <p className={styles.error}>{error}</p> : null}
+            <p className={styles.signedInLine}>
+              Signed in as <strong>{session.user.email}</strong> ·{" "}
+              <button className={styles.inlineLink} type="button" disabled={signingOut} onClick={() => void restartAccountSignIn()}>
+                {signingOut ? "Signing out..." : "Use another email"}
+              </button>
+            </p>
+          </>
+        ) : (
+          <>
+            <p className={styles.eyebrow}>{isOrganizerEntry ? "Organizer account" : "One quick step"}</p>
+            <h1 className={styles.title}>{isOrganizerEntry ? "Set up your organizer workspace" : "How will you use Hire Line Dancers?"}</h1>
+            <p className={styles.subtitle}>
+              {isOrganizerEntry
+                ? "Add your account details, then you can contact instructors and track your inquiries."
+                : "Choose the account workspace you need. You can contact support later if you need both."}
+            </p>
+            {error ? <p className={styles.error}>{error}</p> : null}
+            <p className={styles.notice}>Signed in as {session.user.email}. To use an existing account, sign in with the email address used for that account.</p>
+            <button className={styles.secondaryButton} type="button" disabled={signingOut} onClick={() => void restartAccountSignIn()}>
+              {signingOut ? "Signing out..." : "Use another account"}
+            </button>
+          </>
+        )}
         {signOutError ? <p className={styles.error} role="alert">{signOutError}</p> : null}
         <OnboardingForm
           email={session.user.email ?? ""}
@@ -434,6 +448,7 @@ export function AccountWorkspace({ adminOnly = false }: { adminOnly?: boolean })
           initialFirstName={account?.first_name ?? session.user.user_metadata.given_name ?? ""}
           initialLastName={account?.last_name ?? session.user.user_metadata.family_name ?? ""}
           fixedRole={entryIntent ?? undefined}
+          simpleInstructor={isInstructorEntry}
           onComplete={async () => {
             if (entryReturnTo) {
               window.location.replace(entryReturnTo);
@@ -488,6 +503,7 @@ function OnboardingForm({
   initialLastName,
   fixedRole,
   invitationToken,
+  simpleInstructor = false,
   onComplete
 }: {
   email: string;
@@ -496,6 +512,7 @@ function OnboardingForm({
   initialLastName: string;
   fixedRole?: AccountIntent;
   invitationToken?: string;
+  simpleInstructor?: boolean;
   onComplete: () => void | Promise<void>;
 }) {
   const [role, setRole] = useState<AccountRole>(fixedRole ?? "organizer");
@@ -549,26 +566,30 @@ function OnboardingForm({
         </div>
       ) : null}
 
-      <label className={styles.field}>
-        <span>First name</span>
-        <input required name="firstName" autoComplete="given-name" value={firstName} onChange={(event) => setFirstName(event.target.value)} />
-      </label>
-      <label className={styles.field}>
-        <span>Last name</span>
-        <input required name="lastName" autoComplete="family-name" value={lastName} onChange={(event) => setLastName(event.target.value)} />
-      </label>
-      <label className={styles.field}>
-        <span>Email</span>
-        <input value={email} disabled />
-      </label>
+      <div className={simpleInstructor ? styles.nameRow : styles.stack}>
+        <label className={styles.field}>
+          <span>First name</span>
+          <input required name="firstName" autoComplete="given-name" value={firstName} onChange={(event) => setFirstName(event.target.value)} />
+        </label>
+        <label className={styles.field}>
+          <span>Last name</span>
+          <input required name="lastName" autoComplete="family-name" value={lastName} onChange={(event) => setLastName(event.target.value)} />
+        </label>
+      </div>
+      {simpleInstructor ? null : (
+        <label className={styles.field}>
+          <span>Email</span>
+          <input value={email} disabled />
+        </label>
+      )}
       <label className={styles.field}>
         <span>{role === "organizer" ? "Company or organization (optional)" : "Business name (optional)"}</span>
         <input autoComplete="organization" value={company} onChange={(event) => setCompany(event.target.value)} />
       </label>
       {role === "instructor" ? <InstructorOnboardingPricing /> : null}
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
-      <button className={styles.button} disabled={busy} type="submit">
-        {busy ? "Saving..." : invitationToken ? "Accept invitation" : role === "instructor" ? "Open instructor workspace" : "Open organizer workspace"}
+      <button className={simpleInstructor ? `${styles.button} ${styles.primaryCta}` : styles.button} disabled={busy} type="submit">
+        {busy ? "Saving..." : invitationToken ? "Accept invitation" : simpleInstructor ? "Continue to your profile" : role === "instructor" ? "Open instructor workspace" : "Open organizer workspace"}
       </button>
     </form>
   );

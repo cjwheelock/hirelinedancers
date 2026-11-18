@@ -3559,3 +3559,39 @@
     animation: none;
   }
 }
+
+/* Instructor sign-up (first screen after sign-in) */
+.signedInLine {
+  margin: 14px 0 0;
+  color: #5a4a3e;
+  font-size: 0.95rem;
+}
+.signedInLine strong { color: #2a1e17; }
+.inlineLink {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #1f6f6b;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.inlineLink:hover { color: #174f4c; }
+.nameRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+.onboardingPricingFootnote {
+  margin: 0;
+  color: #5a4a3e;
+  font-size: 0.9rem;
+}
+.primaryCta {
+  border-color: #b8482a;
+  border-radius: 999px;
+  background: #b8482a;
+  color: #fff;
+}
+.primaryCta:hover { border-color: #7a2e1a; background: #7a2e1a; color: #fff; }
