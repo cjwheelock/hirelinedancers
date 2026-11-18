@@ -50,10 +50,10 @@ test("fee education uses the existing commercial contract and a fixed $100 examp
 });
 
 test("guidance is limited to private profile pricing and booking defaults", () => {
-  for (const path of ["src/components/ProfileEditor.tsx", "src/components/PayoutsCard.tsx"]) {
-    assert.match(source(path), /<InstructorPricingGuide\s*\/>/);
-    assert.match(source(path), /min="0\.5" max="24"/);
-  }
+  assert.match(source("src/components/PayoutsCard.tsx"), /<InstructorPricingGuide\s*\/>/);
+  assert.match(source("src/components/PayoutsCard.tsx"), /min="0\.5" max="24"/);
+  // Rates are set once, in payout booking defaults, not again in the profile editor.
+  assert.doesNotMatch(source("src/components/ProfileEditor.tsx"), /InstructorPricingGuide|Typical minimum rate/);
   for (const path of ["src/components/BookingPanel.tsx", "src/components/BookingAgreementReview.tsx", "src/app/profile/PublicProfile.tsx"]) {
     assert.doesNotMatch(source(path), /InstructorPricingGuide|We recommend charging|A quick guide to pricing/);
   }

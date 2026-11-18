@@ -116,7 +116,7 @@ export function PayoutsCard({
               </p>
               {status.requirementsCurrentlyDue.length ? <p className={styles.help}>Stripe still needs {status.requirementsCurrentlyDue.length} item{status.requirementsCurrentlyDue.length === 1 ? "" : "s"} from you.</p> : null}
               <div className={styles.buttonRow}>
-                <button className={styles.button} type="button" disabled={busy !== null} onClick={() => void open("onboard")}>
+                <button className={`${styles.button} ${styles.primaryCta}`} type="button" disabled={busy !== null} onClick={() => void open("onboard")}>
                   {busy === "onboard" ? "Opening Stripe..." : status.hasAccount ? "Continue payout setup" : "Set up payouts"}
                 </button>
                 {status.hasAccount ? <button className={styles.secondaryButton} type="button" disabled={busy !== null || loading} onClick={() => void refresh()}>Check again</button> : null}
@@ -190,7 +190,7 @@ function BookingPreferencesCard({ profileId, settings, onSaved }: { profileId: s
       {message ? <p className={styles.success}>{message}</p> : null}
       {error ? <p className={styles.error}>{error}</p> : null}
       <div className={styles.buttonRow}>
-        <button className={styles.button} type="submit" disabled={busy}>{busy ? "Saving..." : "Save booking defaults"}</button>
+        <button className={`${styles.button} ${styles.primaryCta}`} type="submit" disabled={busy}>{busy ? "Saving..." : "Save booking defaults"}</button>
       </div>
     </form>
   );

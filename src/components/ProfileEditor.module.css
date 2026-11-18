@@ -668,3 +668,43 @@ button.welcomeTile {
   padding-left: 12px;
   border-left: 3px solid #b8482a;
 }
+
+/* Required-to-submit summary */
+.requiredBox {
+  display: grid;
+  gap: 8px;
+  margin-top: 4px;
+  padding: 14px 18px;
+  border: 1px solid #eadfd0;
+  border-radius: 14px;
+  background: #fbf7f1;
+}
+.requiredBox ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.requiredBox li {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+/* Optional extras on the Services step */
+.moreDetails {
+  border: 1px solid #eadfd0;
+  border-radius: 14px;
+  padding: 0 18px;
+  background: #fff;
+}
+.moreDetails > summary {
+  cursor: pointer;
+  padding: 16px 0;
+  font-weight: 700;
+  color: #2a1e17;
+}
+.moreDetails[open] > summary { border-bottom: 1px solid #eadfd0; margin-bottom: 18px; }
+.moreDetails > div { padding-bottom: 18px; }

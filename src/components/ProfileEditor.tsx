@@ -21,8 +21,6 @@ import {
   type ProfilePackage
 } from "@/lib/marketplace";
 import { ProfileMediaManager, type EditorMedia } from "./ProfileMediaManager";
-import { InstructorPricingGuide } from "./InstructorPricingGuide";
-import pricing from "./InstructorPricingGuide.module.css";
 import styles from "./Marketplace.module.css";
 import editor from "./ProfileEditor.module.css";
 
@@ -49,7 +47,7 @@ const steps = [
   { id: "basics", label: "Basics" },
   { id: "media", label: "Photos & videos" },
   { id: "services", label: "Services" },
-  { id: "links", label: "Links & pricing" },
+  { id: "links", label: "Social links" },
   { id: "review", label: "Preview & submit" }
 ] as const;
 
@@ -103,12 +101,16 @@ export function ProfileEditor({
   profile,
   settings,
   hasLifetimeAccess,
-  onSaved
+  defaultInquiryEmail = "",
+  onSaved,
+  onSubmitted
 }: {
   profile: InstructorProfile;
   settings: InstructorPrivateSettings | null;
   hasLifetimeAccess: boolean | null;
+  defaultInquiryEmail?: string;
   onSaved: () => void;
+  onSubmitted?: () => void;
   describeEdgeError: (error: unknown) => Promise<string>;
 }) {
   const [step, setStep] = useState<StepId>("basics");
@@ -135,9 +137,7 @@ export function ProfileEditor({
     provides_music_playback: profile.provides_music_playback ?? false,
     liability_insurance_status: profile.liability_insurance_status,
     preferred_response_hours: profile.preferred_response_hours.toString(),
-    inquiry_email: settings?.inquiry_email ?? "",
-    minimum_rate: settings?.minimum_rate_cents ? (settings.minimum_rate_cents / 100).toString() : "",
-    minimum_hours: settings?.minimum_hours?.toString() ?? "",
+    inquiry_email: settings?.inquiry_email || defaultInquiryEmail,
     instagram: settings?.instagram_url ?? "",
     tiktok: settings?.tiktok_url ?? "",
     youtube: settings?.youtube_url ?? "",
@@ -187,8 +187,8 @@ export function ProfileEditor({
 
   const checklist = useMemo(() => [
     { label: "Headshot", done: headshotReady, step: "media" as StepId, required: true },
-    { label: "Inquiry email", done: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.inquiry_email.trim()), step: "links" as StepId, required: true },
-    { label: "Name, location, and event types", done: Boolean(form.display_name.trim() && form.city.trim() && form.region.trim() && form.event_types.length), step: "services" as StepId, required: true },
+    { label: "Inquiry email", done: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.inquiry_email.trim()), step: "basics" as StepId, required: true },
+    { label: "Your city and event types", done: Boolean(form.display_name.trim() && form.city.trim() && form.region.trim() && form.event_types.length), step: "services" as StepId, required: true },
     { label: "About you (optional)", done: Boolean(form.bio.trim()), step: "basics" as StepId, required: false },
     { label: "Headline", done: Boolean(form.headline.trim()), step: "basics" as StepId, required: false },
     { label: "Video (optional)", done: videoCount > 0, step: "media" as StepId, required: false },
@@ -200,6 +200,9 @@ export function ProfileEditor({
   ], [cleanHighlights.length, cleanPackages.length, form, headshotReady, photoCount, videoCount]);
   const score = Math.round((checklist.filter((item) => item.done).length / checklist.length) * 100);
   const nextTip = checklist.find((item) => !item.done);
+  const requiredItems = checklist.filter((item) => item.required);
+  const optionalItems = checklist.filter((item) => !item.required);
+  const requiredLeft = requiredItems.filter((item) => !item.done).length;
 
   function goTo(id: StepId) {
     setStep(id);
@@ -242,11 +245,11 @@ export function ProfileEditor({
       const inquiryEmail = form.inquiry_email.trim().toLowerCase();
       const inquiryEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inquiryEmail);
       if (inquiryEmail && !inquiryEmailValid) {
-        setError("Enter a valid inquiry email in Links & pricing, or leave it blank for now.");
+        setError("Enter a valid inquiry email in Basics, or leave it blank for now.");
         return false;
       }
       if (continueToSubmission && !inquiryEmailValid) {
-        setError("Add the email where you want inquiry alerts in Links & pricing before continuing.");
+        setError("Add the email where you want inquiry alerts in Basics before continuing.");
         return false;
       }
       if (continueToSubmission && !headshotReady) {
@@ -299,8 +302,6 @@ export function ProfileEditor({
       const { error: settingsError } = !inquiryEmailValid ? { error: null } : await client.from("instructor_private_settings").upsert({
         instructor_profile_id: profile.id,
         inquiry_email: inquiryEmail,
-        minimum_rate_cents: form.minimum_rate ? Math.round(Number(form.minimum_rate) * 100) : null,
-        minimum_hours: form.minimum_hours ? Number(form.minimum_hours) : null,
         instagram_url: cleanSocial(form.instagram, "instagram"),
         tiktok_url: cleanSocial(form.tiktok, "tiktok"),
         youtube_url: cleanSocial(form.youtube, "youtube"),
@@ -355,6 +356,7 @@ export function ProfileEditor({
         goTo("review");
         setMessage("Your profile was submitted. We’ll review it ASAP.");
         onSaved();
+        onSubmitted?.();
         return true;
       }
 
@@ -426,6 +428,10 @@ export function ProfileEditor({
   }
 
   const stepIndex = steps.findIndex((item) => item.id === step);
+  const hasExtras = Boolean(
+    packages.length || highlights.length || form.provides_speakers || form.provides_microphone || form.provides_music_playback ||
+    form.favorite_dance || form.favorite_song_name || form.favorite_song_spotify_url || form.liability_insurance_status !== "not_provided"
+  );
 
   return (
     <div className={`${styles.card} ${editor.editor}`} ref={topRef}>
@@ -449,6 +455,19 @@ export function ProfileEditor({
             {nextTip ? <> · Next: <button type="button" className={editor.inlineLink} disabled={busy !== null || mediaBusy} onClick={() => goTo(nextTip.step)}>{nextTip.label.toLowerCase()}</button></> : " · Looking great"}
           </p>
         </div>
+        {canContinue ? (
+          <div className={editor.requiredBox}>
+            <strong>{requiredLeft === 0 ? "You have everything you need to submit." : "To submit, you need:"}</strong>
+            <ul>
+              {requiredItems.map((item) => (
+                <li key={item.label}>
+                  {item.done ? <CheckCircle2 size={16} aria-hidden="true" className={editor.done} /> : <Circle size={16} aria-hidden="true" className={editor.todo} />}
+                  {item.done ? <span>{item.label}</span> : <button type="button" className={editor.inlineLink} disabled={busy !== null || mediaBusy} onClick={() => goTo(item.step)}>{item.label}</button>}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
         <nav className={editor.steps} aria-label="Profile setup steps">
           {steps.map((item, index) => (
             <button
@@ -490,6 +509,11 @@ export function ProfileEditor({
                 <input maxLength={80} value={form.business_name} onChange={(e) => setValue("business_name", e.target.value)} />
               </label>
             </div>
+            <label className={styles.field}>
+              <span>Inquiry email</span>
+              <input type="email" required autoComplete="email" placeholder="you@example.com" value={form.inquiry_email} onChange={(e) => setValue("inquiry_email", e.target.value)} />
+              <small>Where we send new inquiries and booking alerts. Planners never see it.</small>
+            </label>
             <label className={styles.field}>
               <span>Headline</span>
               <input
@@ -611,6 +635,9 @@ export function ProfileEditor({
               </div>
             </div>
 
+            <details className={editor.moreDetails} open={hasExtras || undefined}>
+              <summary>Add more (optional): packages, past events, equipment, insurance and favorites</summary>
+              <div className={styles.stack}>
             <div className={editor.subsection}>
               <div className={editor.subsectionHeader}>
                 <div>
@@ -708,41 +735,22 @@ export function ProfileEditor({
                 <input type="url" value={form.favorite_song_spotify_url} onChange={(e) => setValue("favorite_song_spotify_url", e.target.value)} placeholder="https://open.spotify.com/track/..." />
               </label>
             </div>
+              </div>
+            </details>
           </section>
         ) : null}
 
         {step === "links" ? (
           <section className={styles.stack} aria-labelledby="step-links">
             <div>
-              <h3 id="step-links">Your links and pricing</h3>
-              <p className={styles.help}>Everything on this step is private. Your social links are shared with a client only after they book and pay, so bookings stay protected.</p>
+              <h3 id="step-links">Your social links</h3>
+              <p className={styles.help}>Optional and private. Your links are shared with a client only after they book and pay, so bookings stay protected. You&rsquo;ll set your rates when you set up payouts.</p>
             </div>
             <div className={`${styles.grid} ${styles.alignedGrid}`}>
               <label className={styles.field}><span>Instagram</span><input placeholder="@yourhandle" value={form.instagram} onChange={(e) => setValue("instagram", e.target.value)} />{form.instagram ? <small className={editor.fieldHint}>{socialProblem(cleanSocial(form.instagram, "instagram"), "instagram") ?? cleanSocial(form.instagram, "instagram")}</small> : null}</label>
               <label className={styles.field}><span>TikTok</span><input placeholder="@yourhandle" value={form.tiktok} onChange={(e) => setValue("tiktok", e.target.value)} />{form.tiktok ? <small className={editor.fieldHint}>{socialProblem(cleanSocial(form.tiktok, "tiktok"), "tiktok") ?? cleanSocial(form.tiktok, "tiktok")}</small> : null}</label>
               <label className={styles.field}><span>YouTube</span><input placeholder="youtube.com/@yourchannel" value={form.youtube} onChange={(e) => setValue("youtube", e.target.value)} />{form.youtube ? <small className={editor.fieldHint}>{socialProblem(cleanSocial(form.youtube, "youtube"), "youtube") ?? cleanSocial(form.youtube, "youtube")}</small> : null}</label>
               <label className={styles.field}><span>Website</span><input placeholder="yourwebsite.com" value={form.website} onChange={(e) => setValue("website", e.target.value)} />{form.website ? <small className={editor.fieldHint}>{socialProblem(cleanSocial(form.website, "website"), "website") ?? cleanSocial(form.website, "website")}</small> : null}</label>
-            </div>
-            <div className={editor.divider} />
-            <div className={pricing.pricingLayout}>
-              <div className={pricing.fields}>
-                <label className={styles.field}>
-                  <span>Typical minimum rate ($)</span>
-                  <input type="number" min="0" step="1" value={form.minimum_rate} onChange={(e) => setValue("minimum_rate", e.target.value)} />
-                </label>
-                <label className={styles.field}>
-                  <span>Minimum booking hours</span>
-                  <input type="number" min="0.5" max="24" step="0.5" value={form.minimum_hours} onChange={(e) => setValue("minimum_hours", e.target.value)} />
-                </label>
-              </div>
-              <InstructorPricingGuide />
-            </div>
-            <div className={`${styles.grid} ${styles.alignedGrid}`}>
-              <label className={styles.field}>
-                <span>Inquiry email</span>
-                <input type="email" required autoComplete="email" placeholder="you@example.com" value={form.inquiry_email} onChange={(e) => setValue("inquiry_email", e.target.value)} />
-                <small>Where we send new inquiries and booking alerts. We&rsquo;ll email this address to confirm it works.</small>
-              </label>
             </div>
           </section>
         ) : null}
@@ -760,15 +768,20 @@ export function ProfileEditor({
             <h3 id="step-review">{profile.status === "draft" ? "Preview and submit" : "Preview and share"}</h3>
             <p className={styles.help}>Check how planners will see you, then {profile.status === "draft" ? "submit for a quick review." : "share your link anywhere."}</p>
           </div>
-          <ul className={editor.checklist}>
-            {checklist.map((item) => (
-              <li key={item.label}>
-                {item.done ? <CheckCircle2 size={18} aria-hidden="true" className={editor.done} /> : <Circle size={18} aria-hidden="true" className={editor.todo} />}
-                <span>{item.label}{item.required ? " (required)" : ""}</span>
-                {!item.done ? <button type="button" className={editor.inlineLink} disabled={busy !== null || mediaBusy} onClick={() => goTo(item.step)}>Add</button> : null}
-              </li>
-            ))}
-          </ul>
+          {[["Required to submit", requiredItems], ["Make your profile stronger (optional)", optionalItems]].map(([heading, items]) => (
+            <div key={heading as string} className={styles.stack}>
+              <span className={styles.legend}>{heading as string}</span>
+              <ul className={editor.checklist}>
+                {(items as typeof checklist).map((item) => (
+                  <li key={item.label}>
+                    {item.done ? <CheckCircle2 size={18} aria-hidden="true" className={editor.done} /> : <Circle size={18} aria-hidden="true" className={editor.todo} />}
+                    <span>{item.label.replace(/ \(optional\)$/, "")}</span>
+                    {!item.done ? <button type="button" className={editor.inlineLink} disabled={busy !== null || mediaBusy} onClick={() => goTo(item.step)}>Add</button> : null}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
           <div className={styles.buttonRow}>
             <a className={styles.secondaryButton} href={previewUrl} target="_blank" rel="noopener noreferrer"><Eye size={16} aria-hidden="true" /> Preview your profile</a>
             {publicUrl ? <a className={styles.secondaryButton} href={publicUrl} target="_blank" rel="noopener noreferrer"><ExternalLink size={16} aria-hidden="true" /> View live profile</a> : null}
@@ -786,7 +799,7 @@ export function ProfileEditor({
           {canContinue && hasLifetimeAccess === false ? (
             <p className={styles.help}>Joining is free. Your no-fee instructor access is still being set up. Refresh the page in a moment, or email <a href="mailto:hello@hirelinedancers.com">hello@hirelinedancers.com</a> if this continues.</p>
           ) : null}
-          {canContinue && hasLifetimeAccess ? <p className={styles.help}>Joining is free. Submit your profile and we&rsquo;ll review it, usually within a day. By submitting, you agree to the <a href="/legal/terms/">Terms of Service</a>. You&rsquo;ll set up payouts before sending your first quote.</p> : null}
+          {canContinue && hasLifetimeAccess ? <p className={styles.help}>Joining is free. Submit your profile and we&rsquo;ll review it, usually within a day. By submitting, you agree to the <a href="/legal/terms/">Terms of Service</a>. Next, you&rsquo;ll set up payouts so you can get paid.</p> : null}
         </section>
       ) : null}
 
@@ -796,17 +809,17 @@ export function ProfileEditor({
             <button type="button" className={styles.secondaryButton} disabled={busy !== null || mediaBusy} onClick={() => void next(-1)}><ArrowLeft size={16} aria-hidden="true" /> Back</button>
           ) : null}
           {canEdit ? (
-            <button type="button" className={editor.textButton} disabled={busy !== null || mediaBusy} onClick={() => void save(false)}>
-              {busy === "save" ? "Saving..." : profile.status === "draft" ? step === "review" ? "Save draft" : "Save and continue" : "Save changes"}
+            <button type="button" className={editor.textButton} disabled={busy !== null || mediaBusy} onClick={() => void save(false, profile.status === "draft")}>
+              {busy === "save" ? "Saving..." : profile.status === "draft" ? "Save and finish later" : "Save changes"}
             </button>
           ) : null}
         </div>
         {step !== "review" ? (
-          <button type="button" className={styles.button} disabled={busy !== null || mediaBusy} onClick={() => void next(1)}>
+          <button type="button" className={`${styles.button} ${styles.primaryCta}`} disabled={busy !== null || mediaBusy} onClick={() => void next(1)}>
             Next: {steps[stepIndex + 1]?.label} <ArrowRight size={16} aria-hidden="true" />
           </button>
         ) : canContinue ? (
-          <button type="button" className={styles.button} disabled={busy !== null || mediaBusy || hasLifetimeAccess === null} onClick={() => void save(true)}>
+          <button type="button" className={`${styles.button} ${styles.primaryCta}`} disabled={busy !== null || mediaBusy || hasLifetimeAccess === null} onClick={() => void save(true)}>
             {busy === "continue" ? "Submitting..." : "Submit for review"}
           </button>
         ) : canEdit ? (

@@ -612,6 +612,7 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
   const [paymentSetupRecoveryError, setPaymentSetupRecoveryError] = useState<string | null>(null);
   const [paymentSetupRetryVersion, setPaymentSetupRetryVersion] = useState(0);
   const [profileNotice, setProfileNotice] = useState<{ tone: "notice" | "success"; message: string } | null>(null);
+  const [justSubmitted, setJustSubmitted] = useState(false);
   const [, setMembershipNotice] = useState<{ tone: "notice" | "success"; message: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -1025,12 +1026,27 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
       {profile ? (
         <div hidden={tab !== "profile"}>
           {["pending_review", "approved", "published"].includes(profile.status) && <SpotlightReview key={`spotlight-${profile.id}`} profile={profile} />}
-          <ProfileEditor key={profile.id} profile={profile} settings={settings} hasLifetimeAccess={hasLifetimeAccess} onSaved={() => void load(true)} describeEdgeError={edgeFunctionError} />
-          <div className={styles.card}>
-            <h3>Inquiry response window</h3>
-            <p>Reply within 48 hours, even if you are unavailable. We send reminders after 24 and 47 hours, then help the organizer consider other instructors.</p>
-          </div>
+          <ProfileEditor
+            key={profile.id}
+            profile={profile}
+            settings={settings}
+            hasLifetimeAccess={hasLifetimeAccess}
+            defaultInquiryEmail={account.email ?? ""}
+            onSaved={() => void load(true)}
+            onSubmitted={() => {
+              setJustSubmitted(true);
+              chooseTab("payouts");
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+            describeEdgeError={edgeFunctionError}
+          />
           <InstructorSmsSettings />
+        </div>
+      ) : null}
+      {!loading && tab === "inquiries" ? (
+        <div className={styles.card}>
+          <h3>Inquiry response window</h3>
+          <p>Reply within 48 hours, even if you are unavailable. We send reminders after 24 and 47 hours, then help the organizer consider other instructors.</p>
         </div>
       ) : null}
       {!loading && tab === "inquiries" ? (
@@ -1041,6 +1057,9 @@ function InstructorDashboard({ account }: { account: MarketplaceAccount }) {
           focusThreadId={focusThreadId}
           onDataChange={() => void load(true)}
         />
+      ) : null}
+      {!loading && profile && tab === "payouts" && justSubmitted ? (
+        <p className={styles.success} role="status">Your profile was submitted. We&rsquo;ll review it ASAP. Last step: set up payouts so you can get paid when clients book you.</p>
       ) : null}
       {!loading && profile && tab === "payouts" ? (
         <PayoutsCard profileId={profile.id} settings={settings} onSaved={() => void load(true)} />
@@ -1057,7 +1076,7 @@ function MembershipCard({ profile }: { profile: InstructorProfile }) {
       <h2>No membership fee</h2>
       <p>Your instructor account has no membership fee. Hire Line Dancers is paid through a platform fee on bookings that clients pay through Hire Line Dancers.</p>
       <p><span className={styles.status}>No fee</span></p>
-      {profile.status === "draft" ? <p className={styles.notice}>Complete your profile and choose Continue to submit it for review. It will be published automatically after approval.</p> : null}
+      {profile.status === "draft" ? <p className={styles.notice}>Complete your profile and choose Submit for review. It will be published automatically after approval.</p> : null}
       {profile.status === "pending_review" ? <p className={styles.notice}>Your profile is under review. It will go live automatically when approved.</p> : null}
       {profile.status === "approved" ? <p className={styles.notice}>Your profile is approved and is being prepared for the directory.</p> : null}
       {profile.status === "published" ? <p className={styles.success}>Your profile is live in the directory.</p> : null}

@@ -330,13 +330,13 @@ test("clearing, unmatched cities, state queries, and event preferences retain ex
 function editorHarness(status = "draft") {
   return harness("editor", { profile: { ...profile, status, styles: [], event_types: [], languages: [], preferred_response_hours: 24 }, settings: { inquiry_email: "account@example.test" }, hasLifetimeAccess: true, onSaved: () => {}, describeEdgeError: async () => "Request failed" });
 }
-test("draft Save and continue saves then advances, without submitting", async () => {
+test("draft Save and finish later saves and stays on the step, without submitting", async () => {
   const app = editorHarness(); await app.render();
   app.field("About you (optional)").props.onChange(event("Hi")); await app.render();
   assert.equal(app.field("About you (optional)").props.maxLength, undefined);
-  app.button("Save and continue").props.onClick(); await app.render();
-  assert.ok(app.text().includes("Welcome video (optional)"));
-  assert.ok(app.text().includes("Your profile changes are saved."));
+  app.button("Save and finish later").props.onClick(); await app.render();
+  assert.ok(app.field("About you (optional)"));
+  assert.ok(app.text().includes("Saved."));
   assert.ok(!app.calls.some(call => call.name.includes("submit")));
   const update = app.calls.find(call => call.name === "instructor_profiles.update");
   assert.equal(update.args[0].bio, "Hi");
@@ -355,7 +355,7 @@ test("failed save stays on current step with a visible error and retains edits",
   const app = editorHarness(); await app.render();
   app.field("About you (optional)").props.onChange(event("Keep these edits")); await app.render();
   app.queue("instructor_profiles", () => ({ error: { message: "Save unavailable" } }));
-  app.button("Save and continue").props.onClick(); await app.render();
+  app.button("Save and finish later").props.onClick(); await app.render();
   assert.equal(app.field("About you (optional)").props.value, "Keep these edits");
   assert.ok(app.text().includes("Save unavailable"));
   assert.equal(app.navigations.length, 0);
@@ -363,28 +363,28 @@ test("failed save stays on current step with a visible error and retains edits",
 test("rapid double save only writes once; navigation is disabled while saving", async () => {
   const app = editorHarness(); await app.render();
   const pending = deferred(); app.queue("instructor_private_settings", () => pending.promise);
-  const click = app.button("Save and continue").props.onClick; click(); click(); await app.render();
+  const click = app.button("Save and finish later").props.onClick; click(); click(); await app.render();
   assert.equal(app.calls.filter(call => call.name === "instructor_private_settings.upsert").length, 1);
   assert.equal(app.button("Next: Photos & videos ").props.disabled, true);
   pending.resolve({ error: null }); await app.render();
-  assert.ok(app.text().includes("Welcome video (optional)"));
+  assert.ok(app.text().includes("Saved."));
 });
 test("network exception releases save lock and preserves the current step", async () => {
   const app = editorHarness(); await app.render();
   app.queue("instructor_private_settings", () => Promise.reject(new Error("offline")));
-  app.button("Save and continue").props.onClick(); await app.render();
+  app.button("Save and finish later").props.onClick(); await app.render();
   assert.ok(app.field("About you (optional)"));
   assert.ok(app.text().includes("Could not confirm"));
-  assert.equal(app.button("Save and continue").props.disabled, false);
+  assert.equal(app.button("Save and finish later").props.disabled, false);
 });
 
 for (const bio of ["Hi", "", null]) test(`optional bio (${JSON.stringify(bio)}) and no videos or teaching photos can submit; saves alone never submit`, async () => {
   const app = harness("editor", { profile: { ...profile, bio }, settings: { inquiry_email: "account@example.test" }, hasLifetimeAccess: true, onSaved: () => {}, describeEdgeError: async () => "Request failed" });
   await app.render();
   app.nodes().find(node => node.type === "button" && text(node).includes("5Preview & submit")).props.onClick(); await app.render();
-  assert.ok(app.text().includes("Video (optional)"));
-  assert.ok(app.text().includes("One to three photos of you teaching (optional)"));
-  app.button("Save draft").props.onClick(); await app.render();
+  assert.ok(app.text().includes("Make your profile stronger (optional)"));
+  assert.ok(app.text().includes("One to three photos of you teaching"));
+  app.button("Save and finish later").props.onClick(); await app.render();
   assert.ok(!app.calls.some(call => call.name === "submit_lifetime_instructor_profile_for_review"));
   app.button("Submit for review").props.onClick(); await app.render();
   assert.equal(app.calls.filter(call => call.name === "submit_lifetime_instructor_profile_for_review").length, 1);
