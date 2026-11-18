@@ -79,7 +79,7 @@ export function featuredFor(
   leadId: number,
   assigned: string | null,
 ): { market: OutreachMarket; instructorId: string | null } {
-  const complete = instructors.filter((i) => i.service_market_slug === market.service_market_slug && i.years !== null && i.pronoun);
+  const complete = instructors.filter((i) => i.service_market_slug === market.service_market_slug && i.years !== null);
   if (!complete.length) return { market, instructorId: null };
   const pick = complete.find((i) => i.instructor_profile_id === assigned) ?? complete[leadId % complete.length];
   return {

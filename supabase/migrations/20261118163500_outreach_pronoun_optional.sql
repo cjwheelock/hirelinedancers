@@ -1,0 +1,3 @@
+-- A missing instructor pronoun never holds a city back: emails fall back to they/their/them.
+-- outreach_activate_markets() no longer requires featured_instructor_pronoun to approve sending
+-- and no longer lists it as a missing detail.
