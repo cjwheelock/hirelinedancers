@@ -2,6 +2,46 @@ import type { BlogPost } from "../blog";
 
 export const cityPosts: BlogPost[] = [
   {
+    slug: "where-to-line-dance-houston",
+    title: "Where to Go Line Dancing in Houston, Richmond and Webster",
+    description: "Four Houston-area venues with advertised line-dance lessons, official schedules, addresses and practical notes for choosing your first night out.",
+    publishDate: "2026-11-18",
+    updatedDate: "2026-11-18",
+    status: "ready",
+    category: "City guide",
+    citySlug: "houston-tx",
+    author: "Hire Line Dancers",
+    body: `
+<p>Houston has several ways to turn a night out into a line-dance lesson. Start with the part of the metro you want to visit, then choose a night explicitly labeled for line dancing. A country dance lesson may teach partner styles instead, and a Latin night is a different experience again.</p>
+<p>This is a practical shortlist, not a ranking: two Houston venues and two separate Whiskey River locations in Richmond and Webster. The suburban options are not downtown Houston stops.</p>
+<p><strong>Last checked: November 18, 2026.</strong> Times are local. The official websites below advertise recurring lessons; that does not confirm every individual date. Recheck the venue before traveling, especially during Thanksgiving week, and ask about admission, identification and any schedule changes.</p>
+<h2>1. Neon Boots Dancehall &amp; Saloon, Houston</h2>
+<p><strong>Address:</strong> 11410 Hempstead Road, Houston, TX 77092.</p>
+<p>Neon Boots advertises free Thursday line-dance lessons starting at 7:30 p.m. That makes Thursday the specific night to investigate if you want instruction rather than simply a country dance floor.</p>
+<p>There is one important calendar caveat: the detailed lesson page still showed an October lineup when checked. Treat the Thursday schedule as the venue's recurring program, not a verified November dance list. Ask which levels and dances are being taught on your date before bringing a first-timer. Tuesday's country lessons and Saturday's couples lessons are separate offerings, not interchangeable line-dance classes.</p>
+<p><a href="https://neonbootsclub.com/neon-boots-dance-lessons/">Official lesson page</a> · <a href="https://neonbootsclub.com/about-us/">Location and weekly programming</a></p>
+<h2>2. Stampede Houston</h2>
+<p><strong>Address:</strong> 11925 Eastex Freeway, Houston, TX 77039.</p>
+<p>Stampede's Friday page advertises free line-dance classes at 8 p.m., upstairs at VIBES on the second floor, with no experience required. This is an option for a lesson followed by a broader nightclub evening rather than a dedicated line-dance-only session.</p>
+<p>The same page promotes Top 40 music and other nightlife activities, so do not assume the whole night is country music or repeated line-dance practice. Confirm entry conditions and the lesson location before heading over. If stairs are an issue, ask about access to the upstairs class before making plans.</p>
+<p><a href="https://www.stampedehouston.com/friday/">Official Friday lesson and visitor details</a></p>
+<h2>3. Whiskey River West, Richmond</h2>
+<p><strong>Address:</strong> 6535 South Peek Road, Richmond, TX 77407.</p>
+<p>West publishes line-dance lessons on Wednesdays and Saturdays from 8:30 to 9:15 p.m. The lessons are complimentary, and the venue says no partner is needed. Choose this location if Richmond is convenient and you want a clearly identified line-dance slot.</p>
+<p>The published entry policy is 21 and over, except Wednesdays when it is 18 and over. Thursday's lessons are Latin and Friday's are beginner country, so those are not substitutes for the listed line-dance sessions. Check the event listing for changes before leaving.</p>
+<p><a href="https://www.wrwest.com/dancelessons">Official lesson schedule, age policy and address</a></p>
+<h2>4. Whiskey River South, Webster</h2>
+<p><strong>Address:</strong> 1030 West NASA Parkway, Webster, TX 77598.</p>
+<p>South's line-dance lessons are on Thursdays from 8:30 to 9:15 p.m. Its lesson page describes them as complimentary, with no partner needed, and lists a 21-and-over policy. This is a different physical venue from West, with a different weekly schedule.</p>
+<p>Webster is the option to consider for a southeast-metro night out. Friday's beginner country lesson and Sunday's Latin lesson are separate styles; pick Thursday when the goal is specifically line dancing.</p>
+<p><a href="https://www.wrsouth.com/dancelessons">Official lesson schedule, age policy and address</a></p>
+<h2>Choosing a first night</h2>
+<ul><li><strong>Want a specific line-dance class?</strong> Start with the named lesson slots, not a generic country-night listing.</li><li><strong>Going with beginners?</strong> Ask about the level, arrive before instruction starts and do not assume every dance will be taught from scratch.</li><li><strong>Planning a group outing?</strong> Confirm cover charges, age restrictions, accessibility and holiday hours directly. A free lesson is not a promise that every part of the visit is free.</li></ul>
+<h2>Want the lesson at your own event?</h2>
+<p>A public dance night is one way to learn. For a wedding, company gathering or private celebration, you can also <a href="/cities/houston-tx/">explore Houston-area line dance instructors</a> and ask about a lesson tailored to your group.</p>
+`
+  },
+  {
     slug: "where-to-line-dance-dallas",
     title: "Where to Go Line Dancing in Dallas, Carrollton and Plano",
     description: "A Dallas-area shortlist with a country dance hall and two soul line-dance class locations, verified addresses, schedules and practical booking notes.",
