@@ -41,7 +41,7 @@ export default function JoinPage() {
             <li><Check size={18} aria-hidden="true" />We only earn when you&apos;re booked</li>
           </ul>
           <div>
-            <Link className="button primary" href={applyHref}>Apply to get listed</Link>
+            <Link className={`button primary ${styles.heroCta}`} href={applyHref}>Apply to get listed</Link>
           </div>
         </div>
         <div className={styles.heroArt}>

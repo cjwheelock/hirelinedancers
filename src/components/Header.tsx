@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { ChevronDown, Search } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { useMarketplaceSession } from "@/hooks/useMarketplaceSession";
-import { getMarketplaceClient } from "@/lib/marketplace";
+import { getMarketplaceClient, signInUrl } from "@/lib/marketplace";
 import styles from "./Header.module.css";
 
 /** Sign-in pages carry their own full-screen layout with no site chrome. */
@@ -31,6 +31,7 @@ export function Header() {
   const { session, account, isAdmin, loading } = useMarketplaceSession();
 
   if (isAuthPath(pathname)) return null;
+  const onJoinPage = Boolean(pathname?.startsWith("/instructors/join"));
   if (isAppPath(pathname)) {
     return <AppHeader loading={loading} signedIn={Boolean(session)} account={account} email={session?.user.email ?? null} isAdmin={isAdmin} onAdminPage={Boolean(pathname?.startsWith("/admin"))} />;
   }
@@ -51,17 +52,32 @@ export function Header() {
               {session ? (account?.role === "instructor" ? "Profile" : "Messages") : "Sign in"}
             </Link>
           ) : null}
-          <Link className="button primary small navlink is-cta" href="/instructors/">
-            <Search size={16} aria-hidden="true" />
-            <span className="nav-cta-long">Find an instructor</span>
-            <span className="nav-cta-short">Find</span>
-          </Link>
-          {!loading && !session ? (
-            <Link className="navlink is-join" href="/instructors/join/">
-              <span className="nav-join-long">Join as an instructor</span>
-              <span className="nav-join-short">Join</span>
-            </Link>
-          ) : null}
+          {onJoinPage ? (
+            <>
+              <Link className="navlink is-join" href="/instructors/">
+                <span className="nav-join-long">Find an instructor</span>
+                <span className="nav-join-short">Find</span>
+              </Link>
+              <Link className="button primary small navlink is-cta" href={signInUrl("/account/", "instructor")}>
+                <span className="nav-cta-long">Apply to get listed</span>
+                <span className="nav-cta-short">Apply</span>
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link className="button primary small navlink is-cta" href="/instructors/">
+                <Search size={16} aria-hidden="true" />
+                <span className="nav-cta-long">Find an instructor</span>
+                <span className="nav-cta-short">Find</span>
+              </Link>
+              {!loading && !session ? (
+                <Link className="navlink is-join" href="/instructors/join/">
+                  <span className="nav-join-long">Join as an instructor</span>
+                  <span className="nav-join-short">Join</span>
+                </Link>
+              ) : null}
+            </>
+          )}
         </nav>
       </div>
     </header>

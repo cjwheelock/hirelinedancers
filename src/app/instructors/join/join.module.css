@@ -17,9 +17,10 @@
 .heroText :global(.lede) { margin: 0; }
 .heroArt { flex: 1 1 380px; min-width: 0; }
 .heroArt img { width: 100%; height: clamp(320px, 38vw, 480px); object-fit: cover; border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); display: block; }
-.badges { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 10px; }
-.badges li { display: flex; align-items: center; gap: 8px; background: var(--panel); border: 1px solid var(--line); padding: 10px 14px; border-radius: var(--radius-pill); font-size: 15px; font-weight: 600; }
-.badges svg { color: var(--pine); }
+.badges { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 20px; }
+.badges li { display: flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 600; color: var(--ink-2); }
+.badges svg { width: 16px; height: 16px; }
+.badges svg { color: var(--pine); flex: none; }
 
 .heading { display: flex; flex-direction: column; gap: 14px; max-width: 720px; margin-bottom: 36px; }
 .heading p { margin: 0; font-size: 18px; line-height: 1.55; color: var(--ink-2); }
@@ -98,3 +99,5 @@
 .ctaBadge { align-self: flex-start; background: var(--gold); color: var(--ink); font-size: 14px; font-weight: 700; padding: 8px 14px; border-radius: var(--radius-pill); }
 .ctaButton { background: #fff; color: var(--sunset-deep); border: 2px solid #fff; }
 .ctaButton:hover { background: var(--paper); color: var(--sunset-deep); }
+.heroText .heroCta { min-height: 64px; padding: 18px 40px; font-size: 19px; box-shadow: 0 14px 30px rgba(184, 72, 42, 0.28); }
+@media (max-width: 560px) { .heroText .heroCta { width: 100%; justify-content: center; } }
