@@ -2,6 +2,39 @@ import type { BlogPost } from "../blog";
 
 export const cityPosts: BlogPost[] = [
   {
+    slug: "where-to-line-dance-new-york-city",
+    title: "Where to Go Line Dancing in New York City",
+    description: "Four Manhattan and Brooklyn options for line dancing, with official class schedules, dated socials, addresses and tips for your first night.",
+    publishDate: "2026-11-19",
+    updatedDate: "2026-11-19",
+    status: "ready",
+    category: "City guide",
+    citySlug: "new-york-ny",
+    author: "Hire Line Dancers",
+    body: `
+<p>For a first night of line dancing in New York City, start with a dedicated beginner class or choose a social with a named lesson on the schedule. Here are four options in Manhattan and Brooklyn, from a recurring studio class to a one-night honky-tonk. This is a shortlist, not a ranking.</p>
+<p><strong>Last checked: November 19, 2026.</strong> Times are local. Check the official listing before leaving, especially for holiday-week changes, age restrictions and ticket availability.</p>
+<h2>Danznik Studios: beginner line dancing in Midtown</h2>
+<p><strong>Address:</strong> 240 West 37th Street, second floor, Manhattan.</p>
+<p>Danznik lists a beginner line-dance class with Bella Rojo on Mondays from 6:30 to 8 p.m., including November 23. The posted price is $30. Choose this option if your priority is time to learn steps in a studio rather than dancing between sets in a busy venue. Use the NYC listing, since the studio also runs classes in Westchester.</p>
+<p><a href="https://www.danznik.com/e/beginner-line-dance/">Official Danznik schedule and registration</a></p>
+<h2>Big Apple Ranch: a lesson and social in Midtown</h2>
+<p><strong>Address:</strong> 320 West 37th Street, second floor, Manhattan.</p>
+<p>Big Apple Ranch lists Saturday, December 12 for its next posted dance. The schedule separates a beginner two-step lesson at 8 p.m. from a line-dance lesson at 8:30 p.m. Open dancing follows at 9 p.m. Admission is listed as $20, cash only. Note the street number: this is not the Danznik studio on the same block.</p>
+<p><a href="https://www.bigappleranch.com/event">Official Big Apple Ranch schedule and admission</a></p>
+<h2>Brooklyn Bowl: Do Si Don'tcha in Williamsburg</h2>
+<p><strong>Address:</strong> 61 Wythe Avenue, Brooklyn.</p>
+<p>Brooklyn Bowl has a November 23 listing for Do Si Don'tcha: Y'all Stars Country Line Dancing. The organizer describes a mix of line dances and partner styles, so treat this as a social event, not a dedicated beginner class. The event page lists conflicting show times; check the ticket page or venue before choosing when to arrive. The event is 18 and over and requires valid photo ID.</p>
+<p><a href="https://brooklyn.brooklynbowl.com/events/detail/do-si-don-tcha-y-all-stars-country-line-dancing-k7vgf_4m5vqd5">Official Brooklyn Bowl event and ticket link</a></p>
+<h2>Houston Hall: Molly &amp; June's anniversary honky-tonk</h2>
+<p><strong>Address:</strong> 222 West Houston Street, Manhattan.</p>
+<p>The November 27 anniversary event is listed by SOB's, but it takes place offsite at Houston Hall. The listing advertises beginner-friendly dance lessons with Salty Cowboy at 8 p.m., followed later by DJ sets. It's a one-night event, not a standing weekly class at Houston Hall. The event is 21 and over.</p>
+<p><a href="https://sobs.com/events/molly-junes-honky-tonk-2-year-anniversary-nov-27-2026/">Official Molly &amp; June's event listing</a></p>
+<h2>Which should you try first?</h2>
+<p>Pick Danznik if you want a class without having to navigate a social first. Try Big Apple Ranch if you want both a lesson and time on the floor afterward. For a night out with friends, choose the dated Brooklyn Bowl or Houston Hall event and double-check admission before you go. A line dance typically doesn't require a partner; two-step and country swing are separate partner styles.</p>
+`,
+  },
+  {
     slug: "where-to-line-dance-houston",
     title: "Where to Go Line Dancing in Houston, Richmond and Webster",
     description: "Four Houston-area venues with advertised line-dance lessons, official schedules, addresses and practical notes for choosing your first night out.",
