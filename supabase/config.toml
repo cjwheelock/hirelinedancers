@@ -25,6 +25,9 @@ verify_jwt = false
 [functions.process-inquiry-notifications]
 verify_jwt = false
 
+[functions.admin-deal-alerts]
+verify_jwt = false
+
 [functions.profile-reminder-worker]
 verify_jwt = false
 
