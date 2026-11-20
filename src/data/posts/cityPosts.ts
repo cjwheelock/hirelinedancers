@@ -2,6 +2,39 @@ import type { BlogPost } from "../blog";
 
 export const cityPosts: BlogPost[] = [
   {
+    slug: "where-to-line-dance-los-angeles",
+    title: "Where to Go Line Dancing in Los Angeles County",
+    description: "Four Los Angeles County places to learn line dancing, with official schedules for Hollywood, Long Beach and San Dimas and tips for choosing your first lesson.",
+    publishDate: "2026-11-20",
+    updatedDate: "2026-11-20",
+    status: "ready",
+    category: "City guide",
+    citySlug: "los-angeles-ca",
+    author: "Hire Line Dancers",
+    body: `
+<p>Los Angeles County has several ways to learn a line dance, from a rooftop lesson in Hollywood to a country night with a live band in Long Beach. You do not need a partner for line dancing. If a venue also lists two-step, check which time is for line dance.</p>
+<p><strong>Last checked: November 20, 2026.</strong> The times below are local and reflect posted schedules, not a guarantee for Thanksgiving week or a special event. Check the linked calendar before going.</p>
+<h2>Desert 5 Spot: beginner lessons in Hollywood</h2>
+<p><strong>Address:</strong> 6516 Selma Avenue, Los Angeles.</p>
+<p>The Hollywood location lists Bootloose beginner line-dance lessons on Wednesdays and Fridays at 7, 8 and 9 p.m. The venue lists a $10 ticket covering all three lessons; check the ticket page for the final price and date. Its Saturday intermediate open line dancing is a different listing, so start with the beginner session if you are new.</p>
+<p><a href="https://www.desertfivespot.com/shindigs-la">Official Desert 5 Spot lesson schedule</a> · <a href="https://www.desertfivespot.com/la">Hollywood location and entry information</a></p>
+<h2>Gaslamp: country night in Long Beach</h2>
+<p><strong>Address:</strong> 6251 East Pacific Coast Highway, Long Beach.</p>
+<p>Gaslamp lists Thursday country nights with line-dance instructor Cindi Massengale. Lessons are posted for 6:30 and 7:15 p.m. Live country music starts at 8:30 p.m., with DJ sets throughout the evening. The night is 21 and over. Check the venue for the exact date before planning around the weekly schedule.</p>
+<p><a href="https://www.gaslamplongbeach.com/thursdays">Official Gaslamp Thursday schedule</a></p>
+<h2>Cowboy Country Saloon: a structured class in North Long Beach</h2>
+<p><strong>Address:</strong> 3321 South Street, Long Beach.</p>
+<p>Cindi’s own lesson page lists Monday classes at Cowboy Country, including a separate absolute-beginner level for people who want to learn the basic steps. On Mondays the bar is open only to class participants, and the classes are 21 and over. Ask the instructor which series is currently enrolling and whether a drop-in is available. Weekend entertainment runs on a separate venue calendar.</p>
+<p><a href="https://www.dancewithcindi.com/lessons">Instructor’s class levels and registration information</a> · <a href="https://cowboycountrysaloon.com/contact-us">Official Cowboy Country address</a></p>
+<h2>Montana’s Country Nightclub: separate line and partner lessons in San Dimas</h2>
+<p><strong>Address:</strong> 657 West Arrow Highway, San Dimas.</p>
+<p>Montana’s posts Friday and Saturday dance lessons, with partner dance at 7 p.m. and line dance at 7:30 p.m. If you are coming for line dancing, use the second time. The venue lists a $10 cash-only cover and requires guests to be 21 or over with valid government-issued photo ID.</p>
+<p><a href="https://www.montanascountrynightclub.com/pages/faqs">Official Montana’s schedule and admission FAQ</a> · <a href="https://www.montanascountrynightclub.com/pages/dance-lessons">Monthly lesson calendar</a></p>
+<h2>What should you try first?</h2>
+<p>Try Desert 5 Spot if you want a beginner drop-in with several start times. Pick Cowboy Country’s absolute-beginner series if you would rather work through basics over several classes. For a lesson followed by dancing and music, check Gaslamp or Montana’s. Arrive before the lesson and give yourself room to see the instructor’s feet.</p>
+`,
+  },
+  {
     slug: "where-to-line-dance-new-york-city",
     title: "Where to Go Line Dancing in New York City",
     description: "Four Manhattan and Brooklyn options for line dancing, with official class schedules, dated socials, addresses and tips for your first night.",
