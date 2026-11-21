@@ -12,7 +12,7 @@ export const cityPosts: BlogPost[] = [
     citySlug: "atlanta-ga",
     author: "Hire Line Dancers",
     body: `
-<p>Atlanta’s line-dance calendar runs from queer country nights in the city to an Acworth restaurant with a dedicated teaching night. If you’re coming for a lesson, check the style before you go: some country nights rotate between line dance and partner two-step, and some list open dancing without a class.</p>
+<p>Atlanta’s line-dance calendar runs from queer country nights in the city to daytime beginner lessons in Alpharetta. If you’re coming for a lesson, check the style before you go: some country nights rotate between line dance and partner two-step, and some list open dancing without a class.</p>
 <p><strong>Last checked: November 21, 2026.</strong> Times are local. Check the linked schedules before heading out, especially on a holiday week.</p>
 <h2>The Atlanta Eagle: Tuesday country night</h2>
 <p><strong>Address:</strong> 1492 Piedmont Avenue NE, Suite F, Atlanta, GA 30309.</p>
