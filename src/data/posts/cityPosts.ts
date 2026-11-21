@@ -2,6 +2,45 @@ import type { BlogPost } from "../blog";
 
 export const cityPosts: BlogPost[] = [
   {
+    slug: "where-to-line-dance-atlanta",
+    title: "Where to Go Line Dancing in Atlanta",
+    description: "Atlanta-area line dancing with dated lessons, rotating country nights, daytime beginner lessons and official links to check before you go.",
+    publishDate: "2026-11-21",
+    updatedDate: "2026-11-21",
+    status: "ready",
+    category: "City guide",
+    citySlug: "atlanta-ga",
+    author: "Hire Line Dancers",
+    body: `
+<p>Atlanta’s line-dance calendar runs from queer country nights in the city to an Acworth restaurant with a dedicated teaching night. If you’re coming for a lesson, check the style before you go: some country nights rotate between line dance and partner two-step, and some list open dancing without a class.</p>
+<p><strong>Last checked: November 21, 2026.</strong> Times are local. Check the linked schedules before heading out, especially on a holiday week.</p>
+<h2>The Atlanta Eagle: Tuesday country night</h2>
+<p><strong>Address:</strong> 1492 Piedmont Avenue NE, Suite F, Atlanta, GA 30309.</p>
+<p>DanceOut Atlanta’s Tuesday country night is a good place to start if you want a free lesson followed by time to practice. The November 24 schedule lists Garrett teaching the improver-level line dance “Miles On It” at 8 p.m., with open dancing at 9 p.m. The lesson style rotates, so use the dated schedule rather than assuming every Tuesday is line dance. Country Night is 21 and over.</p>
+<p><a href="https://www.danceoutatlanta.com/lesson-schedule">DanceOut Atlanta’s dated lesson schedule</a> · <a href="https://atlantaeagle.com/event/country/">Atlanta Eagle’s Country Night listing</a></p>
+<h2>The Heretic: two lesson levels on line-dance Thursdays</h2>
+<p><strong>Address:</strong> 2069 Cheshire Bridge Road NE, Atlanta, GA 30324.</p>
+<p>DanceOut’s usual first, third and fifth Thursdays offer a more challenging line dance at 7 p.m. and an easier one at 8 p.m., then open dancing at 9 p.m. Second and fourth Thursdays usually feature partner dancing instead. The lessons are free, and Country Night is 21 and over. The organizer explicitly lists no lesson and a holiday closure for November 26; use its monthly calendar for the next confirmed date.</p>
+<p><a href="https://www.danceoutatlanta.com/lesson-schedule">DanceOut Atlanta’s Thursday format and exceptions</a> · <a href="https://www.danceoutatlanta.com/first-time">First-timer guide and venue address</a></p>
+<h2>Backstage Atlanta: Tuesday lessons on the Southside</h2>
+<p><strong>Address:</strong> 2505 Godby Road, Atlanta, GA 30349.</p>
+<p>Fall In Line Tuesdays is a line-dancing block party with a teaching window before the later social. The venue’s December 1 event lists free classes from 6 to 9 p.m. and invites experienced dancers to join the floor afterward. Come during the earlier window if learning steps is the point of your visit. Backstage is 21 and over.</p>
+<p><a href="https://www.backstageatlanta.com/fall-in-line">Backstage Atlanta’s Fall In Line page</a> · <a href="https://posh.vip/e/-fall-in-line-tuesdays-at-backstage-atlant-2026-12-2-5-0">December 1 event listing from Backstage</a></p>
+<h2>Club 201: daytime beginner lessons in Alpharetta</h2>
+<p><strong>Address:</strong> 201 Wills Road, Alpharetta, GA 30009.</p>
+<p>Club 201 offers a Friday beginner class at 10 a.m., taught by Jean Maggio. If you prefer an evening, Nancy Anthony’s Wednesday beginner lesson starts at 6:30 p.m., followed by intermediate instruction and open line dancing from 8 p.m. The club is open to the public, ages 18 and over. Check the date rather than heading to a separate swing, ballroom or country partner session.</p>
+<p><a href="https://www.club201dance.com/line-dancing">Club 201’s lesson schedule</a> · <a href="https://www.club201dance.com/">Address and admission information</a></p>
+<h2>PBR Atlanta: Thursday nightlife at The Battery</h2>
+<p><strong>Address:</strong> 825 Battery Avenue SE, Suite 610, Atlanta, GA 30339.</p>
+<p>Throwdown Thursday includes staff-led line dances as part of the bar’s country night. The Battery lists December 3 from 8 p.m. to midnight. It does not post a separate lesson start time, so think of this as a night out where you can learn some dances rather than a stand-alone beginner class.</p>
+<p><a href="https://liveatthebatteryatlanta.com/eat-and-drink/pbr-atlanta/weekly-specials/pbr-throwdown-thursdays">PBR Atlanta’s weekly event and address</a> · <a href="https://batteryatl.com/event/throwdown-thursday-at-pbr-atlanta/2026-12-03/">The Battery’s December 3 listing</a></p>
+<h2>One date to put on the calendar: She-Haw at My Sister’s Room</h2>
+<p><strong>Address:</strong> 1104 Crescent Avenue NE, Atlanta, GA 30309.</p>
+<p>For this November 29 event, DanceOut lists line-dance lessons at 8:30 and 10 p.m., with doors at 7 p.m. My Sister’s Room also lists the party on its calendar. This is a dated event, not a standing weekly class.</p>
+<p><a href="https://www.mysistersroom.com/events">My Sister’s Room event calendar and address</a> · <a href="https://www.danceoutatlanta.com/lesson-schedule">DanceOut Atlanta’s November lesson times</a></p>
+`,
+  },
+  {
     slug: "where-to-line-dance-los-angeles",
     title: "Where to Go Line Dancing in Los Angeles County",
     description: "Four Los Angeles County places to learn line dancing, with official schedules for Hollywood, Long Beach and San Dimas and tips for choosing your first lesson.",
