@@ -2,6 +2,52 @@ import type { BlogPost } from "../blog";
 
 export const cityPosts: BlogPost[] = [
   {
+    slug: "where-to-line-dance-charlotte",
+    title: "Where to Go Line Dancing in Charlotte",
+    description: "Four places to take line dance lessons around Charlotte and a NoDa country social, with official schedules, addresses and holiday notes.",
+    publishDate: "2026-11-22",
+    updatedDate: "2026-11-22",
+    status: "ready",
+    category: "City guide",
+    citySlug: "charlotte-nc",
+    author: "Hire Line Dancers",
+    body: `
+<p>In Charlotte, you can start with a Sunday afternoon lesson in South End, practice after a class in a brewery event room, or spend a Wednesday on a country nightclub dance floor. If you want someone to teach the steps, check which part of the evening is the lesson. Open dancing and partner two-step can share a calendar with line dancing without being the same thing.</p>
+<p><strong>Last checked: November 22, 2026.</strong> Times are local. The venues below are a shortlist, not a ranking. Confirm the exact date before leaving, especially around Thanksgiving and December holidays.</p>
+<h2>Triple C’s Barrel Room: a beginner lesson before the social</h2>
+<p><strong>Address:</strong> 2832 Griffith Street, Charlotte, NC 28203. Go to the Barrel Room across Fairwood Avenue from the taproom, not the taproom itself.</p>
+<p>The brewery lists Dance With Me on Monday, November 23 and Monday, November 30, from 6 to 10 p.m., for $5. The 6 to 7 p.m. hour is dedicated to beginner line-dance instruction. After 7, the floor opens for requests and a mix of line dancing, two-step and other partner styles. If you want the steps taught from the beginning, get there for the first hour.</p>
+<p><a href="https://www.triplecbrewing.com/live-music-events">Triple C events calendar</a> · <a href="https://www.triplecbrewing.com/barrelroom/">Barrel Room location</a></p>
+<h2>Nickyo’s Rodeo: a Sunday afternoon option in South End</h2>
+<p><strong>Address:</strong> 120 W. Bland Street, Charlotte, NC 28203.</p>
+<p>Nickyo’s lists beginner line-dance lessons on Wednesdays from 8:30 to 9:30 p.m. and Sundays from 2 to 3 p.m. Sunday is a useful alternative if you are new to line dancing and would rather start in daylight. These are the venue’s regular slots, not a date-specific holiday confirmation. Check its latest updates for your visit.</p>
+<p><a href="https://www.nickyosrodeo.com/events">Nickyo’s lesson schedule and venue updates</a></p>
+<h2>Coyote Joe’s: Wednesday lessons and a live band</h2>
+<p><strong>Address:</strong> 4621 Wilkinson Boulevard, Charlotte, NC.</p>
+<p>Coyote Joe’s usual Wednesday schedule has Mitchell Mullis teaching line dances from 7:15 to 9:15 p.m., with the house band following at 9:30. Concerts or special events can replace the regular program. The Friday and Saturday listings describe live music, not the same lesson. Confirm the Wednesday lesson with the venue if you are going during a holiday week.</p>
+<p>The club is 18 and over. Its FAQ requires a state-issued license or military ID for entry and says purchases inside are cash only.</p>
+<p><a href="https://coyote-joes.com/about">Coyote Joe’s weekly schedule</a> · <a href="https://coyote-joes.com/faq">Entry and payment FAQ</a></p>
+<h2>The Swanee Theatre, Kannapolis: free lessons at two levels</h2>
+<p><strong>Address:</strong> 200 West Avenue, Kannapolis, NC 28081.</p>
+<p>The Swanee lists free Monday line-dance lessons through December 14, 2026. Beginners start at 6 p.m.; intermediate instruction runs from 7 to 8 p.m. This is a separate program from the theatre’s Wednesday open shag dancing, which is a partner dance and is not a lesson.</p>
+<p><a href="https://swaneetheatre.com/weekly-happenings/">The Swanee’s weekly schedule</a> · <a href="https://swaneetheatre.com/contact/">Address and parking information</a></p>
+<h2>Chasers Charlotte NoDa: Southern Country Charlotte dance nights</h2>
+<p><strong>Address:</strong> 3217 The Plaza, Charlotte, NC.</p>
+<p>Southern Country Charlotte hosts country dancing and supports local LGBTQ+ events and charities. It lists December dances on Thursday, December 3 and Thursday, December 17, from 7 to 10 p.m. at Chasers. Guests must be 21 or older with valid ID.</p>
+<p>These are announced country dances, not confirmed beginner line-dance lesson slots. Check the organizer’s lesson schedule for the style and level before going. Its fall listing does not show a Thanksgiving dance on November 26.</p>
+<p><a href="https://www.southerncountrycharlotte.com/scc-home">Southern Country Charlotte’s dated announcements</a> · <a href="https://www.southerncountrycharlotte.com/dance-lesson-schedule">Organizer’s lesson schedule</a></p>
+<h2>Make the first visit easy</h2>
+<ul>
+<li><strong>Start with instruction.</strong> Triple C’s dedicated beginner hour or Nickyo’s beginner lessons give you time to learn the sequence before you try to follow a room already dancing.</li>
+<li><strong>Go solo if you like.</strong> Line dancing does not require a partner. The partner-dance portions of mixed events are separate.</li>
+<li><strong>Check the room and the date.</strong> Confirm the location, lesson time, ID rules and any cover with the venue.</li>
+</ul>
+<h2>Bring line dancing to your Charlotte event</h2>
+<p>Planning a wedding, company gathering or party? <a href="/cities/charlotte-nc/">Explore Charlotte-area instructors</a> and include your date, venue, group size and how many guests will be trying it for the first time.</p>
+`,
+  },
+
+  {
     slug: "where-to-line-dance-atlanta",
     title: "Where to Go Line Dancing in Atlanta",
     description: "Atlanta-area line dancing with dated lessons, rotating country nights, daytime beginner lessons and official links to check before you go.",
