@@ -2,6 +2,48 @@ import type { BlogPost } from "../blog";
 
 export const cityPosts: BlogPost[] = [
   {
+    slug: "where-to-line-dance-las-vegas",
+    title: "Where to Go Line Dancing in Las Vegas",
+    description: "Find instructor-led line dancing on the Las Vegas Strip, at Town Square and in the northwest valley, with venue calendars and a Thanksgiving closure to know.",
+    publishDate: "2026-11-23",
+    updatedDate: "2026-11-23",
+    status: "ready",
+    category: "City guide",
+    citySlug: "las-vegas-nv",
+    author: "Hire Line Dancers",
+    body: `
+<p>If you want to learn a line dance rather than watch a country band, pick the lesson first and plan the rest of the night around it. On the Strip, two rooms offer instruction without a trip across town. For locals, the northwest valley has both a scheduled country-club lesson night and a neighborhood tavern with weekly classes.</p>
+<p><strong>Last checked: November 23, 2026.</strong> Times below are Las Vegas time. Thanksgiving changes at least one venue’s schedule this week.</p>
+<h2>Gilley’s Saloon: an early evening lesson at Treasure Island</h2>
+<p><strong>Address:</strong> 3300 Las Vegas Boulevard South, Las Vegas.</p>
+<p>Gilley’s lists line-dance lessons at 7 p.m. Monday through Thursday on its regular schedule. That makes it an option if you are staying on the Strip and want to learn before dinner. For Thanksgiving week, its dated calendar shows 7 to 8 p.m. lessons on Monday, November 23, Tuesday the 24th, Wednesday the 25th and Friday the 27th. Use those entries rather than assuming a Thursday holiday lesson. A weekend band listing by itself is not a lesson announcement.</p>
+<p><a href="https://gilleyslasvegas.com/honky-tonk">Gilley’s honky-tonk schedule</a> · <a href="https://gilleyslasvegas.com/event-calendar/month/2026/11/">November event calendar</a></p>
+<h2>Category 10: a free lesson in Hurricane Hall</h2>
+<p><strong>Address:</strong> 3555 South Las Vegas Boulevard, Las Vegas.</p>
+<p>Category 10 advertises free instructor-led line dancing for all levels in Hurricane Hall. Check its lesson listings before choosing a time, particularly if you are bringing younger dancers: the venue is 21 and over after 9 p.m.</p>
+<p><a href="https://www.category10.com/lasvegas/line-dancing/">Category 10 line dancing and lesson details</a></p>
+<h2>Stoney’s Rockin’ Country: two lesson slots at Town Square</h2>
+<p><strong>Address:</strong> 6611 Las Vegas Boulevard South, Suite 160, Las Vegas.</p>
+<p>The Town Square club normally offers lessons Thursday through Saturday at 7:30 and 8:30 p.m. The instructors break down both line and partner dances, so check what is being taught in each slot if you want a particular style. Instruction is free, but admission may carry a cover. The club lists <strong>Thursday, November 26, as closed for Thanksgiving</strong>.</p>
+<p><a href="https://www.stoneysrockincountry.com/dance-lessons">Town Square lesson schedule</a> · <a href="https://www.stoneysrockincountry.com/">Club calendar and holiday notices</a></p>
+<h2>Stoney’s North Forty: a separate schedule at Santa Fe Station</h2>
+<p><strong>Address:</strong> 4949 North Rancho Drive, Las Vegas.</p>
+<p>North Forty’s regular Wednesday through Saturday schedule has doors at 7 p.m. and lessons at 7:15 and 7:45. Do not use the Town Square times for this branch. Check the dance names on North Forty’s own calendar and confirm admission and holiday hours before heading out.</p>
+<p><a href="https://stoneysnorthforty.com/dance-lessons">North Forty lesson calendar</a> · <a href="https://stoneysnorthforty.com/northwest-las-vegas-country-bar">North Forty venue details</a></p>
+<h2>Hideaway Tavern: a neighborhood alternative on Thom Boulevard</h2>
+<p><strong>Address:</strong> 3369 Thom Boulevard, Las Vegas.</p>
+<p>Hideaway advertises weekly line-dance lessons. Its listing does not give a firm time or price, so call the tavern before making the trip. Ask when instruction starts, not just when the music starts.</p>
+<p><a href="https://www.hideawaylv.com/">Hideaway Tavern’s events and contact information</a></p>
+<h2>Walnut Recreation Center: daytime line dancing for seniors</h2>
+<p><strong>Address:</strong> 3075 North Walnut Road, Las Vegas.</p>
+<p>Clark County’s November senior calendar lists line dancing on Tuesday, November 24, from 9 to 11 a.m. This is a daytime recreation program, not a nightclub; the calendar does not promise beginner instruction. Check with the center about eligibility and registration. The center lists November 26 and 27 as closed.</p>
+<p><a href="https://www.clarkcountynv.gov/government/departments/parks___recreation/facilities/walnut">Walnut Recreation Center</a> · <a href="https://www.clarkcountynv.gov/adobe/assets/urn%3Aaaid%3Aaem%3A7211a7f6-6498-43fe-83e3-649afeb5a730/original/as/walnut-senior-calendar.pdf">November senior calendar (PDF)</a></p>
+<h2>Planning a private lesson?</h2>
+<p>For a wedding, conference or group night out, <a href="/cities/las-vegas-nv/">find a Las Vegas line dance instructor</a>. Include your venue, group size and how long you want guests on the floor so the instructor can plan for the room.</p>
+`,
+  },
+
+  {
     slug: "where-to-line-dance-charlotte",
     title: "Where to Go Line Dancing in Charlotte",
     description: "Four places to take line dance lessons around Charlotte and a NoDa country social, with official schedules, addresses and holiday notes.",
