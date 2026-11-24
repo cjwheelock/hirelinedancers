@@ -2,6 +2,48 @@ import type { BlogPost } from "../blog";
 
 export const cityPosts: BlogPost[] = [
   {
+    slug: "where-to-line-dance-orange-county",
+    title: "Where to Go Line Dancing in Orange County",
+    description: "Find Orange County country line-dance lessons, family classes and social dance nights in Anaheim, Costa Mesa, Lake Forest, San Juan Capistrano and beyond.",
+    publishDate: "2026-11-24",
+    updatedDate: "2026-11-24",
+    status: "ready",
+    category: "City guide",
+    citySlug: "orange-county-ca",
+    author: "Hire Line Dancers",
+    body: `
+<p>Start with the kind of night you want. Anaheim and San Juan Capistrano have lessons you can plan an evening around. Costa Mesa has a family option, Lake Forest has social dancing, and two YMCA branches have December classes for anyone looking beyond the saloon.</p>
+<p><strong>Last checked: November 24, 2026.</strong> Times are local. Check the venue’s calendar before heading out, especially during Thanksgiving and Christmas weeks.</p>
+<h2>THE RANCH Saloon, Anaheim: two slots on Line Dance Thursday</h2>
+<p><strong>Address:</strong> 1025 East Ball Road, Anaheim.</p>
+<p>On December 3, the saloon’s 18-and-over Thursday lists Kerry teaching at 6:30 and 7:30 p.m. The calendar also lists Line Dance Thursday on December 10 and 17. If you go on a different night, look at the individual lesson listing: the venue also hosts partner dances, including two-step and West Coast Swing. Lessons are included with admission, which may carry a cover. The saloon lists November 26 and December 24 and 25 as closed.</p>
+<p><a href="https://www.theranch.com/saloon/calendar/">THE RANCH Saloon calendar</a> · <a href="https://www.theranch.com/saloon/calendar/detail.aspx?date=12/3/2026">December 3 lesson details</a></p>
+<h2>Swallow’s Inn, San Juan Capistrano: Tuesday beginner and intermediate lessons</h2>
+<p><strong>Address:</strong> 31786 Camino Capistrano, San Juan Capistrano.</p>
+<p>The December 1 listing names DJ Champagne Cowgirl and sets the beginner lesson at 6 p.m. and the intermediate lesson at 7 p.m. The beginner lesson is advertised as free. Pick the early slot if you are just getting the steps under your feet, and use the event listing rather than assuming every country band night includes instruction.</p>
+<p><a href="https://www.swallowsinn.com/event/taco-tuesday-happy-hour-specials-dj-champagne-cowgirl-with-free-beginning-line-dance-lessons-43/">December 1 at Swallow’s Inn</a> · <a href="https://www.swallowsinn.com/events/">Swallow’s Inn calendar</a></p>
+<h2>Westwood Coast, Costa Mesa: family and late-night lessons</h2>
+<p><strong>Address:</strong> 1870 Harbor Boulevard, Suite L1-108, Costa Mesa.</p>
+<p>Westwood Coast advertises family line dancing at 6 p.m. Wednesdays. Its regular evening schedule lists intermediate lessons at 9 p.m. Thursdays and beginner lessons at 9 p.m. Fridays. Those are different sessions; check the specific event for entry rules and holiday changes.</p>
+<p><a href="https://westwoodworld.com/costa-mesa">Westwood Coast location</a> · <a href="https://westwoodworld.com/events">Westwood event calendar</a></p>
+<h2>Bigshots Billiards Bar &amp; Grill, Lake Forest: social dancing with optional instruction</h2>
+<p><strong>Address:</strong> 23512 El Toro Road, Lake Forest.</p>
+<p>The venue lists country line dancing for ages 18 and over at 8 p.m. on Sundays, Wednesdays and Thursdays with DJ Coco Chanelle. It says lessons depend on instructor availability, so confirm before going specifically to learn. Saturday country bands are separate from that posted line-dance schedule.</p>
+<p><a href="https://bigshotsbilliards.com/">Bigshots location and entertainment</a> · <a href="https://bigshotsbilliards.com/faqs">Bigshots line-dance FAQ</a></p>
+<h2>InCahoots, Fullerton: a Wednesday country dance night</h2>
+<p><strong>Address:</strong> 1401 South Lemon Street, Fullerton.</p>
+<p>InCahoots advertises Wednesday dance lessons and a 7:30 p.m. to 2 a.m. event window, with cash-only entry. The venue publishes a line-dance repertoire, but its weekly listing does not say which style is taught in each slot. If you want line instruction rather than partner dancing, confirm the lesson plan before going.</p>
+<p><a href="https://ocincahoots.com/">InCahoots Wednesday schedule</a> · <a href="https://ocincahoots.com/line-dances">InCahoots line-dance list</a></p>
+<h2>YMCA of Orange County: December classes away from the bar</h2>
+<p><strong>Laguna Niguel Family YMCA:</strong> 29831 Crown Valley Parkway, Laguna Niguel. On Friday, December 4, the listing shows beginner instruction from 6 to 7 p.m. and intermediate line dancing from 7 to 7:30 p.m.</p>
+<p><strong>Huntington Beach Family YMCA:</strong> 8875 Adams Avenue, Huntington Beach. On Thursday, December 17, the branch lists a separate holiday line-dancing class with Adriana. Look up the branch and event name on the registration page for availability and fees.</p>
+<p><a href="https://orangecounty.recliquecore.com/programs/120054/special-events/">YMCA of Orange County registration</a> · <a href="https://www.ymca.org/locations/laguna-niguel-family-ymca">Laguna Niguel branch</a> · <a href="https://www.ymca.org/locations/huntington-beach-family-ymca">Huntington Beach branch</a></p>
+<h2>Planning a private lesson instead?</h2>
+<p>For a wedding, office party or club event, <a href="/cities/orange-county-ca/">find an Orange County line dance instructor</a>. Include your city, group size and how many guests have danced before so the instructor can plan for the room.</p>
+`,
+  },
+
+  {
     slug: "where-to-line-dance-las-vegas",
     title: "Where to Go Line Dancing in Las Vegas",
     description: "Find instructor-led line dancing on the Las Vegas Strip, at Town Square and in the northwest valley, with venue calendars and a Thanksgiving closure to know.",
