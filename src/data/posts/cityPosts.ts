@@ -2,6 +2,52 @@ import type { BlogPost } from "../blog";
 
 export const cityPosts: BlogPost[] = [
   {
+    slug: "where-to-line-dance-san-diego",
+    title: "Where to Go Line Dancing in San Diego",
+    description: "San Diego County line dance lessons and socials, from East Village and Pacific Beach to Balboa Park, El Cajon, Poway and Encinitas.",
+    publishDate: "2026-11-25",
+    updatedDate: "2026-11-25",
+    status: "ready",
+    category: "City guide",
+    citySlug: "san-diego-ca",
+    author: "Hire Line Dancers",
+    body: `
+<p>Pick your first night by when you actually want to dance. Downtown and Pacific Beach both have Moonshine lessons, but the Pacific Beach lesson starts well after doors. Balboa Park has a free outdoor beginner lesson, and Poway has a daytime option. For live country music after the lesson, look east to Renegade.</p>
+<p><strong>Last checked: November 25, 2026.</strong> Times are local. Where a listing gives a regular schedule rather than a dated event, confirm before leaving, especially around the holidays.</p>
+<h2>Moonshine Flats, East Village: Thursday lessons downtown</h2>
+<p><strong>Address:</strong> 344 Seventh Avenue, San Diego.</p>
+<p>The December 10 listing sets aside 7 to 10 p.m. for line dancing and lessons, with doors at 7. This is the 21-and-over downtown venue. If you want a night out but do not want to wait until late for instruction, start here rather than assuming the two Moonshine venues run the same timetable.</p>
+<p><a href="https://www.moonshineflats.com/event/?dt=261210&amp;id=738112&amp;rm=73659&amp;ve=flats">December 10 at Moonshine Flats</a> · <a href="https://www.moonshineflats.com/entertainment/line-dancing-lessons/">Moonshine Flats lesson information</a></p>
+<h2>Moonshine Beach, Pacific Beach: a later Tuesday lesson</h2>
+<p><strong>Address:</strong> 1165 Garnet Avenue, San Diego.</p>
+<p>On December 15, doors open at 7 p.m. but the first line-dance lesson is advertised for about 8:45 p.m. Instruction runs until about 10, followed by a DJ and more dancing. The venue is 21 and over. Check the calendar for other Tuesday dates.</p>
+<p><a href="https://moonshinebeachsd.com/event/?dt=261215&amp;id=1754747&amp;rm=0&amp;ve=beach">December 15 at Moonshine Beach</a> · <a href="https://moonshinebeachsd.com/calendar/">Moonshine Beach calendar</a></p>
+<h2>Renegade Country Bar, El Cajon: lessons before the band</h2>
+<p><strong>Address:</strong> 14335 Old Highway 80, El Cajon.</p>
+<p>Renegade lists Lisa Evans on its regular Friday and Saturday lesson schedule from 7 to 8:30 p.m., ahead of live country music at 9. The bar advertises a $5 weekend cover starting at 6. Its Thursday lesson is labeled country couples dance, so choose Friday or Saturday if you are making the drive specifically for line dancing. Check with the venue for holiday changes.</p>
+<p><a href="https://www.renegadebar.com/about/">Renegade’s lesson schedule</a> · <a href="https://www.renegadebar.com/hours-and-location/">Hours and address</a></p>
+<h2>San Diego Coasters at Balboa Park: free outdoor beginner dancing</h2>
+<p><strong>Address:</strong> 2294 Pan American Plaza, San Diego, near the House of the USA at the International Cottages.</p>
+<p>The LGBTQIA+ dance organization lists outdoor line dancing on Saturdays except the first Saturday of the month. The beginner lesson starts at 4:30 p.m. and the event runs until 7:30. It is free, and donations are welcome. Check the organizer’s updates before setting out if it is raining.</p>
+<p><a href="https://sdcoasters.com/events/">San Diego Coasters events</a></p>
+<h2>Queen Bee’s Art &amp; Cultural Center, North Park: a class and social</h2>
+<p><strong>Address:</strong> 3925 Ohio Street, San Diego.</p>
+<p>At this separate indoor location, the Coasters list a beginner-to-improver line-dance class and social with Nick on the third Wednesday of each month, from 7 to 9 p.m. The listed prices are $10 for members and $15 for nonmembers. Pick this if you have tried a beginner lesson and want to practice fundamentals and learn new dances.</p>
+<p><a href="https://sdcoasters.com/events/">Coasters class schedule and pricing</a></p>
+<h2>Poway Community Park: an afternoon class for older adults</h2>
+<p><strong>Address:</strong> Sycamore Hall, 13094 Civic Center Drive, Poway.</p>
+<p>Poway’s Older Adult Programs calendar lists a Friday, December 4 session from 1 to 3 p.m. The first 30 minutes are instruction, so arrive at the start if you want to learn the steps. Check the city listing or ask the center about eligibility and future dates.</p>
+<p><a href="https://www.poway.org/m/calendar/event/detail/5642">Poway’s December 4 listing</a></p>
+<h2>Fox Point Farms, Encinitas: a dated North County social</h2>
+<p><strong>Address:</strong> 1200 Fox Point Farms Lane, Encinitas.</p>
+<p>The Coastal Outriders list a November 30 event from 6 to 9 p.m. with both line and partner dancing. Treat it as a mixed social rather than assuming a dedicated beginner line lesson: the event listing does not specify a separate instruction slot. Check the organizer’s calendar for subsequent dates.</p>
+<p><a href="https://linedancingsandiego.com/event/line-dancing-fox-point-farms-11-30-advanced-tickets/">November 30 organizer listing</a> · <a href="https://linedancingsandiego.com/events/">Coastal Outriders calendar</a></p>
+<h2>Planning a private lesson?</h2>
+<p>For a wedding, company party or group outing, <a href="/cities/san-diego-ca/">find a San Diego line dance instructor</a>. Tell them how many people you expect and how many have danced before so they can pick steps your group can learn together.</p>
+`,
+  },
+
+  {
     slug: "where-to-line-dance-orange-county",
     title: "Where to Go Line Dancing in Orange County",
     description: "Find Orange County country line-dance lessons, family classes and social dance nights in Anaheim, Costa Mesa, Lake Forest, San Juan Capistrano and beyond.",
