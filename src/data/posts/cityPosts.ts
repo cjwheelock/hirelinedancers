@@ -2,6 +2,47 @@ import type { BlogPost } from "../blog";
 
 export const cityPosts: BlogPost[] = [
   {
+    slug: "where-to-line-dance-denver",
+    title: "Where to Go Line Dancing in Denver",
+    description: "Find Denver-area line dance lessons, from country dance halls and a Colfax social to recreation center classes and a Thursday night in Sedalia.",
+    publishDate: "2026-11-26",
+    updatedDate: "2026-11-26",
+    status: "ready",
+    category: "City guide",
+    author: "Hire Line Dancers",
+    body: `
+<p>In Denver, a free line-dance lesson and a free partner lesson can be on different floors at the same time. Pick the night by what you want to learn: start with the Grizzly Rose on Sunday for a dance hall, Glenarm for a class without a bar, or Charlie’s if you want several levels to choose from in one evening.</p>
+<p><strong>Last checked: November 26, 2026.</strong> Times are local. Check the linked calendar before leaving, especially around holidays and private events.</p>
+<h2>Grizzly Rose, Denver: a Sunday lesson on the main floor</h2>
+<p><strong>Address:</strong> 5450 Lincoln Street, Denver.</p>
+<p>The venue lists a free line-dance lesson from 7 to 8 p.m. on November 29 and December 6. For a Wednesday option, its December 2 lineup puts the $5 line-dance class in the banquet room at 7 p.m. and a separate free partner lesson on the main floor. The club is closed on Thanksgiving, and it lists no classes December 3 because of a private event.</p>
+<p><a href="https://grizzlyrose.com/dance-classes/">Grizzly Rose lesson calendar</a></p>
+<h2>Charlie’s Denver, Capitol Hill: choose your level</h2>
+<p><strong>Address:</strong> 900 East Colfax Avenue, Denver.</p>
+<p>At this LGBTQ+ country bar, Beyond Line Dance lists a free Saturday, November 28 evening with three levels of instruction. The absolute-beginner slot starts at 6:30 p.m. Earlier the same day, a separate 2 to 5 p.m. Alternative Line Dance session is geared to improver and intermediate dancers and listed at $5 to $10. Check the instructor’s calendar for the levels and times on later dates.</p>
+<p><a href="https://beyondlinedance.com/">Beyond Line Dance schedule</a></p>
+<h2>Stampede, Aurora: Wednesday line dancing with Laurie Burkhardt</h2>
+<p><strong>Address:</strong> 2430 South Havana Street, Aurora.</p>
+<p>The club lists Wednesday line-dance lessons beginning at 6:30 p.m., half an hour after doors. The lesson is advertised as free, but the club lists a ticket price for the December 2 event, so check the entry terms. Monday’s event is West Coast Swing, not the line-dance lesson.</p>
+<p><a href="https://www.stampedeclub.net/calendar/">Stampede event calendar</a></p>
+<h2>Glenarm Recreation Center, Five Points: a beginner class without the bar</h2>
+<p><strong>Address:</strong> 2800 Glenarm Place, Denver.</p>
+<p>Beyond Line Dance lists a $5 class on Tuesday, December 1, from 5:30 to 7 p.m. Start at 5:30 for beginner steps or at 6:15 for the improver portion. This is an instruction-first option if you want to learn without waiting for a nightlife event.</p>
+<p><a href="https://beyondlinedance.com/">Instructor’s schedule</a> · <a href="https://denvergov.org/Government/Agencies-Departments-Offices/Agencies-Departments-Offices-Directory/Parks-Recreation/Recreation-Centers-Pools-Activities/Recreation-Centers/Glenarm-Recreation-Center">City recreation center page</a></p>
+<h2>Barnum Recreation Center, west Denver: a class for experienced dancers</h2>
+<p><strong>Address:</strong> 360 Hooker Street, Denver.</p>
+<p>Beyond Line Dance lists a $5 intermediate-to-advanced class on Wednesday, December 2, from 6:30 to 8 p.m. Pick this if you already know the basics and want to learn new choreography rather than start from scratch.</p>
+<p><a href="https://beyondlinedance.com/">Instructor’s schedule</a> · <a href="https://denvergov.org/Government/Agencies-Departments-Offices/Agencies-Departments-Offices-Directory/Parks-Recreation/Recreation-Centers-Pools-Activities/Recreation-Centers/Barnum-Recreation-Center">City recreation center page</a></p>
+<h2>Wide Open Saloon, Sedalia: a Thursday lesson followed by a DJ</h2>
+<p><strong>Address:</strong> 5607 U.S. Highway 85, Sedalia.</p>
+<p>The saloon lists free Thursday line-dance instruction from 6 to 7:30 p.m. on December 3 and 10, followed by DJ music until 9:30. The December 9 couples class is a separate partner event. The venue is closed on Thanksgiving.</p>
+<p><a href="https://wideopensaloon.com/events">Wide Open Saloon calendar</a></p>
+<h2>Planning a private lesson?</h2>
+<p>For a wedding, company party or group outing, <a href="/instructors/">browse Hire Line Dancers instructors</a>. Share your event location and how much dance experience your guests have so the instructor can pick steps your group can learn together.</p>
+`,
+  },
+
+  {
     slug: "where-to-line-dance-san-diego",
     title: "Where to Go Line Dancing in San Diego",
     description: "San Diego County line dance lessons and socials, from East Village and Pacific Beach to Balboa Park, El Cajon, Poway and Encinitas.",
