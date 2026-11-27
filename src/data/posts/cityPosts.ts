@@ -2,6 +2,42 @@ import type { BlogPost } from "../blog";
 
 export const cityPosts: BlogPost[] = [
   {
+    slug: "where-to-line-dance-minneapolis",
+    title: "Where to Go Line Dancing in Minneapolis, St. Paul and the Twin Cities",
+    description: "Twin Cities line dancing with free Minneapolis lessons, a Sunday social, a ticketed Prior Lake class and a St. Paul practice night.",
+    publishDate: "2026-11-27",
+    updatedDate: "2026-11-27",
+    status: "ready",
+    category: "City guide",
+    author: "Hire Line Dancers",
+    body: `
+<p>If you want to learn a line dance in the Twin Cities, pick the lesson first and the venue second. Some country nights start with partner two-step, some teach line dances before a mixed social, and some are simply a chance to practice. You can go solo to a line-dance class without having to bring a partner.</p>
+<p><strong>Last checked: November 27, 2026.</strong> Times are Central. This is a shortlist, not a ranking. Check the organizer’s latest listing before leaving, particularly for holiday dates, age rules and any cover separate from a free lesson.</p>
+<h2>Cowboy Jack’s Downtown: line-dance lessons in the Barn</h2>
+<p><strong>Address:</strong> 126 N. 5th St., Minneapolis, MN 55403.</p>
+<p>Cowboy Jack’s lists free line-dance lessons in the Barn at Hold Your Lady Tight Night. Its Thursday, December 10 event runs from 7 to 11 p.m. That is the listed event window, not four hours of instruction. If you’re coming for the lesson, check the exact start with the venue rather than arriving halfway through the night.</p>
+<p><a href="https://www.thecowboyjacks.com/event-details/hyltn-2026-12-10-19-00">Cowboy Jack’s December 10 event</a> · <a href="https://www.holdyourladytightnight.com/">Hold Your Lady Tight Night</a></p>
+<h2>Animales BBQ Co.: a clearly marked lesson hour</h2>
+<p><strong>Address:</strong> 241 Fremont Ave. N., Minneapolis, MN 55405.</p>
+<p>Gunpowder and Lead Dance has no-cover nights listed for Thursday, December 3 and Wednesday, December 30. On both dates, the venue puts partner instruction at 6:30 p.m., line-dance instruction from 7 to 8 p.m., and open dancing from 8 to 9 p.m. If you want line dance only, aim for the 7 p.m. slot. These are dated listings, not a promise of a weekly class.</p>
+<p><a href="https://animalesbbq.com/calendar/thursday-night-line-dancing-december-3">December 3 schedule</a> · <a href="https://animalesbbq.com/calendar/wednesday-night-line-dancing-december-30">December 30 schedule</a></p>
+<h2>Eagles Club #34: a Sunday lesson and mixed social</h2>
+<p><strong>Address:</strong> 2507 E. 25th St., Minneapolis, MN 55406.</p>
+<p>Twin Cities Country Dancers hosts an LGBTQ+ and friends country dance in the Ernie Mattson Ballroom. The group’s event listing puts line-dance instruction at 6:30 p.m., open dancing from 7:30 to 10 p.m., and the cover at $8. Some Sundays also offer an introductory two-step lesson. The social mixes line dancing with partner dances, so not every song is a line dance. Check the current Sunday announcement for format or price changes.</p>
+<p><a href="https://www.gifd.org/event.aspx?idevnt=69463">Group’s Sunday event listing</a> · <a href="https://www.twincitiescountrydancers.org/">Twin Cities Country Dancers</a></p>
+<h2>Minnesota Horse &amp; Hunt Club: a ticketed lesson night in Prior Lake</h2>
+<p><strong>Address:</strong> 2920 220th St. E., Prior Lake, MN 55372.</p>
+<p>The club advertises a public Line Dancing Night on Wednesday, December 16, from 7 to 10 p.m., with instruction for beginners and experienced dancers. The listing shows $20 presale including tax, or $25 plus tax at the door. Check the event page for ticket availability and the lesson start before making the drive.</p>
+<p><a href="https://horseandhunt.com/product/line-dancing-night-december-2026/">Club event and ticket details</a></p>
+<h2>Urban Growler: a St. Paul practice night, not a confirmed lesson</h2>
+<p><strong>Address:</strong> 2325 Endicott St., St. Paul, MN 55114.</p>
+<p>Urban Growler’s Holiday Honky-Tonk is listed for Friday, December 11, from 7 to 11 p.m. with a $10 cover. The organizer describes separate lead-up lessons but does not promise instruction at this event. Pick it to practice or watch, rather than relying on it to teach your first dance.</p>
+<p><a href="https://events.humanitix.com/holiday-honky-tonk">Urban Growler’s event listing</a></p>
+<h2>Want a lesson for your own group?</h2>
+<p>Public dance nights are a good way to try it. For a wedding, office party or private celebration, <a href="/instructors/">browse line dance instructors</a> and ask for a beginner lesson tailored to your guests.</p>
+`
+  },
+  {
     slug: "where-to-line-dance-denver",
     title: "Where to Go Line Dancing in Denver",
     description: "Find Denver-area line dance lessons, from country dance halls and a Colfax social to recreation center classes and a Thursday night in Sedalia.",
