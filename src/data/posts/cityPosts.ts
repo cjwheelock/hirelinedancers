@@ -4,19 +4,15 @@ export const cityPosts: BlogPost[] = [
   {
     slug: "where-to-line-dance-chicago",
     title: "Where to Go Line Dancing in Chicago and the Suburbs",
-    description: "Find beginner line-dance lessons in Wrigleyville and Hickory Hills, a mixed country social in Lakeview, and a Saturday dance hall in Aurora.",
+    description: "Find beginner line-dance lessons in Hickory Hills and Aurora, a mixed country social in Lakeview, and the holiday pause in Wrigleyville.",
     publishDate: "2026-11-28",
     updatedDate: "2026-11-28",
     status: "ready",
     category: "City guide",
     author: "Hire Line Dancers",
     body: `
-<p>For your first Chicago line-dance night, the important detail isn’t whether a bar plays country music. It’s when someone will actually teach you the steps. In Wrigleyville, there’s a Saturday hour for beginners. In Hickory Hills, you can take a studio class without committing to a night out. A mixed country social is another option, but check which style the instructor is teaching that night.</p>
+<p>For your first Chicago line-dance night, the important detail isn’t whether a bar plays country music. It’s when someone will actually teach you the steps. Start with a dated studio lesson in Hickory Hills or a Saturday lesson before the band in Aurora. Stolen Saddle’s regular line dancing is on holiday pause, so don’t head to Wrigleyville for its usual Saturday beginner hour right now. A mixed country social is another option, but check which style the instructor is teaching that night.</p>
 <p><strong>Last checked: November 28, 2026.</strong> Times are Central. This is a shortlist, not a ranking. Check the host’s schedule before you leave, especially around holidays. Line dancing doesn’t require a partner; country two-step is a separate partner dance.</p>
-<h2>Stolen Saddle: an early beginner hour in Wrigleyville</h2>
-<p><strong>Address:</strong> 3505 N. Clark St., Chicago, IL 60657.</p>
-<p>Stolen Saddle lists Windy City Cowboy Club line dancing on Thursdays from 7 to 10 p.m. and Saturdays from 6 to 9 p.m. Saturday from 6 to 7 p.m. is the clearest first-timer option: the venue describes a heavier emphasis on lessons, easier dances and verbal cues. The venue says it is 21+ after 9 p.m.; check the event listing for any additional entry rules.</p>
-<p><a href="https://www.stolensaddlebar.com/happenings">Stolen Saddle’s line-dancing schedule</a> · <a href="https://www.stolensaddlebar.com/contact-us">Venue address and age policy</a></p>
 <h2>Diamond Dancesport: a studio class for absolute beginners</h2>
 <p><strong>Address:</strong> 7767 W. 96th Place, Hickory Hills, IL 60457.</p>
 <p>The December calendar lists Absolute Beginner Line Dance at 7 p.m. Thursday, December 3, 10 and 17, with no class December 24 or 31. The studio lists group classes at $20 per person and says this class is drop-in. It’s a studio lesson, not a bar social; country two-step is listed separately.</p>
@@ -29,6 +25,10 @@ export const cityPosts: BlogPost[] = [
 <p><strong>Address:</strong> 4440 Ogden Ave., Aurora, IL 60504.</p>
 <p>The venue’s Saturday, December 5 listing has doors at 5 p.m., line-dance lessons from 6 to 9 p.m. and live music by Wildwood starting at 9 p.m. It’s a ticketed 21+ event, and you’ll need ID. If the lessons are the reason you’re driving out, go early rather than arriving for the band. Check the venue calendar for the lineup and entry rules on other dates.</p>
 <p><a href="https://saddleupatq.com/">Saddle Up at Q’s event calendar</a></p>
+<h2>Stolen Saddle: regular line dancing is on holiday pause</h2>
+<p><strong>Address:</strong> 3505 N. Clark St., Chicago, IL 60657.</p>
+<p>The venue’s 2026 Santa Baby notice says regular line dancing and weekly programming will return after the holidays. The first lesson back has not been confirmed. Check the venue’s current events before relying on its usual Thursday and Saturday schedule.</p>
+<p><a href="https://www.stolensaddlebar.com/santa-baby-christmas-bar">Stolen Saddle’s 2026 holiday notice</a></p>
 <h2>Want a lesson for your own group?</h2>
 <p>For a wedding, work party or private celebration, <a href="/instructors/">browse line dance instructors</a> and ask for an easy first dance people can join without a partner.</p>
 `
