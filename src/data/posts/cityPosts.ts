@@ -2,6 +2,38 @@ import type { BlogPost } from "../blog";
 
 export const cityPosts: BlogPost[] = [
   {
+    slug: "where-to-line-dance-chicago",
+    title: "Where to Go Line Dancing in Chicago and the Suburbs",
+    description: "Find beginner line-dance lessons in Wrigleyville and Hickory Hills, a mixed country social in Lakeview, and a Saturday dance hall in Aurora.",
+    publishDate: "2026-11-28",
+    updatedDate: "2026-11-28",
+    status: "ready",
+    category: "City guide",
+    author: "Hire Line Dancers",
+    body: `
+<p>For your first Chicago line-dance night, the important detail isn’t whether a bar plays country music. It’s when someone will actually teach you the steps. In Wrigleyville, there’s a Saturday hour for beginners. In Hickory Hills, you can take a studio class without committing to a night out. A mixed country social is another option, but check which style the instructor is teaching that night.</p>
+<p><strong>Last checked: November 28, 2026.</strong> Times are Central. This is a shortlist, not a ranking. Check the host’s schedule before you leave, especially around holidays. Line dancing doesn’t require a partner; country two-step is a separate partner dance.</p>
+<h2>Stolen Saddle: an early beginner hour in Wrigleyville</h2>
+<p><strong>Address:</strong> 3505 N. Clark St., Chicago, IL 60657.</p>
+<p>Stolen Saddle lists Windy City Cowboy Club line dancing on Thursdays from 7 to 10 p.m. and Saturdays from 6 to 9 p.m. Saturday from 6 to 7 p.m. is the clearest first-timer option: the venue describes a heavier emphasis on lessons, easier dances and verbal cues. The venue says it is 21+ after 9 p.m.; check the event listing for any additional entry rules.</p>
+<p><a href="https://www.stolensaddlebar.com/happenings">Stolen Saddle’s line-dancing schedule</a> · <a href="https://www.stolensaddlebar.com/contact-us">Venue address and age policy</a></p>
+<h2>Diamond Dancesport: a studio class for absolute beginners</h2>
+<p><strong>Address:</strong> 7767 W. 96th Place, Hickory Hills, IL 60457.</p>
+<p>The December calendar lists Absolute Beginner Line Dance at 7 p.m. Thursday, December 3, 10 and 17, with no class December 24 or 31. The studio lists group classes at $20 per person and says this class is drop-in. It’s a studio lesson, not a bar social; country two-step is listed separately.</p>
+<p><a href="https://diamonddancesport.com/schedule/">Diamond Dancesport group schedule</a> · <a href="https://diamonddancesport.com/wp-content/uploads/2026/11/dec-26.pdf">December calendar</a></p>
+<h2>Charlie’s Chicago: a queer country social with rotating lessons</h2>
+<p><strong>Address:</strong> 3726 N. Broadway, Chicago, IL 60613.</p>
+<p>Second City Country Dance Association lists a Wednesday and Saturday program from 7 to 11 p.m. with a free lesson at 8 p.m., a review at 10 p.m. and no cover before 10 p.m. The lesson rotates among line and partner dances. The posted lesson-by-lesson lineup didn’t confirm a December line-dance date when checked, so confirm the format for your night. Treat this as a mixed social unless the host lists line dancing as the lesson.</p>
+<p><a href="https://www.sccdance.org/">Second City Country Dance Association’s schedule</a></p>
+<h2>Saddle Up at Q: learn before the band in Aurora</h2>
+<p><strong>Address:</strong> 4440 Ogden Ave., Aurora, IL 60504.</p>
+<p>The venue’s Saturday, December 5 listing has doors at 5 p.m., line-dance lessons from 6 to 9 p.m. and live music by Wildwood starting at 9 p.m. It’s a ticketed 21+ event, and you’ll need ID. If the lessons are the reason you’re driving out, go early rather than arriving for the band. Check the venue calendar for the lineup and entry rules on other dates.</p>
+<p><a href="https://saddleupatq.com/">Saddle Up at Q’s event calendar</a></p>
+<h2>Want a lesson for your own group?</h2>
+<p>For a wedding, work party or private celebration, <a href="/instructors/">browse line dance instructors</a> and ask for an easy first dance people can join without a partner.</p>
+`
+  },
+  {
     slug: "where-to-line-dance-minneapolis",
     title: "Where to Go Line Dancing in Minneapolis, St. Paul and the Twin Cities",
     description: "Twin Cities line dancing with free Minneapolis lessons, a Sunday social, a ticketed Prior Lake class and a St. Paul practice night.",
